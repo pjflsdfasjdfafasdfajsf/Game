@@ -27,6 +27,9 @@ typedef struct {
 
     ID3D12Resource *vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+    void *vertexData;
+    UINT vertexCapacity;
+    UINT vertexCount;
 
     ID3D12DescriptorHeap *descriptorHeap;
     // TODO: You probably guessed that this is temporary.
@@ -48,10 +51,14 @@ void D3D12SynchronizationInitialize(Win32Direct12 *d3d12);
 
 void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12);
 
-void D3D12DeviceRenderFrame(Win32Direct12 *d3d12);
-
-void D3D12VertexBufferInitialize(Win32Direct12 *d3d12);
-
 void D3D12HeapInitialize(Win32Direct12 *d3d12);
 
+void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity);
+
 void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12);
+
+void D3D12FrameBegin(Win32Direct12 *d3d12);
+
+void D3D12RectangleDraw(Win32Direct12 *d3d12, float originX, float originY, float width, float height, float colorRed, float colorGreen, float colorBlue, float colorAlpha);
+
+void D3D12FrameEnd(Win32Direct12 *d3d12);

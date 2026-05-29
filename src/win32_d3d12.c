@@ -269,134 +269,54 @@ void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
     d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 }
 
-void D3D12DeviceRenderFrame(Win32Direct12 *d3d12) {
-    if (!d3d12) {
-        return;
-    }
-
-    HRESULT hresult;
-
-    hresult = ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"CommandAllocator Reset");
-    }
-
-    hresult = ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, d3d12->pipelineState);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"CommandList Reset");
-    }
-
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
-
-    ID3D12DescriptorHeap *descriptorHeaps[] = {d3d12->descriptorHeap};
-    ID3D12GraphicsCommandList_SetDescriptorHeaps(d3d12->commandList, 1, descriptorHeaps);
-
-    u32 textureIndex = 0;
-    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureIndex, 0);
-
-    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (f32)DEFAULT_WINDOW_WIDTH, (f32)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
-    ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
-
-    D3D12_RECT scissorRectangle = {0, 0, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT};
-    ID3D12GraphicsCommandList_RSSetScissorRects(d3d12->commandList, 1, &scissorRectangle);
-
-    D3D12_RESOURCE_BARRIER barrier;
-    MemoryZero(&barrier, sizeof(barrier));
-
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
-
-    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
-    renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
-
-    ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
-
-    const f32 clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &d3d12->vertexBufferView);
-
-    ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, 3, 1, 0, 0);
-
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
-
-    hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"CommandList Close");
-    }
-
-    ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)d3d12->commandList};
-    ID3D12CommandQueue_ExecuteCommandLists(d3d12->commandQueue, 1, commandLists);
-
-    hresult = IDXGISwapChain3_Present(d3d12->swapChain, 1, 0);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"SwapChain Present");
-    }
-
-    D3D12DeviceWaitForGPU(d3d12);
-}
-
-void D3D12VertexBufferInitialize(Win32Direct12 *d3d12) {
+void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity) {
     if (!d3d12 || !d3d12->device) {
         return;
     }
 
     HRESULT hresult;
+    const UINT vertexBufferSizeInBytes = maximumVertexCapacity * sizeof(Vertex);
 
-    const Vertex triangleVertices[] = {
-        {{0.0f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.5f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-    const UINT vertexBufferSize = sizeof(triangleVertices);
+    D3D12_HEAP_PROPERTIES uploadHeapProperties;
+    MemoryZero(&uploadHeapProperties, sizeof(uploadHeapProperties));
+    uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-    D3D12_HEAP_PROPERTIES heapProperties;
-    MemoryZero(&heapProperties, sizeof(heapProperties));
+    D3D12_RESOURCE_DESC bufferResourceDescription;
+    MemoryZero(&bufferResourceDescription, sizeof(bufferResourceDescription));
+    bufferResourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferResourceDescription.Alignment = 0;
+    bufferResourceDescription.Width = vertexBufferSizeInBytes;
+    bufferResourceDescription.Height = 1;
+    bufferResourceDescription.DepthOrArraySize = 1;
+    bufferResourceDescription.MipLevels = 1;
+    bufferResourceDescription.Format = DXGI_FORMAT_UNKNOWN;
+    bufferResourceDescription.SampleDesc.Count = 1;
+    bufferResourceDescription.SampleDesc.Quality = 0;
+    bufferResourceDescription.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    bufferResourceDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-    D3D12_RESOURCE_DESC resourceDescription;
-    MemoryZero(&resourceDescription, sizeof(resourceDescription));
-
-    resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resourceDescription.Alignment = 0;
-    resourceDescription.Width = vertexBufferSize;
-    resourceDescription.Height = 1;
-    resourceDescription.DepthOrArraySize = 1;
-    resourceDescription.MipLevels = 1;
-    resourceDescription.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDescription.SampleDesc.Count = 1;
-    resourceDescription.SampleDesc.Quality = 0;
-    resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->vertexBuffer));
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferResourceDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->vertexBuffer));
 
     if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"CreateCommittedResource (Vertex Buffer)");
+        ErrorShowHRESULT(hresult, L"CreateCommittedResource");
+        return;
     }
 
-    u8 *vertexDataBegin = 0;
     D3D12_RANGE readRange;
     MemoryZero(&readRange, sizeof(readRange));
 
-    hresult = ID3D12Resource_Map(d3d12->vertexBuffer, 0, &readRange, (void **)&vertexDataBegin);
+    hresult = ID3D12Resource_Map(d3d12->vertexBuffer, 0, &readRange, &d3d12->vertexData);
     if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"Map (Vertex Buffer)");
+        ErrorShowHRESULT(hresult, L"Map");
+        return;
     }
-
-    MemoryCopyForwards(vertexDataBegin, triangleVertices, vertexBufferSize);
-    ID3D12Resource_Unmap(d3d12->vertexBuffer, 0, 0);
 
     d3d12->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(d3d12->vertexBuffer);
     d3d12->vertexBufferView.StrideInBytes = sizeof(Vertex);
-    d3d12->vertexBufferView.SizeInBytes = vertexBufferSize;
+    d3d12->vertexBufferView.SizeInBytes = vertexBufferSizeInBytes;
+
+    d3d12->vertexCapacity = maximumVertexCapacity;
+    d3d12->vertexCount = 0;
 }
 
 void D3D12HeapInitialize(Win32Direct12 *d3d12) {
@@ -530,4 +450,133 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
     ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->descriptorHeap, &heapHandle);
 
     ID3D12Device_CreateShaderResourceView(d3d12->device, d3d12->someRandomTextureIdk, &shaderResourceViewDescription, heapHandle);
+}
+
+void D3D12FrameBegin(Win32Direct12 *d3d12) {
+    if (!d3d12) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    d3d12->vertexCount = 0;
+
+    hresult = ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"CommandAllocator Reset");
+    }
+
+    hresult = ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, d3d12->pipelineState);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"CommandList Reset");
+    }
+
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
+
+    ID3D12DescriptorHeap *descriptorHeaps[] = {d3d12->descriptorHeap};
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(d3d12->commandList, 1, descriptorHeaps);
+
+    UINT textureIndex = 0;
+    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureIndex, 0);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (f32)DEFAULT_WINDOW_WIDTH, (f32)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
+    ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
+
+    D3D12_RECT scissorRectangle = {0, 0, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT};
+    ID3D12GraphicsCommandList_RSSetScissorRects(d3d12->commandList, 1, &scissorRectangle);
+
+    D3D12_RESOURCE_BARRIER barrier;
+    MemoryZero(&barrier, sizeof(barrier));
+
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+    renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
+
+    const f32 clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+void D3D12RectangleDraw(Win32Direct12 *d3d12, f32 originX, f32 originY, f32 width, f32 height, f32 colorRed, f32 colorGreen, f32 colorBlue, f32 colorAlpha) {
+    if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
+        return;
+    }
+
+    const UINT verticesPerRectangle = 6;
+    if (d3d12->vertexCount + verticesPerRectangle > d3d12->vertexCapacity) {
+        return;
+    }
+
+    f32 leftEdge = originX;
+    f32 rightEdge = originX + width;
+    f32 topEdge = originY;
+    f32 bottomEdge = originY - height;
+
+    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {0.0f, 0.0f}};
+    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {1.0f, 0.0f}};
+    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {0.0f, 1.0f}};
+    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {1.0f, 1.0f}};
+
+    Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
+
+    currentVertexDestination[0] = topLeft;
+    currentVertexDestination[1] = topRight;
+    currentVertexDestination[2] = bottomLeft;
+    currentVertexDestination[3] = bottomLeft;
+    currentVertexDestination[4] = topRight;
+    currentVertexDestination[5] = bottomRight;
+
+    UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
+
+    D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
+    rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
+    rectangleBufferView.StrideInBytes = sizeof(Vertex);
+    rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
+
+    ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
+    ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
+
+    d3d12->vertexCount += verticesPerRectangle;
+}
+
+void D3D12FrameEnd(Win32Direct12 *d3d12) {
+    if (!d3d12) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    D3D12_RESOURCE_BARRIER barrier;
+    MemoryZero(&barrier, sizeof(barrier));
+
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
+
+    hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"CommandList Close");
+    }
+
+    ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)d3d12->commandList};
+    ID3D12CommandQueue_ExecuteCommandLists(d3d12->commandQueue, 1, commandLists);
+
+    hresult = IDXGISwapChain3_Present(d3d12->swapChain, 1, 0);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"SwapChain Present");
+    }
+
+    D3D12DeviceWaitForGPU(d3d12);
 }

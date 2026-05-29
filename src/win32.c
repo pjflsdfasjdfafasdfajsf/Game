@@ -2,7 +2,9 @@
 //
 // TODO:
 //     * Image rendering
+//     * Integrate stb_image
 //     * Text rendering
+//
 
 #include "win32.h"
 #include "win32_d3d12.h"
@@ -288,7 +290,15 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-void RunUpdateLoop(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
+void RunDraw(Win32Direct12 *d3d12) {
+    D3D12FrameBegin(d3d12);
+    {
+        D3D12RectangleDraw(d3d12, -0.5f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+    }
+    D3D12FrameEnd(d3d12);
+}
+
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
     MSG message;
     MemoryZero(&message, sizeof(message));
 
@@ -315,7 +325,7 @@ void RunUpdateLoop(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
             wasFocused = isFocused;
 
             if (isFocused) {
-                D3D12DeviceRenderFrame(d3d12);
+                RunDraw(d3d12);
             } else {
                 Sleep(10);
             }
@@ -349,13 +359,13 @@ void WINAPI WinMainCRTStartup() {
     D3D12HeapInitialize(&d3d12);
     D3D12PipelineInitialize(&d3d12);
     D3D12SynchronizationInitialize(&d3d12);
-    D3D12VertexBufferInitialize(&d3d12);
+    D3D12VertexBufferInitialize(&d3d12, 4096);
 
     D3D12InitializeTextureTEMP(&d3d12);
 
     WindowShow(mainWindowHandle);
 
-    RunUpdateLoop(&d3d12, &audio, mainWindowHandle);
+    RunUpdate(&d3d12, &audio, mainWindowHandle);
 
     D3D12DeviceWaitForGPU(&d3d12);
 
