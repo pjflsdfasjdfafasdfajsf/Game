@@ -1,23 +1,19 @@
-#define COBJMACROS
-
-#include "win32_d3d12.h"
 #include "win32.h"
+#include "win32_d3d12.h"
 
 #include "game_platform.h"
 
 #include <d3dcompiler.h>
 
-#define COM_OUT_POINTER(pointer) ((void **)(pointer))
-
-void D3D12Initialize(D3D12 *d3d12) {
+void D3D12Initialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
 
-    MemoryZero(d3d12, sizeof(D3D12));
+    MemoryZero(d3d12, sizeof(Win32Direct12));
 }
 
-void D3D12DeviceInitialize(D3D12 *d3d12) {
+void D3D12DeviceInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -35,7 +31,7 @@ void D3D12DeviceInitialize(D3D12 *d3d12) {
     }
 }
 
-void D3D12CommandsInitialize(D3D12 *d3d12) {
+void D3D12CommandsInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -68,7 +64,7 @@ void D3D12CommandsInitialize(D3D12 *d3d12) {
     }
 }
 
-void D3D12SwapChainInitialize(D3D12 *d3d12, HWND windowHandle) {
+void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     if (!d3d12 || !windowHandle) {
         return;
     }
@@ -128,7 +124,7 @@ void D3D12SwapChainInitialize(D3D12 *d3d12, HWND windowHandle) {
     }
 }
 
-void D3D12PipelineInitialize(D3D12 *d3d12) {
+void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -226,7 +222,7 @@ void D3D12PipelineInitialize(D3D12 *d3d12) {
     pixelShader->lpVtbl->Release(pixelShader);
 }
 
-void D3D12SynchronizationInitialize(D3D12 *d3d12) {
+void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -244,7 +240,7 @@ void D3D12SynchronizationInitialize(D3D12 *d3d12) {
     }
 }
 
-void D3D12DeviceWaitForGPU(D3D12 *d3d12) {
+void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -272,7 +268,7 @@ void D3D12DeviceWaitForGPU(D3D12 *d3d12) {
     d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 }
 
-void D3D12DeviceRenderFrame(D3D12 *d3d12) {
+void D3D12DeviceRenderFrame(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
     }
@@ -291,7 +287,7 @@ void D3D12DeviceRenderFrame(D3D12 *d3d12) {
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
 
-    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (float)DEFAULT_WINDOW_WIDTH, (float)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (f32)DEFAULT_WINDOW_WIDTH, (f32)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
     ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
 
     D3D12_RECT scissorRectangle = {0, 0, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT};
@@ -313,7 +309,7 @@ void D3D12DeviceRenderFrame(D3D12 *d3d12) {
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
 
-    const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    const f32 clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
     ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

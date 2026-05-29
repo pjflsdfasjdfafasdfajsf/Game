@@ -24,20 +24,20 @@ typedef struct {
     ID3D12Fence *fence;
     UINT64 fenceValue;
     HANDLE fenceEvent;
-} D3D12;
+} Win32Direct12;
 
-void D3D12Initialize(D3D12 *d3d12);
+void D3D12Initialize(Win32Direct12 *d3d12);
 
-void D3D12DeviceInitialize(D3D12 *d3d12);
+void D3D12DeviceInitialize(Win32Direct12 *d3d12);
 
-void D3D12CommandsInitialize(D3D12 *d3d12);
+void D3D12CommandsInitialize(Win32Direct12 *d3d12);
 
-void D3D12SwapChainInitialize(D3D12 *d3d12, HWND windowHandle);
+void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle);
 
-void D3D12PipelineInitialize(D3D12 *d3d12);
+void D3D12PipelineInitialize(Win32Direct12 *d3d12);
 
-void D3D12SynchronizationInitialize(D3D12 *d3d12);
+void D3D12SynchronizationInitialize(Win32Direct12 *d3d12);
 
-void D3D12DeviceWaitForGPU(D3D12 *d3d12);
+void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12);
 
-void D3D12DeviceRenderFrame(D3D12 *d3d12);
+void D3D12DeviceRenderFrame(Win32Direct12 *d3d12);
