@@ -327,6 +327,14 @@ void RunUpdateLoop(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
 void WINAPI WinMainCRTStartup() {
     HWND mainWindowHandle = WindowCreate(L"Win32");
 
+    // NOTE: If you're changing something in Error* API and want to test it:
+#if 0
+    ErrorShowLast(L"ErrorShowLast");
+    ErrorShowHRESULT(1, L"ErrorShowHRESULT");
+
+    ExitProcess(1);
+#endif
+
     if (!mainWindowHandle) {
         ExitProcess(1);
     }
