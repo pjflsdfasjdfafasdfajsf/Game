@@ -4,15 +4,14 @@
 //     less memory and are more explicit
 //
 // TODO:
-//    * Render a triangle
 //    * Play some sound
 
 #define COBJMACROS
 #define UNICODE
 
-#include <d3d12.h>
+#include "win32_d3d12.h"
+
 #include <d3dcompiler.h>
-#include <dxgi1_4.h>
 #include <windows.h>
 #include <winuser.h>
 
@@ -24,30 +23,10 @@ typedef size_t usize;
 
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
-#define FRAME_COUNT 3
 
 #define COM_OUT_POINTER(pointer) ((void **)(pointer))
 
 int _fltused = 0;
-
-IDXGIFactory4 *globalFactory = 0;
-ID3D12Device *globalDevice = 0;
-ID3D12CommandQueue *globalCommandQueue = 0;
-ID3D12CommandAllocator *globalCommandAllocator = 0;
-ID3D12GraphicsCommandList *globalCommandList = 0;
-
-IDXGISwapChain3 *globalSwapChain = 0;
-ID3D12DescriptorHeap *globalRenderTargetViewHeap = 0;
-ID3D12Resource *globalRenderTargets[FRAME_COUNT];
-UINT globalRenderTargetViewDescriptorSize = 0;
-UINT globalFrameIndex = 0;
-
-ID3D12RootSignature *globalRootSignature = 0;
-ID3D12PipelineState *globalPipelineState = 0;
-
-ID3D12Fence *globalFence = 0;
-UINT64 globalFenceValue = 0;
-HANDLE globalFenceEvent = 0;
 
 void MemoryZero(void *destination, usize count) {
     char *bytePointer = (char *)destination;
@@ -108,21 +87,29 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
     ExitProcess(1);
 }
 
-void D3D12DeviceInitialize() {
+void D3D12Initialize(D3D12 *d3d12) {
+    if (!d3d12) {
+        return;
+    }
+
+    MemoryZero(d3d12, sizeof(D3D12));
+}
+
+void D3D12DeviceInitialize(D3D12 *d3d12) {
     HRESULT hresult;
 
-    hresult = CreateDXGIFactory1(&IID_IDXGIFactory4, COM_OUT_POINTER(&globalFactory));
+    hresult = CreateDXGIFactory1(&IID_IDXGIFactory4, COM_OUT_POINTER(&d3d12->factory));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateDXGIFactory1");
     }
 
-    hresult = D3D12CreateDevice(0, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, COM_OUT_POINTER(&globalDevice));
+    hresult = D3D12CreateDevice(0, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, COM_OUT_POINTER(&d3d12->device));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"D3D12CreateDevice");
     }
 }
 
-void D3D12CommandsInitialize() {
+void D3D12CommandsInitialize(D3D12 *d3d12) {
     HRESULT hresult;
 
     D3D12_COMMAND_QUEUE_DESC commandQueueDescription;
@@ -130,28 +117,28 @@ void D3D12CommandsInitialize() {
 
     commandQueueDescription.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    hresult = ID3D12Device_CreateCommandQueue(globalDevice, &commandQueueDescription, &IID_ID3D12CommandQueue, COM_OUT_POINTER(&globalCommandQueue));
+    hresult = ID3D12Device_CreateCommandQueue(d3d12->device, &commandQueueDescription, &IID_ID3D12CommandQueue, COM_OUT_POINTER(&d3d12->commandQueue));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandQueue");
     }
 
-    hresult = ID3D12Device_CreateCommandAllocator(globalDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, COM_OUT_POINTER(&globalCommandAllocator));
+    hresult = ID3D12Device_CreateCommandAllocator(d3d12->device, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, COM_OUT_POINTER(&d3d12->commandAllocator));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandAllocator");
     }
 
-    hresult = ID3D12Device_CreateCommandList(globalDevice, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, globalCommandAllocator, 0, &IID_ID3D12GraphicsCommandList, COM_OUT_POINTER(&globalCommandList));
+    hresult = ID3D12Device_CreateCommandList(d3d12->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, d3d12->commandAllocator, 0, &IID_ID3D12GraphicsCommandList, COM_OUT_POINTER(&d3d12->commandList));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandList");
     }
 
-    hresult = ID3D12GraphicsCommandList_Close(globalCommandList);
+    hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Close Initial");
     }
 }
 
-void D3D12SwapChainInitialize(HWND windowHandle) {
+void D3D12SwapChainInitialize(D3D12 *d3d12, HWND windowHandle) {
     HRESULT hresult;
     UINT index;
 
@@ -167,18 +154,18 @@ void D3D12SwapChainInitialize(HWND windowHandle) {
     swapChainDescription.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
     IDXGISwapChain1 *temporarySwapChain = 0;
-    hresult = IDXGIFactory4_CreateSwapChainForHwnd(globalFactory, (IUnknown *)globalCommandQueue, windowHandle, &swapChainDescription, 0, 0, &temporarySwapChain);
+    hresult = IDXGIFactory4_CreateSwapChainForHwnd(d3d12->factory, (IUnknown *)d3d12->commandQueue, windowHandle, &swapChainDescription, 0, 0, &temporarySwapChain);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateSwapChainForHwnd");
     }
 
-    hresult = IDXGISwapChain1_QueryInterface(temporarySwapChain, &IID_IDXGISwapChain3, COM_OUT_POINTER(&globalSwapChain));
+    hresult = IDXGISwapChain1_QueryInterface(temporarySwapChain, &IID_IDXGISwapChain3, COM_OUT_POINTER(&d3d12->swapChain));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"QueryInterface SwapChain3");
     }
     IDXGISwapChain1_Release(temporarySwapChain);
 
-    globalFrameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(globalSwapChain);
+    d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 
     D3D12_DESCRIPTOR_HEAP_DESC renderTargetViewHeapDescription;
     MemoryZero(&renderTargetViewHeapDescription, sizeof(renderTargetViewHeapDescription));
@@ -186,28 +173,28 @@ void D3D12SwapChainInitialize(HWND windowHandle) {
     renderTargetViewHeapDescription.NumDescriptors = FRAME_COUNT;
     renderTargetViewHeapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
-    hresult = ID3D12Device_CreateDescriptorHeap(globalDevice, &renderTargetViewHeapDescription, &IID_ID3D12DescriptorHeap, COM_OUT_POINTER(&globalRenderTargetViewHeap));
+    hresult = ID3D12Device_CreateDescriptorHeap(d3d12->device, &renderTargetViewHeapDescription, &IID_ID3D12DescriptorHeap, COM_OUT_POINTER(&d3d12->renderTargetViewHeap));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateDescriptorHeap");
     }
 
-    globalRenderTargetViewDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(globalDevice, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    d3d12->renderTargetViewDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(globalRenderTargetViewHeap, &renderTargetViewHandle);
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
 
     for (index = 0; index < (UINT)FRAME_COUNT; index++) {
-        hresult = IDXGISwapChain3_GetBuffer(globalSwapChain, index, &IID_ID3D12Resource, COM_OUT_POINTER(&globalRenderTargets[index]));
+        hresult = IDXGISwapChain3_GetBuffer(d3d12->swapChain, index, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->renderTargets[index]));
         if (FAILED(hresult)) {
             ErrorShowHRESULT(hresult, L"SwapChain GetBuffer");
         }
 
-        ID3D12Device_CreateRenderTargetView(globalDevice, globalRenderTargets[index], 0, renderTargetViewHandle);
-        renderTargetViewHandle.ptr += globalRenderTargetViewDescriptorSize;
+        ID3D12Device_CreateRenderTargetView(d3d12->device, d3d12->renderTargets[index], 0, renderTargetViewHandle);
+        renderTargetViewHandle.ptr += d3d12->renderTargetViewDescriptorSize;
     }
 }
 
-void D3D12PipelineInitialize() {
+void D3D12PipelineInitialize(D3D12 *d3d12) {
     HRESULT hresult;
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDescription;
@@ -226,7 +213,7 @@ void D3D12PipelineInitialize() {
         ErrorShowHRESULT(hresult, L"SerializeRootSignature");
     }
 
-    hresult = ID3D12Device_CreateRootSignature(globalDevice, 0, signatureBlob->lpVtbl->GetBufferPointer(signatureBlob), signatureBlob->lpVtbl->GetBufferSize(signatureBlob), &IID_ID3D12RootSignature, COM_OUT_POINTER(&globalRootSignature));
+    hresult = ID3D12Device_CreateRootSignature(d3d12->device, 0, signatureBlob->lpVtbl->GetBufferPointer(signatureBlob), signatureBlob->lpVtbl->GetBufferSize(signatureBlob), &IID_ID3D12RootSignature, COM_OUT_POINTER(&d3d12->rootSignature));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateRootSignature");
     }
@@ -277,7 +264,7 @@ void D3D12PipelineInitialize() {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDescription;
     MemoryZero(&pipelineStateDescription, sizeof(pipelineStateDescription));
 
-    pipelineStateDescription.pRootSignature = globalRootSignature;
+    pipelineStateDescription.pRootSignature = d3d12->rootSignature;
     pipelineStateDescription.VS.pShaderBytecode = vertexShader->lpVtbl->GetBufferPointer(vertexShader);
     pipelineStateDescription.VS.BytecodeLength = vertexShader->lpVtbl->GetBufferSize(vertexShader);
     pipelineStateDescription.PS.pShaderBytecode = pixelShader->lpVtbl->GetBufferPointer(pixelShader);
@@ -292,7 +279,7 @@ void D3D12PipelineInitialize() {
     pipelineStateDescription.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     pipelineStateDescription.SampleDesc.Count = 1;
 
-    hresult = ID3D12Device_CreateGraphicsPipelineState(globalDevice, &pipelineStateDescription, &IID_ID3D12PipelineState, COM_OUT_POINTER(&globalPipelineState));
+    hresult = ID3D12Device_CreateGraphicsPipelineState(d3d12->device, &pipelineStateDescription, &IID_ID3D12PipelineState, COM_OUT_POINTER(&d3d12->pipelineState));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateGraphicsPipelineState");
     }
@@ -301,105 +288,105 @@ void D3D12PipelineInitialize() {
     pixelShader->lpVtbl->Release(pixelShader);
 }
 
-void D3D12SynchronizationInitialize() {
+void D3D12SynchronizationInitialize(D3D12 *d3d12) {
     HRESULT hresult;
 
-    hresult = ID3D12Device_CreateFence(globalDevice, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, COM_OUT_POINTER(&globalFence));
+    hresult = ID3D12Device_CreateFence(d3d12->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, COM_OUT_POINTER(&d3d12->fence));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateFence");
     }
 
-    globalFenceEvent = CreateEventW(0, FALSE, FALSE, 0);
-    if (!globalFenceEvent) {
+    d3d12->fenceEvent = CreateEventW(0, FALSE, FALSE, 0);
+    if (!d3d12->fenceEvent) {
         ErrorShowLast(L"CreateEventW");
     }
 }
 
-void D3D12DeviceWaitForGPU() {
+void D3D12DeviceWaitForGPU(D3D12 *d3d12) {
     HRESULT hresult;
-    const UINT64 fenceToWaitFor = globalFenceValue;
+    const UINT64 fenceToWaitFor = d3d12->fenceValue;
 
-    hresult = ID3D12CommandQueue_Signal(globalCommandQueue, globalFence, fenceToWaitFor);
+    hresult = ID3D12CommandQueue_Signal(d3d12->commandQueue, d3d12->fence, fenceToWaitFor);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandQueue Signal");
     }
 
-    globalFenceValue++;
+    d3d12->fenceValue++;
 
-    if (ID3D12Fence_GetCompletedValue(globalFence) < fenceToWaitFor) {
-        hresult = ID3D12Fence_SetEventOnCompletion(globalFence, fenceToWaitFor, globalFenceEvent);
+    if (ID3D12Fence_GetCompletedValue(d3d12->fence) < fenceToWaitFor) {
+        hresult = ID3D12Fence_SetEventOnCompletion(d3d12->fence, fenceToWaitFor, d3d12->fenceEvent);
 
         if (FAILED(hresult)) {
             ErrorShowHRESULT(hresult, L"SetEventOnCompletion");
         }
 
-        WaitForSingleObject(globalFenceEvent, INFINITE);
+        WaitForSingleObject(d3d12->fenceEvent, INFINITE);
     }
 
-    globalFrameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(globalSwapChain);
+    d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 }
 
-void D3D12DeviceRenderFrame() {
+void D3D12DeviceRenderFrame(D3D12 *d3d12) {
     HRESULT hresult;
 
-    hresult = ID3D12CommandAllocator_Reset(globalCommandAllocator);
+    hresult = ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandAllocator Reset");
     }
 
-    hresult = ID3D12GraphicsCommandList_Reset(globalCommandList, globalCommandAllocator, globalPipelineState);
+    hresult = ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, d3d12->pipelineState);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Reset");
     }
 
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(globalCommandList, globalRootSignature);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
 
     D3D12_VIEWPORT viewport = {0.0f, 0.0f, (float)DEFAULT_WINDOW_WIDTH, (float)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
-    ID3D12GraphicsCommandList_RSSetViewports(globalCommandList, 1, &viewport);
+    ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
 
     D3D12_RECT scissorRectangle = {0, 0, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT};
-    ID3D12GraphicsCommandList_RSSetScissorRects(globalCommandList, 1, &scissorRectangle);
+    ID3D12GraphicsCommandList_RSSetScissorRects(d3d12->commandList, 1, &scissorRectangle);
 
     D3D12_RESOURCE_BARRIER barrier;
     MemoryZero(&barrier, sizeof(barrier));
 
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = globalRenderTargets[globalFrameIndex];
+    barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    ID3D12GraphicsCommandList_ResourceBarrier(globalCommandList, 1, &barrier);
+    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
 
     D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(globalRenderTargetViewHeap, &renderTargetViewHandle);
-    renderTargetViewHandle.ptr += globalFrameIndex * globalRenderTargetViewDescriptorSize;
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+    renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(globalCommandList, 1, &renderTargetViewHandle, FALSE, 0);
+    ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
 
     const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    ID3D12GraphicsCommandList_ClearRenderTargetView(globalCommandList, renderTargetViewHandle, clearColor, 0, 0);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(globalCommandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    ID3D12GraphicsCommandList_DrawInstanced(globalCommandList, 3, 1, 0, 0);
+    ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, 3, 1, 0, 0);
 
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-    ID3D12GraphicsCommandList_ResourceBarrier(globalCommandList, 1, &barrier);
+    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
 
-    hresult = ID3D12GraphicsCommandList_Close(globalCommandList);
+    hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Close");
     }
 
-    ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)globalCommandList};
-    ID3D12CommandQueue_ExecuteCommandLists(globalCommandQueue, 1, commandLists);
+    ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)d3d12->commandList};
+    ID3D12CommandQueue_ExecuteCommandLists(d3d12->commandQueue, 1, commandLists);
 
-    hresult = IDXGISwapChain3_Present(globalSwapChain, 1, 0);
+    hresult = IDXGISwapChain3_Present(d3d12->swapChain, 1, 0);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"SwapChain Present");
     }
 
-    D3D12DeviceWaitForGPU();
+    D3D12DeviceWaitForGPU(d3d12);
 }
 
 LRESULT CALLBACK WindowProcedure(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter) {
@@ -459,7 +446,7 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-void RunUpdateLoop() {
+void RunUpdateLoop(D3D12 *d3d12) {
     MSG message;
     MemoryZero(&message, sizeof(message));
 
@@ -473,7 +460,7 @@ void RunUpdateLoop() {
             TranslateMessage(&message);
             DispatchMessageW(&message);
         } else {
-            D3D12DeviceRenderFrame();
+            D3D12DeviceRenderFrame(d3d12);
         }
     }
 }
@@ -485,17 +472,20 @@ void WINAPI WinMainCRTStartup() {
         ExitProcess(1);
     }
 
-    D3D12DeviceInitialize();
-    D3D12CommandsInitialize();
-    D3D12SwapChainInitialize(mainWindowHandle);
-    D3D12PipelineInitialize();
-    D3D12SynchronizationInitialize();
+    D3D12 d3d12;
+    D3D12Initialize(&d3d12);
+
+    D3D12DeviceInitialize(&d3d12);
+    D3D12CommandsInitialize(&d3d12);
+    D3D12SwapChainInitialize(&d3d12, mainWindowHandle);
+    D3D12PipelineInitialize(&d3d12);
+    D3D12SynchronizationInitialize(&d3d12);
 
     WindowShow(mainWindowHandle);
 
-    RunUpdateLoop();
+    RunUpdateLoop(&d3d12);
 
-    D3D12DeviceWaitForGPU();
+    D3D12DeviceWaitForGPU(&d3d12);
 
     ExitProcess(0);
 }
