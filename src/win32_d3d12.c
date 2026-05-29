@@ -155,15 +155,18 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     signatureBlob->lpVtbl->Release(signatureBlob);
 
     const char *shaderCode =
+        "struct VSInput {\n"
+        "    float3 position : POSITION;\n"
+        "    float4 color : COLOR;\n"
+        "};\n"
         "struct PSInput {\n"
         "    float4 position : SV_POSITION;\n"
         "    float4 color : COLOR;\n"
         "};\n"
-        "PSInput VSMain(uint vertexID : SV_VertexID) {\n"
+        "PSInput VSMain(VSInput input) {\n"
         "    PSInput result;\n"
-        "    if (vertexID == 0) { result.position = float4(0.0, 0.5, 0.0, 1.0); result.color = float4(1.0, 0.0, 0.0, 1.0); }\n"
-        "    else if (vertexID == 1) { result.position = float4(0.5, -0.5, 0.0, 1.0); result.color = float4(0.0, 1.0, 0.0, 1.0); }\n"
-        "    else { result.position = float4(-0.5, -0.5, 0.0, 1.0); result.color = float4(0.0, 0.0, 1.0, 1.0); }\n"
+        "    result.position = float4(input.position, 1.0);\n"
+        "    result.color = input.color;\n"
         "    return result;\n"
         "}\n"
         "float4 PSMain(PSInput input) : SV_TARGET {\n"
@@ -212,6 +215,13 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     pipelineStateDescription.NumRenderTargets = 1;
     pipelineStateDescription.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     pipelineStateDescription.SampleDesc.Count = 1;
+
+    D3D12_INPUT_ELEMENT_DESC inputElementDescriptions[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+
+    pipelineStateDescription.InputLayout.pInputElementDescs = inputElementDescriptions;
+    pipelineStateDescription.InputLayout.NumElements = sizeof(inputElementDescriptions) / sizeof(D3D12_INPUT_ELEMENT_DESC);
 
     hresult = ID3D12Device_CreateGraphicsPipelineState(d3d12->device, &pipelineStateDescription, &IID_ID3D12PipelineState, COM_OUT_POINTER(&d3d12->pipelineState));
     if (FAILED(hresult)) {
@@ -312,6 +322,7 @@ void D3D12DeviceRenderFrame(Win32Direct12 *d3d12) {
     const f32 clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
     ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &d3d12->vertexBufferView);
 
     ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, 3, 1, 0, 0);
 
@@ -333,4 +344,61 @@ void D3D12DeviceRenderFrame(Win32Direct12 *d3d12) {
     }
 
     D3D12DeviceWaitForGPU(d3d12);
+}
+
+void D3D12VertexBufferInitialize(Win32Direct12 *d3d12) {
+    if (!d3d12 || !d3d12->device) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    const Vertex triangleVertices[] = {
+        {{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+
+    const UINT vertexBufferSize = sizeof(triangleVertices);
+
+    D3D12_HEAP_PROPERTIES heapProperties;
+    MemoryZero(&heapProperties, sizeof(heapProperties));
+
+    heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC resourceDescription;
+    MemoryZero(&resourceDescription, sizeof(resourceDescription));
+
+    resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDescription.Alignment = 0;
+    resourceDescription.Width = vertexBufferSize;
+    resourceDescription.Height = 1;
+    resourceDescription.DepthOrArraySize = 1;
+    resourceDescription.MipLevels = 1;
+    resourceDescription.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDescription.SampleDesc.Count = 1;
+    resourceDescription.SampleDesc.Quality = 0;
+    resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->vertexBuffer));
+
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"CreateCommittedResource (Vertex Buffer)");
+    }
+
+    u8 *vertexDataBegin = 0;
+    D3D12_RANGE readRange;
+    MemoryZero(&readRange, sizeof(readRange));
+
+    hresult = ID3D12Resource_Map(d3d12->vertexBuffer, 0, &readRange, (void **)&vertexDataBegin);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"Map (Vertex Buffer)");
+    }
+
+    MemoryCopy(vertexDataBegin, triangleVertices, vertexBufferSize);
+    ID3D12Resource_Unmap(d3d12->vertexBuffer, 0, 0);
+
+    d3d12->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(d3d12->vertexBuffer);
+    d3d12->vertexBufferView.StrideInBytes = sizeof(Vertex);
+    d3d12->vertexBufferView.SizeInBytes = vertexBufferSize;
 }

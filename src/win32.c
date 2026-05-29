@@ -1,10 +1,8 @@
 // NOTE: Windows platform layer implementation.
 //
-//     * W version of the functions are used everywhere as they use a little bit
-//     less memory and are more explicit
-//
 // TODO:
-//     * Make it so our pop ups look properly (HDR stuff or sum shi)
+//     * Image rendering
+//     * Text rendering
 
 #include "win32.h"
 #include "win32_d3d12.h"
@@ -350,6 +348,7 @@ void WINAPI WinMainCRTStartup() {
     D3D12SwapChainInitialize(&d3d12, mainWindowHandle);
     D3D12PipelineInitialize(&d3d12);
     D3D12SynchronizationInitialize(&d3d12);
+    D3D12VertexBufferInitialize(&d3d12);
 
     WindowShow(mainWindowHandle);
 

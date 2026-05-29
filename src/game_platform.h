@@ -14,11 +14,25 @@ typedef uint8_t u8;
 typedef uint32_t u32;
 typedef float f32;
 
+typedef struct {
+    f32 position[3];
+    f32 color[4];
+} Vertex;
+
 static inline void MemoryZero(void *destination, usize count) {
     char *bytePointer = (char *)destination;
 
     while (count--) {
         *bytePointer++ = 0;
+    }
+}
+
+static inline void MemoryCopy(void *destination, const void *source, usize count) {
+    char *destinationPointer = (char *)destination;
+    const char *sourcePointer = (const char *)source;
+
+    while (count--) {
+        *destinationPointer++ = *sourcePointer++;
     }
 }
 
