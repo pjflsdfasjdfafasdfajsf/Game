@@ -27,7 +27,7 @@ static inline void MemoryZero(void *destination, usize count) {
     }
 }
 
-static inline void MemoryCopy(void *destination, const void *source, usize count) {
+static inline void MemoryCopyForwards(void *destination, const void *source, usize count) {
     char *destinationPointer = (char *)destination;
     const char *sourcePointer = (const char *)source;
 

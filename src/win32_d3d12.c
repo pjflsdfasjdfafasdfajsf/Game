@@ -395,7 +395,7 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12) {
         ErrorShowHRESULT(hresult, L"Map (Vertex Buffer)");
     }
 
-    MemoryCopy(vertexDataBegin, triangleVertices, vertexBufferSize);
+    MemoryCopyForwards(vertexDataBegin, triangleVertices, vertexBufferSize);
     ID3D12Resource_Unmap(d3d12->vertexBuffer, 0, 0);
 
     d3d12->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(d3d12->vertexBuffer);
