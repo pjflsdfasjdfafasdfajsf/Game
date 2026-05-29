@@ -1,5 +1,6 @@
 # NOTE: Windows artifacts
 *.exe
+*.obj
 
 # NOTE: dxc artifacts.
 BasicGeometryPS.h

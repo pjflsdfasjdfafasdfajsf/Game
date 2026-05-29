@@ -11,8 +11,11 @@
 
 typedef size_t usize;
 typedef uint8_t u8;
+typedef uint16_t u16;
 typedef uint32_t u32;
 typedef float f32;
+
+#define ABS(x) (((x) < 0) ? -(x) : (x))
 
 typedef struct {
     union {
@@ -50,6 +53,20 @@ typedef struct {
     };
 } Vector2;
 
+typedef struct {
+    union {
+        struct {
+            u32 width;
+            u32 height;
+        };
+
+        struct {
+            u32 x;
+            u32 y;
+        };
+    };
+} UnsignedVector2;
+
 static inline Vector2 V2(f32 x, f32 y) {
     return (Vector2){{x, y}};
 }
@@ -75,6 +92,19 @@ static inline void MemoryCopyForwards(void *destination, const void *source, usi
     while (count--) {
         *destinationPointer++ = *sourcePointer++;
     }
+}
+
+static inline bool MemoryEquals(const void *memoryA, const void *memoryB, usize count) {
+    const u8 *bytePointerA = (const u8 *)memoryA;
+    const u8 *bytePointerB = (const u8 *)memoryB;
+
+    while (count--) {
+        if (*bytePointerA++ != *bytePointerB++) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static inline usize StringGetLength(const char *string) {

@@ -57,7 +57,7 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12);
 
 void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity);
 
-u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, const void *pixels);
+u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
 void D3D12FrameBegin(Win32Direct12 *d3d12);
 

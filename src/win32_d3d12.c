@@ -340,7 +340,7 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12) {
     }
 }
 
-u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, const void *pixels) {
+u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPerPixel, const void *pixels) {
     if (!d3d12 || !pixels) {
         return 0;
     }
@@ -396,9 +396,18 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, const void *
     const u8 *sourcePixels = (const u8 *)pixels;
     for (u32 y = 0; y < height; ++y) {
         u8 *destinationRow = mappedData + footprint.Offset + (y * footprint.Footprint.RowPitch);
-        const u8 *sourceRow = sourcePixels + (y * width * 4);
+        const u8 *sourceRow = sourcePixels + (y * width * bytesPerPixel);
 
-        MemoryCopyForwards(destinationRow, sourceRow, width * 4);
+        if (bytesPerPixel == 4) {
+            MemoryCopyForwards(destinationRow, sourceRow, width * 4);
+        } else if (bytesPerPixel == 3) {
+            for (u32 x = 0; x < width; ++x) {
+                destinationRow[x * 4 + 0] = sourceRow[x * 3 + 0];
+                destinationRow[x * 4 + 1] = sourceRow[x * 3 + 1];
+                destinationRow[x * 4 + 2] = sourceRow[x * 3 + 2];
+                destinationRow[x * 4 + 3] = 255;                 
+            }
+        }
     }
     ID3D12Resource_Unmap(uploadHeap, 0, 0);
 
