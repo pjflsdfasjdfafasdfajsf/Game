@@ -28,6 +28,10 @@ typedef struct {
 
   f32 phase;
   f32 phaseIncrement;  
+
+  HANDLE threadHandle;
+  volatile bool isRunning;
+  volatile bool isPaused;
 } Win32Audio;
 
 void ErrorShowLast(const wchar_t *functionName);

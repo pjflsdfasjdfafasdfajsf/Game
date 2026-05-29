@@ -4,7 +4,7 @@
 //     less memory and are more explicit
 //
 // TODO:
-//     * Put sound on its own thread so it isn't stopped when the window is being resized or moved.
+//     * Make it so our pop ups look properly (HDR stuff or sum shi)
 
 #include "win32.h"
 #include "win32_d3d12.h"
@@ -26,7 +26,7 @@ void ErrorShowLast(const wchar_t *functionName) {
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 0, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&errorString, 0, 0);
 
     wchar_t messageBuffer[1024];
-    wsprintfW(messageBuffer, L"%s failed with %lu:\n%s", functionName, errorCode, errorString ? errorString : L"Unknown Error");
+    wsprintfW(messageBuffer, L"%s (%lu):\n%s", functionName, errorCode, errorString ? errorString : L"Unknown Error");
 
     MessageBoxW(0, messageBuffer, L"Win32 Error", MB_ICONERROR | MB_OK);
 
@@ -45,9 +45,9 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 0, hresult, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&errorString, 0, 0);
 
     wchar_t messageBuffer[1024];
-    wsprintfW(messageBuffer, L"%s failed with HRESULT 0x%08X:\n%s", functionName, hresult, errorString ? errorString : L"Unknown Error");
+    wsprintfW(messageBuffer, L"%s (HRESULT 0x%08X):\n%s", functionName, hresult, errorString ? errorString : L"Unknown Error");
 
-    MessageBoxW(0, messageBuffer, L"DirectX Error", MB_ICONERROR | MB_OK);
+    MessageBoxW(0, messageBuffer, L"Win32 Error", MB_ICONERROR | MB_OK);
 
     if (errorString) {
         LocalFree(errorString);
@@ -103,6 +103,74 @@ HWND WindowCreate(const wchar_t *title) {
     }
 
     return windowHandle;
+}
+
+// NOTE: Audio implementation
+
+void AudioUpdate(Win32Audio *audio) {
+    if (!audio) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    u32 paddingFrameCount;
+    hresult = IAudioClient_GetCurrentPadding(audio->audioClient, &paddingFrameCount);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"GetCurrentPadding");
+    }
+
+    u32 availableFrameCount = audio->bufferFrameCount - paddingFrameCount;
+
+    if (availableFrameCount == 0) {
+        return;
+    }
+
+    u8 *audioData;
+    hresult = IAudioRenderClient_GetBuffer(audio->renderClient, availableFrameCount, &audioData);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"GetBuffer");
+    }
+
+    f32 *samplePointer = (f32 *)audioData;
+
+    for (u32 frameIndex = 0; frameIndex < availableFrameCount; frameIndex++) {
+        f32 sampleValue = (audio->phase < 0.5f) ? 0.05f : -0.05f;
+
+        audio->phase += audio->phaseIncrement;
+        if (audio->phase > 1.0f) {
+            audio->phase -= 1.0f;
+        }
+
+        for (u32 channelIndex = 0; channelIndex < audio->channels; channelIndex++) {
+            *samplePointer++ = sampleValue;
+        }
+    }
+
+    hresult = IAudioRenderClient_ReleaseBuffer(audio->renderClient, availableFrameCount, 0);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"ReleaseBuffer");
+    }
+}
+
+DWORD WINAPI AudioThreadProcedure(void *threadParameter) {
+    Win32Audio *audio = (Win32Audio *)threadParameter;
+
+    HRESULT hresult = CoInitializeEx(0, COINIT_MULTITHREADED);
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"CoInitializeEx on Audio Thread");
+    }
+
+    while (audio->isRunning) {
+        if (!audio->isPaused) {
+            AudioUpdate(audio);
+        }
+
+        Sleep(10);
+    }
+
+    CoUninitialize();
+    return 0;
 }
 
 void AudioInitialize(Win32Audio *audio) {
@@ -178,50 +246,13 @@ void AudioInitialize(Win32Audio *audio) {
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_Start");
     }
-}
-void AudioUpdate(Win32Audio *audio) {
-    if (!audio) {
-        return;
-    }
 
-    HRESULT hresult;
+    audio->isRunning = true;
+    audio->isPaused = false;
+    audio->threadHandle = CreateThread(0, 0, AudioThreadProcedure, audio, 0, 0);
 
-    u32 paddingFrameCount;
-    hresult = IAudioClient_GetCurrentPadding(audio->audioClient, &paddingFrameCount);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"GetCurrentPadding");
-    }
-
-    u32 availableFrameCount = audio->bufferFrameCount - paddingFrameCount;
-
-    if (availableFrameCount == 0) {
-        return;
-    }
-
-    u8 *audioData;
-    hresult = IAudioRenderClient_GetBuffer(audio->renderClient, availableFrameCount, &audioData);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"GetBuffer");
-    }
-
-    f32 *samplePointer = (f32 *)audioData;
-
-    for (u32 frameIndex = 0; frameIndex < availableFrameCount; frameIndex++) {
-        f32 sampleValue = (audio->phase < 0.5f) ? 0.05f : -0.05f;
-
-        audio->phase += audio->phaseIncrement;
-        if (audio->phase > 1.0f) {
-            audio->phase -= 1.0f;
-        }
-
-        for (u32 channelIndex = 0; channelIndex < audio->channels; channelIndex++) {
-            *samplePointer++ = sampleValue;
-        }
-    }
-
-    hresult = IAudioRenderClient_ReleaseBuffer(audio->renderClient, availableFrameCount, 0);
-    if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"ReleaseBuffer");
+    if (!audio->threadHandle) {
+        ErrorShowLast(L"CreateThread for Audio");
     }
 }
 
@@ -229,6 +260,8 @@ void AudioPause(Win32Audio *audio) {
     if (!audio || !audio->audioClient) {
         return;
     }
+
+    audio->isPaused = true;
 
     HRESULT hresult = IAudioClient_Stop(audio->audioClient);
     if (FAILED(hresult)) {
@@ -245,6 +278,8 @@ void AudioResume(Win32Audio *audio) {
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_Start");
     }
+
+    audio->isPaused = false;
 }
 
 void WindowShow(HWND windowHandle) {
@@ -283,7 +318,6 @@ void RunUpdateLoop(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
 
             if (isFocused) {
                 D3D12DeviceRenderFrame(d3d12);
-                AudioUpdate(audio);
             } else {
                 Sleep(10);
             }
