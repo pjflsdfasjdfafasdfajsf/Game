@@ -290,10 +290,12 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
+u32 textureId = 0;
+
 void RunDraw(Win32Direct12 *d3d12) {
     D3D12FrameBegin(d3d12);
     {
-        D3D12RectangleDraw(d3d12, -0.5f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+        D3D12RectangleDraw(d3d12, textureId, V2(-0.5f, 0.5f), V2(1.0f, 1.0f), V4(1.0f, 0.0f, 0.0f, 1.0f));
     }
     D3D12FrameEnd(d3d12);
 }
@@ -332,6 +334,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
         }
     }
 }
+
 void WINAPI WinMainCRTStartup() {
     HWND mainWindowHandle = WindowCreate(L"Win32");
 
@@ -347,10 +350,10 @@ void WINAPI WinMainCRTStartup() {
         ExitProcess(1);
     }
 
-    Win32Direct12 d3d12;
+    static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12);
 
-    Win32Audio audio;
+    static Win32Audio audio;
     AudioInitialize(&audio);
 
     D3D12DeviceInitialize(&d3d12);
@@ -361,7 +364,14 @@ void WINAPI WinMainCRTStartup() {
     D3D12SynchronizationInitialize(&d3d12);
     D3D12VertexBufferInitialize(&d3d12, 4096);
 
-    D3D12InitializeTextureTEMP(&d3d12);
+    static u32 texturePixels[64 * 64];
+    for (int y = 0; y < 64; y++) {
+        for (int x = 0; x < 64; x++) {
+            bool isWhite = ((x / 8) % 2) == ((y / 8) % 2);
+            texturePixels[y * 64 + x] = isWhite ? 0xFFFFFFFF : 0xFF000000;
+        }
+    }
+    textureId = D3D12TextureCreate(&d3d12, 64, 64, texturePixels);
 
     WindowShow(mainWindowHandle);
 

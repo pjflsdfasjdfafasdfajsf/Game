@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game_platform.h"
+
 #include <d3d12.h>
 #include <dxgi1_4.h>
 
@@ -31,10 +33,10 @@ typedef struct {
     UINT vertexCapacity;
     UINT vertexCount;
 
+    ID3D12Resource *textures[4096];
+    UINT loadedTextureCount;
+
     ID3D12DescriptorHeap *descriptorHeap;
-    // TODO: You probably guessed that this is temporary.
-    ID3D12Resource *someRandomTextureIdk;
-    ID3D12Resource *textureUploadHeap;
 } Win32Direct12;
 
 void D3D12Initialize(Win32Direct12 *d3d12);
@@ -55,10 +57,10 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12);
 
 void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity);
 
-void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12);
+u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, const void *pixels);
 
 void D3D12FrameBegin(Win32Direct12 *d3d12);
 
-void D3D12RectangleDraw(Win32Direct12 *d3d12, float originX, float originY, float width, float height, float colorRed, float colorGreen, float colorBlue, float colorAlpha);
+void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color);
 
 void D3D12FrameEnd(Win32Direct12 *d3d12);

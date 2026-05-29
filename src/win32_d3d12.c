@@ -235,6 +235,8 @@ void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
         ErrorShowHRESULT(hresult, L"CreateFence");
     }
 
+    d3d12->fenceValue = 1;
+
     d3d12->fenceEvent = CreateEventW(0, FALSE, FALSE, 0);
     if (!d3d12->fenceEvent) {
         ErrorShowLast(L"CreateEventW");
@@ -338,23 +340,23 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12) {
     }
 }
 
-void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
-    if (!d3d12) {
-        return;
+u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, const void *pixels) {
+    if (!d3d12 || !pixels) {
+        return 0;
+    }
+
+    if (d3d12->loadedTextureCount >= 4096) {
+        return 0;
     }
 
     HRESULT hresult;
-
-    const u32 textureWidth = 256;
-    const u32 textureHeight = 256;
-    const u32 texturePixelSize = 4;
+    u32 textureId = d3d12->loadedTextureCount;
 
     D3D12_RESOURCE_DESC textureDescription;
     MemoryZero(&textureDescription, sizeof(textureDescription));
-
     textureDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    textureDescription.Width = textureWidth;
-    textureDescription.Height = textureHeight;
+    textureDescription.Width = width;
+    textureDescription.Height = height;
     textureDescription.DepthOrArraySize = 1;
     textureDescription.MipLevels = 1;
     textureDescription.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -363,10 +365,9 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
 
     D3D12_HEAP_PROPERTIES defaultHeapProperties;
     MemoryZero(&defaultHeapProperties, sizeof(defaultHeapProperties));
-
     defaultHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription, D3D12_RESOURCE_STATE_COPY_DEST, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->someRandomTextureIdk));
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription, D3D12_RESOURCE_STATE_COPY_DEST, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->textures[textureId]));
 
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
     UINT64 totalUploadBufferSize = 0;
@@ -374,12 +375,10 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
 
     D3D12_HEAP_PROPERTIES uploadHeapProperties;
     MemoryZero(&uploadHeapProperties, sizeof(uploadHeapProperties));
-
     uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
     D3D12_RESOURCE_DESC uploadDescription;
     MemoryZero(&uploadDescription, sizeof(uploadDescription));
-
     uploadDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     uploadDescription.Width = totalUploadBufferSize;
     uploadDescription.Height = 1;
@@ -388,20 +387,20 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
     uploadDescription.SampleDesc.Count = 1;
     uploadDescription.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &uploadDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->textureUploadHeap));
+    ID3D12Resource *uploadHeap = 0;
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &uploadDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&uploadHeap));
 
     u8 *mappedData = 0;
-    ID3D12Resource_Map(d3d12->textureUploadHeap, 0, 0, (void **)&mappedData);
+    ID3D12Resource_Map(uploadHeap, 0, 0, (void **)&mappedData);
 
-    for (u32 y = 0; y < textureHeight; ++y) {
-        u32 *row = (u32 *)(mappedData + footprint.Offset + (y * footprint.Footprint.RowPitch));
+    const u8 *sourcePixels = (const u8 *)pixels;
+    for (u32 y = 0; y < height; ++y) {
+        u8 *destinationRow = mappedData + footprint.Offset + (y * footprint.Footprint.RowPitch);
+        const u8 *sourceRow = sourcePixels + (y * width * 4);
 
-        for (u32 x = 0; x < textureWidth; ++x) {
-            bool isWhite = ((x / 32) % 2) == ((y / 32) % 2);
-            row[x] = isWhite ? 0xFFFFFFFF : 0xFF000000;
-        }
+        MemoryCopyForwards(destinationRow, sourceRow, width * 4);
     }
-    ID3D12Resource_Unmap(d3d12->textureUploadHeap, 0, 0);
+    ID3D12Resource_Unmap(uploadHeap, 0, 0);
 
     ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
     ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, 0);
@@ -409,14 +408,14 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
     D3D12_TEXTURE_COPY_LOCATION sourceLocation;
     MemoryZero(&sourceLocation, sizeof(sourceLocation));
 
-    sourceLocation.pResource = d3d12->textureUploadHeap;
+    sourceLocation.pResource = uploadHeap;
     sourceLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     sourceLocation.PlacedFootprint = footprint;
 
     D3D12_TEXTURE_COPY_LOCATION destinationLocation;
     MemoryZero(&destinationLocation, sizeof(destinationLocation));
 
-    destinationLocation.pResource = d3d12->someRandomTextureIdk;
+    destinationLocation.pResource = d3d12->textures[textureId];
     destinationLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     destinationLocation.SubresourceIndex = 0;
 
@@ -426,7 +425,7 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
     MemoryZero(&resourceBarrier, sizeof(resourceBarrier));
 
     resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    resourceBarrier.Transition.pResource = d3d12->someRandomTextureIdk;
+    resourceBarrier.Transition.pResource = d3d12->textures[textureId];
     resourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     resourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     resourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -437,19 +436,24 @@ void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
     ID3D12CommandQueue_ExecuteCommandLists(d3d12->commandQueue, 1, commandLists);
 
     D3D12DeviceWaitForGPU(d3d12);
+    ID3D12Resource_Release(uploadHeap);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDescription;
     MemoryZero(&shaderResourceViewDescription, sizeof(shaderResourceViewDescription));
-
     shaderResourceViewDescription.Format = textureDescription.Format;
     shaderResourceViewDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     shaderResourceViewDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     shaderResourceViewDescription.Texture2D.MipLevels = 1;
 
+    UINT descriptorIncrementSize = ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     D3D12_CPU_DESCRIPTOR_HANDLE heapHandle;
     ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->descriptorHeap, &heapHandle);
+    heapHandle.ptr += (textureId * descriptorIncrementSize);
 
-    ID3D12Device_CreateShaderResourceView(d3d12->device, d3d12->someRandomTextureIdk, &shaderResourceViewDescription, heapHandle);
+    ID3D12Device_CreateShaderResourceView(d3d12->device, d3d12->textures[textureId], &shaderResourceViewDescription, heapHandle);
+
+    d3d12->loadedTextureCount++;
+    return textureId;
 }
 
 void D3D12FrameBegin(Win32Direct12 *d3d12) {
@@ -475,9 +479,6 @@ void D3D12FrameBegin(Win32Direct12 *d3d12) {
 
     ID3D12DescriptorHeap *descriptorHeaps[] = {d3d12->descriptorHeap};
     ID3D12GraphicsCommandList_SetDescriptorHeaps(d3d12->commandList, 1, descriptorHeaps);
-
-    UINT textureIndex = 0;
-    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureIndex, 0);
 
     D3D12_VIEWPORT viewport = {0.0f, 0.0f, (f32)DEFAULT_WINDOW_WIDTH, (f32)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
     ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
@@ -506,7 +507,7 @@ void D3D12FrameBegin(Win32Direct12 *d3d12) {
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-void D3D12RectangleDraw(Win32Direct12 *d3d12, f32 originX, f32 originY, f32 width, f32 height, f32 colorRed, f32 colorGreen, f32 colorBlue, f32 colorAlpha) {
+void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color) {
     if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
         return;
     }
@@ -516,15 +517,15 @@ void D3D12RectangleDraw(Win32Direct12 *d3d12, f32 originX, f32 originY, f32 widt
         return;
     }
 
-    f32 leftEdge = originX;
-    f32 rightEdge = originX + width;
-    f32 topEdge = originY;
-    f32 bottomEdge = originY - height;
+    f32 leftEdge = origin.x;
+    f32 rightEdge = origin.x + size.width;
+    f32 topEdge = origin.y;
+    f32 bottomEdge = origin.y - size.height;
 
-    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {0.0f, 0.0f}};
-    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {1.0f, 0.0f}};
-    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {0.0f, 1.0f}};
-    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {colorRed, colorGreen, colorBlue, colorAlpha}, {1.0f, 1.0f}};
+    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 0.0f}};
+    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 0.0f}};
+    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 1.0f}};
+    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 1.0f}};
 
     Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
 
@@ -543,6 +544,8 @@ void D3D12RectangleDraw(Win32Direct12 *d3d12, f32 originX, f32 originY, f32 widt
     rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
 
     ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
+    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureId, 0);
+
     ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
 
     d3d12->vertexCount += verticesPerRectangle;
