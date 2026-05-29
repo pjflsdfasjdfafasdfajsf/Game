@@ -17,6 +17,7 @@ typedef float f32;
 typedef struct {
     f32 position[3];
     f32 color[4];
+    f32 uv[2];
 } Vertex;
 
 static inline void MemoryZero(void *destination, usize count) {

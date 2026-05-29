@@ -346,9 +346,12 @@ void WINAPI WinMainCRTStartup() {
     D3D12DeviceInitialize(&d3d12);
     D3D12CommandsInitialize(&d3d12);
     D3D12SwapChainInitialize(&d3d12, mainWindowHandle);
+    D3D12HeapInitialize(&d3d12);
     D3D12PipelineInitialize(&d3d12);
     D3D12SynchronizationInitialize(&d3d12);
     D3D12VertexBufferInitialize(&d3d12);
+
+    D3D12InitializeTextureTEMP(&d3d12);
 
     WindowShow(mainWindowHandle);
 

@@ -3,7 +3,9 @@
 
 #include "game_platform.h"
 
-#include <d3dcompiler.h>
+// NOTE: Compiled shaders.
+#include "BasicGeometryVS.h"
+#include "BasicGeometryPS.h"
 
 void D3D12Initialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
@@ -131,20 +133,53 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
 
     HRESULT hresult;
 
+    D3D12_ROOT_PARAMETER rootParameter;
+    MemoryZero(&rootParameter, sizeof(rootParameter));
+
+    rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    rootParameter.Constants.ShaderRegister = 0;
+    rootParameter.Constants.RegisterSpace = 0;
+    rootParameter.Constants.Num32BitValues = 1;
+    rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_STATIC_SAMPLER_DESC staticSamplerDescription;
+    MemoryZero(&staticSamplerDescription, sizeof(staticSamplerDescription));
+
+    staticSamplerDescription.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    staticSamplerDescription.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplerDescription.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplerDescription.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplerDescription.ShaderRegister = 0;
+    staticSamplerDescription.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDescription;
     MemoryZero(&rootSignatureDescription, sizeof(rootSignatureDescription));
 
-    rootSignatureDescription.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    rootSignatureDescription.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+    rootSignatureDescription.NumParameters = 1;
+    rootSignatureDescription.pParameters = &rootParameter;
+    rootSignatureDescription.NumStaticSamplers = 1;
+    rootSignatureDescription.pStaticSamplers = &staticSamplerDescription;
 
     ID3DBlob *signatureBlob = 0;
     ID3DBlob *errorBlob = 0;
 
-    hresult = D3D12SerializeRootSignature(&rootSignatureDescription, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDescription;
+    MemoryZero(&versionedDescription, sizeof(versionedDescription));
+    versionedDescription.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    versionedDescription.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+    versionedDescription.Desc_1_1.NumParameters = 1;
+    versionedDescription.Desc_1_1.pParameters = (const D3D12_ROOT_PARAMETER1 *)&rootParameter;
+    versionedDescription.Desc_1_1.NumStaticSamplers = 1;
+    versionedDescription.Desc_1_1.pStaticSamplers = &staticSamplerDescription;
+
+    hresult = D3D12SerializeVersionedRootSignature(&versionedDescription, &signatureBlob, &errorBlob);
     if (FAILED(hresult)) {
         if (errorBlob) {
             OutputDebugStringA((char *)errorBlob->lpVtbl->GetBufferPointer(errorBlob));
         }
-        ErrorShowHRESULT(hresult, L"SerializeRootSignature");
+
+        ErrorShowHRESULT(hresult, L"SerializeVersionedRootSignature");
     }
 
     hresult = ID3D12Device_CreateRootSignature(d3d12->device, 0, signatureBlob->lpVtbl->GetBufferPointer(signatureBlob), signatureBlob->lpVtbl->GetBufferSize(signatureBlob), &IID_ID3D12RootSignature, COM_OUT_POINTER(&d3d12->rootSignature));
@@ -154,58 +189,16 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
 
     signatureBlob->lpVtbl->Release(signatureBlob);
 
-    const char *shaderCode =
-        "struct VSInput {\n"
-        "    float3 position : POSITION;\n"
-        "    float4 color : COLOR;\n"
-        "};\n"
-        "struct PSInput {\n"
-        "    float4 position : SV_POSITION;\n"
-        "    float4 color : COLOR;\n"
-        "};\n"
-        "PSInput VSMain(VSInput input) {\n"
-        "    PSInput result;\n"
-        "    result.position = float4(input.position, 1.0);\n"
-        "    result.color = input.color;\n"
-        "    return result;\n"
-        "}\n"
-        "float4 PSMain(PSInput input) : SV_TARGET {\n"
-        "    return input.color;\n"
-        "}\n";
-
-    UINT compileFlags = 0;
-#if defined(_DEBUG)
-    compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
-
-    ID3DBlob *vertexShader = 0;
-    hresult = D3DCompile(shaderCode, StringGetLength(shaderCode), 0, 0, 0, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, &errorBlob);
-
-    if (FAILED(hresult)) {
-        if (errorBlob) {
-            OutputDebugStringA((char *)errorBlob->lpVtbl->GetBufferPointer(errorBlob));
-        }
-        ErrorShowHRESULT(hresult, L"Compile Vertex Shader");
-    }
-
-    ID3DBlob *pixelShader = 0;
-    hresult = D3DCompile(shaderCode, StringGetLength(shaderCode), 0, 0, 0, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, &errorBlob);
-
-    if (FAILED(hresult)) {
-        if (errorBlob) {
-            OutputDebugStringA((char *)errorBlob->lpVtbl->GetBufferPointer(errorBlob));
-        }
-        ErrorShowHRESULT(hresult, L"Compile Pixel Shader");
-    }
-
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDescription;
     MemoryZero(&pipelineStateDescription, sizeof(pipelineStateDescription));
 
     pipelineStateDescription.pRootSignature = d3d12->rootSignature;
-    pipelineStateDescription.VS.pShaderBytecode = vertexShader->lpVtbl->GetBufferPointer(vertexShader);
-    pipelineStateDescription.VS.BytecodeLength = vertexShader->lpVtbl->GetBufferSize(vertexShader);
-    pipelineStateDescription.PS.pShaderBytecode = pixelShader->lpVtbl->GetBufferPointer(pixelShader);
-    pipelineStateDescription.PS.BytecodeLength = pixelShader->lpVtbl->GetBufferSize(pixelShader);
+
+    pipelineStateDescription.VS.pShaderBytecode = g_VSMain;
+    pipelineStateDescription.VS.BytecodeLength = sizeof(g_VSMain);
+
+    pipelineStateDescription.PS.pShaderBytecode = g_PSMain;
+    pipelineStateDescription.PS.BytecodeLength = sizeof(g_PSMain);
 
     pipelineStateDescription.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     pipelineStateDescription.SampleMask = UINT_MAX;
@@ -218,7 +211,8 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
 
     D3D12_INPUT_ELEMENT_DESC inputElementDescriptions[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
     pipelineStateDescription.InputLayout.pInputElementDescs = inputElementDescriptions;
     pipelineStateDescription.InputLayout.NumElements = sizeof(inputElementDescriptions) / sizeof(D3D12_INPUT_ELEMENT_DESC);
@@ -227,9 +221,6 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateGraphicsPipelineState");
     }
-
-    vertexShader->lpVtbl->Release(vertexShader);
-    pixelShader->lpVtbl->Release(pixelShader);
 }
 
 void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
@@ -297,6 +288,12 @@ void D3D12DeviceRenderFrame(Win32Direct12 *d3d12) {
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
 
+    ID3D12DescriptorHeap *descriptorHeaps[] = {d3d12->descriptorHeap};
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(d3d12->commandList, 1, descriptorHeaps);
+
+    u32 textureIndex = 0;
+    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureIndex, 0);
+
     D3D12_VIEWPORT viewport = {0.0f, 0.0f, (f32)DEFAULT_WINDOW_WIDTH, (f32)DEFAULT_WINDOW_HEIGHT, 0.0f, 1.0f};
     ID3D12GraphicsCommandList_RSSetViewports(d3d12->commandList, 1, &viewport);
 
@@ -354,10 +351,9 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12) {
     HRESULT hresult;
 
     const Vertex triangleVertices[] = {
-        {{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-
+        {{0.0f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.5f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
     const UINT vertexBufferSize = sizeof(triangleVertices);
 
     D3D12_HEAP_PROPERTIES heapProperties;
@@ -401,4 +397,137 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12) {
     d3d12->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(d3d12->vertexBuffer);
     d3d12->vertexBufferView.StrideInBytes = sizeof(Vertex);
     d3d12->vertexBufferView.SizeInBytes = vertexBufferSize;
+}
+
+void D3D12HeapInitialize(Win32Direct12 *d3d12) {
+    if (!d3d12) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDescription;
+    MemoryZero(&heapDescription, sizeof(heapDescription));
+    heapDescription.NumDescriptors = 4096;
+    heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    heapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    hresult = ID3D12Device_CreateDescriptorHeap(d3d12->device, &heapDescription, &IID_ID3D12DescriptorHeap, COM_OUT_POINTER(&d3d12->descriptorHeap));
+    if (FAILED(hresult)) {
+        ErrorShowHRESULT(hresult, L"ID3D12Device_CreateDescriptorHeap");
+    }
+}
+
+void D3D12InitializeTextureTEMP(Win32Direct12 *d3d12) {
+    if (!d3d12) {
+        return;
+    }
+
+    HRESULT hresult;
+
+    const u32 textureWidth = 256;
+    const u32 textureHeight = 256;
+    const u32 texturePixelSize = 4;
+
+    D3D12_RESOURCE_DESC textureDescription;
+    MemoryZero(&textureDescription, sizeof(textureDescription));
+
+    textureDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    textureDescription.Width = textureWidth;
+    textureDescription.Height = textureHeight;
+    textureDescription.DepthOrArraySize = 1;
+    textureDescription.MipLevels = 1;
+    textureDescription.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDescription.SampleDesc.Count = 1;
+    textureDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    D3D12_HEAP_PROPERTIES defaultHeapProperties;
+    MemoryZero(&defaultHeapProperties, sizeof(defaultHeapProperties));
+
+    defaultHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription, D3D12_RESOURCE_STATE_COPY_DEST, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->someRandomTextureIdk));
+
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+    UINT64 totalUploadBufferSize = 0;
+    ID3D12Device_GetCopyableFootprints(d3d12->device, &textureDescription, 0, 1, 0, &footprint, 0, 0, &totalUploadBufferSize);
+
+    D3D12_HEAP_PROPERTIES uploadHeapProperties;
+    MemoryZero(&uploadHeapProperties, sizeof(uploadHeapProperties));
+
+    uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC uploadDescription;
+    MemoryZero(&uploadDescription, sizeof(uploadDescription));
+
+    uploadDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    uploadDescription.Width = totalUploadBufferSize;
+    uploadDescription.Height = 1;
+    uploadDescription.DepthOrArraySize = 1;
+    uploadDescription.MipLevels = 1;
+    uploadDescription.SampleDesc.Count = 1;
+    uploadDescription.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &uploadDescription, D3D12_RESOURCE_STATE_GENERIC_READ, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->textureUploadHeap));
+
+    u8 *mappedData = 0;
+    ID3D12Resource_Map(d3d12->textureUploadHeap, 0, 0, (void **)&mappedData);
+
+    for (u32 y = 0; y < textureHeight; ++y) {
+        u32 *row = (u32 *)(mappedData + footprint.Offset + (y * footprint.Footprint.RowPitch));
+
+        for (u32 x = 0; x < textureWidth; ++x) {
+            bool isWhite = ((x / 32) % 2) == ((y / 32) % 2);
+            row[x] = isWhite ? 0xFFFFFFFF : 0xFF000000;
+        }
+    }
+    ID3D12Resource_Unmap(d3d12->textureUploadHeap, 0, 0);
+
+    ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
+    ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, 0);
+
+    D3D12_TEXTURE_COPY_LOCATION sourceLocation;
+    MemoryZero(&sourceLocation, sizeof(sourceLocation));
+
+    sourceLocation.pResource = d3d12->textureUploadHeap;
+    sourceLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    sourceLocation.PlacedFootprint = footprint;
+
+    D3D12_TEXTURE_COPY_LOCATION destinationLocation;
+    MemoryZero(&destinationLocation, sizeof(destinationLocation));
+
+    destinationLocation.pResource = d3d12->someRandomTextureIdk;
+    destinationLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    destinationLocation.SubresourceIndex = 0;
+
+    ID3D12GraphicsCommandList_CopyTextureRegion(d3d12->commandList, &destinationLocation, 0, 0, 0, &sourceLocation, 0);
+
+    D3D12_RESOURCE_BARRIER resourceBarrier;
+    MemoryZero(&resourceBarrier, sizeof(resourceBarrier));
+
+    resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    resourceBarrier.Transition.pResource = d3d12->someRandomTextureIdk;
+    resourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    resourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    resourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &resourceBarrier);
+
+    ID3D12GraphicsCommandList_Close(d3d12->commandList);
+    ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)d3d12->commandList};
+    ID3D12CommandQueue_ExecuteCommandLists(d3d12->commandQueue, 1, commandLists);
+
+    D3D12DeviceWaitForGPU(d3d12);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDescription;
+    MemoryZero(&shaderResourceViewDescription, sizeof(shaderResourceViewDescription));
+
+    shaderResourceViewDescription.Format = textureDescription.Format;
+    shaderResourceViewDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    shaderResourceViewDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    shaderResourceViewDescription.Texture2D.MipLevels = 1;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE heapHandle;
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->descriptorHeap, &heapHandle);
+
+    ID3D12Device_CreateShaderResourceView(d3d12->device, d3d12->someRandomTextureIdk, &shaderResourceViewDescription, heapHandle);
 }
