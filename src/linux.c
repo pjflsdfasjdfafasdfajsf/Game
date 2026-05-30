@@ -11,8 +11,10 @@
 
 #include <alsa/asoundlib.h>
 #include <pthread.h>
+#include <poll.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <wayland-client-core.h>
 
 static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
     UNUSED(xdgToplevel), UNUSED(width), UNUSED(height);
@@ -109,41 +111,44 @@ static const struct wl_registry_listener registryListener = {
 };
 
 LinuxWayland WindowCreate(const char *title) {
-    LinuxWayland wayland;
-    MemoryZero(&wayland, sizeof(LinuxWayland));
+    LinuxWayland result;
+    MemoryZero(&result, sizeof(LinuxWayland));
 
-    wayland.display = wl_display_connect(0);
-    if (!wayland.display) {
+    result.width = DEFAULT_WINDOW_WIDTH;
+    result.height = DEFAULT_WINDOW_HEIGHT;
+
+    result.display = wl_display_connect(0);
+    if (!result.display) {
         fprintf(stderr, "Could not connect to Wayland display.\n");
-        return wayland;
+        return result;
     }
 
-    wayland.registry = wl_display_get_registry(wayland.display);
-    wl_registry_add_listener(wayland.registry, &registryListener, &wayland);
+    result.registry = wl_display_get_registry(result.display);
+    wl_registry_add_listener(result.registry, &registryListener, &result);
 
-    wl_display_roundtrip(wayland.display);
+    wl_display_roundtrip(result.display);
 
-    if (!wayland.compositor || !wayland.xdgWmBase) {
+    if (!result.compositor || !result.xdgWmBase) {
         fprintf(stderr, "Failed to bind Wayland compositor or xdg_wm_base.\n");
-        return wayland;
+        return result;
     }
 
-    wayland.surface = wl_compositor_create_surface(wayland.compositor);
-    wayland.xdgSurface = xdg_wm_base_get_xdg_surface(wayland.xdgWmBase, wayland.surface);
-    xdg_surface_add_listener(wayland.xdgSurface, &xdgSurfaceListener, &wayland);
+    result.surface = wl_compositor_create_surface(result.compositor);
+    result.xdgSurface = xdg_wm_base_get_xdg_surface(result.xdgWmBase, result.surface);
+    xdg_surface_add_listener(result.xdgSurface, &xdgSurfaceListener, &result);
 
-    wayland.xdgToplevel = xdg_surface_get_toplevel(wayland.xdgSurface);
-    xdg_toplevel_add_listener(wayland.xdgToplevel, &xdgToplevelListener, &wayland);
+    result.xdgToplevel = xdg_surface_get_toplevel(result.xdgSurface);
+    xdg_toplevel_add_listener(result.xdgToplevel, &xdgToplevelListener, &result);
 
-    xdg_toplevel_set_title(wayland.xdgToplevel, title);
+    xdg_toplevel_set_title(result.xdgToplevel, title);
 
-    wl_surface_commit(wayland.surface);
-    wl_display_roundtrip(wayland.display);
+    wl_surface_commit(result.surface);
+    wl_display_roundtrip(result.display);
 
-    wayland.isRunning = true;
-    wayland.isFocused = true;
+    result.isRunning = true;
+    result.isFocused = true;
 
-    return wayland;
+    return result;
 }
 
 // NOTE: Audio
@@ -298,8 +303,17 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan) {
 
     bool wasFocused = wayland->isFocused;
 
+    struct pollfd pollfd;
+    pollfd.fd = wl_display_get_fd(wayland->display);
+    pollfd.events = POLLIN;
+
     while (wayland->isRunning) {
         wl_display_dispatch_pending(wayland->display);
+        wl_display_flush(wayland->display);
+
+        if (poll(&pollfd, 1, 0) > 0) {
+            wl_display_dispatch(wayland->display);
+        }
 
         if (!wayland->isFocused && wasFocused) {
             AudioPause(audio);
