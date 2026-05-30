@@ -14,6 +14,22 @@ typedef struct {
 
 // NOTE: Shared utilities.
 
+static inline bool IsPowerOfTwo(usize value) {
+    return (value != 0) && ((value & (value - 1)) == 0);
+}
+
+// NOTE: `alignment` must be power of two
+static inline usize MemoryAlignSize(usize currentSize, usize alignment) {
+    if (!IsPowerOfTwo(alignment)) {
+        return currentSize;
+    }
+
+    usize alignmentMask = alignment - 1;
+    usize alignedSize = (currentSize + alignmentMask) & ~alignmentMask;
+
+    return alignedSize;
+}
+
 static inline void MemoryZero(void *destination, usize count) {
     char *bytePointer = (char *)destination;
 
@@ -21,6 +37,11 @@ static inline void MemoryZero(void *destination, usize count) {
         *bytePointer++ = 0;
     }
 }
+
+#define ZeroStruct(instance) MemoryZero(&(instance), sizeof(instance))
+#define ZeroArray(array) MemoryZero((array), sizeof(array))
+#define ZeroItems(pointer, count) MemoryZero((pointer), sizeof(*(pointer)) * (count))
+#define ReturnZeroed(instance) do { ZeroStruct(instance); return (instance); } while(0)
 
 static inline void MemoryCopyForwards(void *destination, const void *source, usize count) {
     char *destinationPointer = (char *)destination;
@@ -123,8 +144,7 @@ static inline void *MemoryArenaAllocateBytesAligned(MemoryArena *arena, usize al
         return 0;
     }
 
-    usize alignmentMask = alignment - 1;
-    usize alignedOffset = (arena->currentOffset + alignmentMask) & ~alignmentMask;
+    usize alignedOffset = MemoryAlignSize(arena->currentOffset, alignment);
 
     if (alignedOffset + allocationSize > arena->totalCapacity) {
         return 0;
@@ -142,11 +162,11 @@ static inline void *MemoryArenaAllocateBytes(MemoryArena *arena, usize allocatio
 
 static inline void *MemoryArenaAllocateBytesAndZero(MemoryArena *arena, usize allocationSize) {
     void *allocatedMemory = MemoryArenaAllocateBytes(arena, allocationSize);
-    
+
     if (allocatedMemory) {
         MemoryZero(allocatedMemory, allocationSize);
     }
-    
+
     return allocatedMemory;
 }
 
@@ -158,7 +178,7 @@ static inline void MemoryArenaClear(MemoryArena *arena) {
 
 static inline MemoryArenaCheckpoint MemoryArenaCreateCheckpoint(MemoryArena *arena) {
     MemoryArenaCheckpoint result;
-    MemoryZero(&result, sizeof(result));
+    ZeroStruct(result);
 
     if (arena) {
         result.arena = arena;
@@ -184,3 +204,77 @@ typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
 
 // --------------------------------------------------
 
+// NOTE: Services that the platform provides to game.
+
+typedef enum {
+    RenderCommandType_None = 0,
+    RenderCommandType_ClearEntireScreen,
+} RenderCommandType;
+
+typedef struct {
+    u32 type;
+    u32 size;
+} RenderCommandHeader;
+
+typedef struct {
+    RenderCommandHeader header;
+    Vector4 color;
+} RenderCommandClearEntireScreen;
+
+typedef struct {
+    u8 *basePointer;
+    usize totalCapacity;
+    usize currentOffset;
+    u32 commandCount;
+    // NOTE: this becomes true if a command that did not fit was pushed in
+    bool hasOverflowed;
+} RenderCommandBuffer;
+
+static inline void RenderCommandBufferInitialize(RenderCommandBuffer *commandBuffer, void *backingMemory, usize totalCapacity) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    MemoryZero(commandBuffer, sizeof(RenderCommandBuffer));
+
+    if (backingMemory && totalCapacity > 0) {
+        commandBuffer->basePointer = (u8 *)backingMemory;
+        commandBuffer->totalCapacity = totalCapacity;
+    }
+}
+
+static inline void RenderCommandBufferReset(RenderCommandBuffer *commandBuffer) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    commandBuffer->currentOffset = 0;
+    commandBuffer->commandCount = 0;
+    commandBuffer->hasOverflowed = false;
+}
+
+static inline void *RenderCommandBufferAllocateBytes(RenderCommandBuffer *commandBuffer, u32 type, usize requestedSize) {
+    if (!commandBuffer || commandBuffer->hasOverflowed || !commandBuffer->basePointer || requestedSize < sizeof(RenderCommandHeader)) {
+        return 0;
+    }
+
+    usize alignedSize = MemoryAlignSize(requestedSize, 8);
+
+    if (commandBuffer->currentOffset + alignedSize > commandBuffer->totalCapacity) {
+        commandBuffer->hasOverflowed = true;
+
+        return 0;
+    }
+
+    void *allocatedMemory = (void *)(commandBuffer->basePointer + commandBuffer->currentOffset);
+    MemoryZero(allocatedMemory, alignedSize);
+
+    RenderCommandHeader *header = (RenderCommandHeader *)allocatedMemory;
+    header->type = type;
+    header->size = (u32)alignedSize;
+
+    commandBuffer->currentOffset += alignedSize;
+    commandBuffer->commandCount++;
+
+    return allocatedMemory;
+}

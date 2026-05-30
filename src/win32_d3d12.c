@@ -34,7 +34,7 @@ void D3D12CommandsInitialize(Win32Direct12 *d3d12) {
     HRESULT hresult;
 
     D3D12_COMMAND_QUEUE_DESC commandQueueDescription;
-    MemoryZero(&commandQueueDescription, sizeof(commandQueueDescription));
+    ZeroStruct(commandQueueDescription);
 
     commandQueueDescription.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
@@ -68,7 +68,7 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     UINT index;
 
     DXGI_SWAP_CHAIN_DESC1 swapChainDescription;
-    MemoryZero(&swapChainDescription, sizeof(swapChainDescription));
+    ZeroStruct(swapChainDescription);
 
     swapChainDescription.Width = DEFAULT_WINDOW_WIDTH;
     swapChainDescription.Height = DEFAULT_WINDOW_HEIGHT;
@@ -93,7 +93,7 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 
     D3D12_DESCRIPTOR_HEAP_DESC renderTargetViewHeapDescription;
-    MemoryZero(&renderTargetViewHeapDescription, sizeof(renderTargetViewHeapDescription));
+    ZeroStruct(renderTargetViewHeapDescription);
 
     renderTargetViewHeapDescription.NumDescriptors = FRAME_COUNT;
     renderTargetViewHeapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -127,7 +127,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     HRESULT hresult;
 
     D3D12_ROOT_PARAMETER rootParameter;
-    MemoryZero(&rootParameter, sizeof(rootParameter));
+    ZeroStruct(rootParameter);
 
     rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     rootParameter.Constants.ShaderRegister = 0;
@@ -136,9 +136,9 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_STATIC_SAMPLER_DESC staticSamplerDescription;
-    MemoryZero(&staticSamplerDescription, sizeof(staticSamplerDescription));
+    ZeroStruct(staticSamplerDescription);
 
-    staticSamplerDescription.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    staticSamplerDescription.Filter = D3D12_FILTER_Min_MAG_MIP_LINEAR;
     staticSamplerDescription.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -146,7 +146,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     staticSamplerDescription.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDescription;
-    MemoryZero(&rootSignatureDescription, sizeof(rootSignatureDescription));
+    ZeroStruct(rootSignatureDescription);
 
     rootSignatureDescription.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
     rootSignatureDescription.NumParameters = 1;
@@ -158,7 +158,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     ID3DBlob *errorBlob = 0;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDescription;
-    MemoryZero(&versionedDescription, sizeof(versionedDescription));
+    ZeroStruct(versionedDescription);
     versionedDescription.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
     versionedDescription.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
     versionedDescription.Desc_1_1.NumParameters = 1;
@@ -183,7 +183,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     signatureBlob->lpVtbl->Release(signatureBlob);
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDescription;
-    MemoryZero(&pipelineStateDescription, sizeof(pipelineStateDescription));
+    ZeroStruct(pipelineStateDescription);
 
     pipelineStateDescription.pRootSignature = d3d12->rootSignature;
 
@@ -202,7 +202,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     pipelineStateDescription.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
     pipelineStateDescription.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     pipelineStateDescription.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-    pipelineStateDescription.SampleMask = UINT_MAX;
+    pipelineStateDescription.SampleMask = UINT_Max;
     pipelineStateDescription.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pipelineStateDescription.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
     pipelineStateDescription.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -272,20 +272,20 @@ void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
     d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
 }
 
-void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity) {
+void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacity) {
     if (!d3d12 || !d3d12->device) {
         return;
     }
 
     HRESULT hresult;
-    const UINT vertexBufferSizeInBytes = maximumVertexCapacity * sizeof(Vertex);
+    const UINT vertexBufferSizeInBytes = MaximumVertexCapacity * sizeof(Vertex);
 
     D3D12_HEAP_PROPERTIES uploadHeapProperties;
-    MemoryZero(&uploadHeapProperties, sizeof(uploadHeapProperties));
+    ZeroStruct(uploadHeapProperties);
     uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
     D3D12_RESOURCE_DESC bufferResourceDescription;
-    MemoryZero(&bufferResourceDescription, sizeof(bufferResourceDescription));
+    ZeroStruct(bufferResourceDescription);
     bufferResourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     bufferResourceDescription.Alignment = 0;
     bufferResourceDescription.Width = vertexBufferSizeInBytes;
@@ -306,7 +306,7 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacit
     }
 
     D3D12_RANGE readRange;
-    MemoryZero(&readRange, sizeof(readRange));
+    ZeroStruct(readRange);
 
     hresult = ID3D12Resource_Map(d3d12->vertexBuffer, 0, &readRange, &d3d12->vertexData);
     if (FAILED(hresult)) {
@@ -318,7 +318,7 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacit
     d3d12->vertexBufferView.StrideInBytes = sizeof(Vertex);
     d3d12->vertexBufferView.SizeInBytes = vertexBufferSizeInBytes;
 
-    d3d12->vertexCapacity = maximumVertexCapacity;
+    d3d12->vertexCapacity = MaximumVertexCapacity;
     d3d12->vertexCount = 0;
 }
 
@@ -330,7 +330,7 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12) {
     HRESULT hresult;
 
     D3D12_DESCRIPTOR_HEAP_DESC heapDescription;
-    MemoryZero(&heapDescription, sizeof(heapDescription));
+    ZeroStruct(heapDescription);
     heapDescription.NumDescriptors = 4096;
     heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     heapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -354,7 +354,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     u32 textureId = d3d12->loadedTextureCount;
 
     D3D12_RESOURCE_DESC textureDescription;
-    MemoryZero(&textureDescription, sizeof(textureDescription));
+    ZeroStruct(textureDescription);
     textureDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     textureDescription.Width = width;
     textureDescription.Height = height;
@@ -365,7 +365,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     textureDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
 
     D3D12_HEAP_PROPERTIES defaultHeapProperties;
-    MemoryZero(&defaultHeapProperties, sizeof(defaultHeapProperties));
+    ZeroStruct(defaultHeapProperties);
     defaultHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 
     hresult = ID3D12Device_CreateCommittedResource(d3d12->device, &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription, D3D12_RESOURCE_STATE_COPY_DEST, 0, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->textures[textureId]));
@@ -375,11 +375,11 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     ID3D12Device_GetCopyableFootprints(d3d12->device, &textureDescription, 0, 1, 0, &footprint, 0, 0, &totalUploadBufferSize);
 
     D3D12_HEAP_PROPERTIES uploadHeapProperties;
-    MemoryZero(&uploadHeapProperties, sizeof(uploadHeapProperties));
+    ZeroStruct(uploadHeapProperties);
     uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
     D3D12_RESOURCE_DESC uploadDescription;
-    MemoryZero(&uploadDescription, sizeof(uploadDescription));
+    ZeroStruct(uploadDescription);
     uploadDescription.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     uploadDescription.Width = totalUploadBufferSize;
     uploadDescription.Height = 1;
@@ -416,14 +416,14 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, 0);
 
     D3D12_TEXTURE_COPY_LOCATION sourceLocation;
-    MemoryZero(&sourceLocation, sizeof(sourceLocation));
+    ZeroStruct(sourceLocation);
 
     sourceLocation.pResource = uploadHeap;
     sourceLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     sourceLocation.PlacedFootprint = footprint;
 
     D3D12_TEXTURE_COPY_LOCATION destinationLocation;
-    MemoryZero(&destinationLocation, sizeof(destinationLocation));
+    ZeroStruct(destinationLocation);
 
     destinationLocation.pResource = d3d12->textures[textureId];
     destinationLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
@@ -432,7 +432,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     ID3D12GraphicsCommandList_CopyTextureRegion(d3d12->commandList, &destinationLocation, 0, 0, 0, &sourceLocation, 0);
 
     D3D12_RESOURCE_BARRIER resourceBarrier;
-    MemoryZero(&resourceBarrier, sizeof(resourceBarrier));
+    ZeroStruct(resourceBarrier);
 
     resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     resourceBarrier.Transition.pResource = d3d12->textures[textureId];
@@ -449,7 +449,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
     ID3D12Resource_Release(uploadHeap);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDescription;
-    MemoryZero(&shaderResourceViewDescription, sizeof(shaderResourceViewDescription));
+    ZeroStruct(shaderResourceViewDescription);
     shaderResourceViewDescription.Format = textureDescription.Format;
     shaderResourceViewDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     shaderResourceViewDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -497,7 +497,7 @@ void D3D12FrameBegin(Win32Direct12 *d3d12) {
     ID3D12GraphicsCommandList_RSSetScissorRects(d3d12->commandList, 1, &scissorRectangle);
 
     D3D12_RESOURCE_BARRIER barrier;
-    MemoryZero(&barrier, sizeof(barrier));
+    ZeroStruct(barrier);
 
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];
@@ -613,7 +613,7 @@ void D3D12FrameEnd(Win32Direct12 *d3d12) {
     HRESULT hresult;
 
     D3D12_RESOURCE_BARRIER barrier;
-    MemoryZero(&barrier, sizeof(barrier));
+    ZeroStruct(barrier);
 
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = d3d12->renderTargets[d3d12->frameIndex];

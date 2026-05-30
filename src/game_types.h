@@ -28,15 +28,17 @@ typedef float f32;
 
 // NOTE: Macros.
 
-#define ABS(x) (((x) < 0) ? -(x) : (x))
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
-#define MAX(x, y) ((x) < (y) ? (y) : (x))
-#define UNUSED(x) (void)x
+#define IsBitSet(value, bitFlag) (((value) & (bitFlag)) != 0
 
-#define KILOBYTES(value) ((value) * 1024ULL)
-#define MEGABYTES(value) (KILOBYTES(value) * 1024ULL)
-#define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
-#define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
+#define Abs(x) (((x) < 0) ? -(x) : (x))
+#define Min(x, y) ((x) > (y) ? (y) : (x))
+#define Max(x, y) ((x) < (y) ? (y) : (x))
+#define Unused(x) (void)x
+
+#define Kilobytes(value) ((value) * 1024ULL)
+#define Megabytes(value) (Kilobytes(value) * 1024ULL)
+#define Gigabytes(value) (Megabytes(value) * 1024ULL)
+#define Terabytes(value) (Gigabytes(value) * 1024ULL)
 
 #define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 

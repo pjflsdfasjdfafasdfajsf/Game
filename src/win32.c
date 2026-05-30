@@ -90,7 +90,7 @@ HWND WindowCreate(const wchar_t *title) {
     }
 
     WNDCLASSW windowClass;
-    MemoryZero(&windowClass, sizeof(windowClass));
+    ZeroStruct(windowClass);
 
     windowClass.lpfnWndProc = WindowProcedure;
     windowClass.hInstance = instance;
@@ -358,7 +358,7 @@ void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
 
 void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP,  HWND windowHandle) {
     MSG message;
-    MemoryZero(&message, sizeof(message));
+    ZeroStruct(message);
 
     bool isRunning = true;
     bool wasFocused = true;
@@ -406,8 +406,8 @@ void WINAPI WinMainCRTStartup() {
         ExitProcess(1);
     }
 
-    usize permanentArenaSize = MEGABYTES(64);
-    usize temporaryArenaSize = MEGABYTES(256);
+    usize permanentArenaSize = Megabytes(64);
+    usize temporaryArenaSize = Megabytes(256);
 
     void *permanentMemoryBlock = VirtualAlloc(0, permanentArenaSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     void *temporaryMemoryBlock = VirtualAlloc(0, temporaryArenaSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);

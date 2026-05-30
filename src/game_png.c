@@ -17,9 +17,10 @@ static void CRC32TableInitialize(void) {
     for (u32 i = 0; i < 256; i++) {
         u32 crc = i;
         for (u32 j = 0; j < 8; j++) {
-            if (crc & 1) {
-                crc = CRC32Polynomial ^ (crc >> 1);
-            } else {
+            if (IsBitSet(crc, 1))) {
+                    crc = CRC32Polynomial ^ (crc >> 1);
+                }
+            else {
                 crc = (crc >> 1);
             }
         }
@@ -163,8 +164,8 @@ static u32 StreamDecodeSymbol(BitStream *stream, const HuffmanTree *tree) {
 }
 
 static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 count) {
-    MemoryZero(tree->counts, sizeof(tree->counts));
-    MemoryZero(tree->symbols, sizeof(tree->symbols));
+    ZeroArray(tree->counts);
+    ZeroArray(tree->symbols);
 
     for (u32 i = 0; i < count; i++) {
         if (lengths[i] > 15) {
@@ -176,7 +177,7 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
     tree->counts[0] = 0;
 
     u16 nextSymbolIndex[16];
-    MemoryZero(nextSymbolIndex, sizeof(nextSymbolIndex));
+    ZeroArray(nextSymbolIndex);
 
     u16 symbolIndex = 0;
     for (u32 i = 1; i <= 15; i++) {
@@ -196,7 +197,7 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
 
 static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *outputBuffer, usize outputCapacity) {
     BitStream stream;
-    MemoryZero(&stream, sizeof(stream));
+    ZeroStruct(stream);
 
     stream.chunks = chunks;
     stream.chunkCount = chunkCount;
@@ -212,10 +213,10 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
         // NOTE: Checksum failed
         return false;
     }
-    if (zlibAdditionalFlags & 0x20) {
-        // NOTE: Preset dictionaries are not allowed in PNG
-        return false;
-    }
+    if (IsBitSet(zlibAdditionalFlags, 0x20))) {
+            // NOTE: Preset dictionaries are not allowed in PNG
+            return false;
+        }
 
     usize outputPosition = 0;
     bool isFinalBlock = false;
@@ -243,10 +244,10 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
             }
         } else if (blockType == 1 || blockType == 2) {
             HuffmanTree literalTree;
-            MemoryZero(&literalTree, sizeof(literalTree));
+            ZeroStruct(literalTree);
 
             HuffmanTree distanceTree;
-            MemoryZero(&distanceTree, sizeof(distanceTree));
+            ZeroStruct(distanceTree);
 
             // NOTE: Fixed huffman
             if (blockType == 1) {
@@ -278,19 +279,19 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                 u32 hclen = StreamReadBits(&stream, 4) + 4;
 
                 u8 codeLengthLengths[19];
-                MemoryZero(codeLengthLengths, sizeof(codeLengthLengths));
+                ZeroArray(codeLengthLengths);
 
                 for (u32 i = 0; i < hclen; i++) {
                     codeLengthLengths[deflateCodeLengthOrder[i]] = (u8)StreamReadBits(&stream, 3);
                 }
 
                 HuffmanTree codeLengthTree;
-                MemoryZero(&codeLengthTree, sizeof(codeLengthTree));
+                ZeroStruct(codeLengthTree);
 
                 HuffmanTreeInitialize(&codeLengthTree, codeLengthLengths, 19);
 
                 u8 lengths[320];
-                MemoryZero(lengths, sizeof(lengths));
+                ZeroArray(lengths);
 
                 u32 totalCodes = hlit + hdist;
                 u32 index = 0;
@@ -378,9 +379,9 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
     const int c = (int)upLeftByte;
 
     const int initialEstimate = a + b - c;
-    const int distanceA = ABS(initialEstimate - a);
-    const int distanceB = ABS(initialEstimate - b);
-    const int distanceC = ABS(initialEstimate - c);
+    const int distanceA = Abs(initialEstimate - a);
+    const int distanceB = Abs(initialEstimate - b);
+    const int distanceC = Abs(initialEstimate - c);
 
     if (distanceA <= distanceB && distanceA <= distanceC) {
         return (u8)a;
@@ -393,7 +394,7 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
 
 Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, const void *memory, usize length) {
     Image result;
-    MemoryZero(&result, sizeof(result));
+    ZeroStruct(result);
 
     if (!memory) {
         return result;
@@ -415,7 +416,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     bool hasParsedIHDR = false;
 
     PNGHeader imageHeader;
-    MemoryZero(&imageHeader, sizeof(imageHeader));
+    ZeroStruct(imageHeader);
 
     PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {
@@ -511,7 +512,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
             break;
         } else {
-            bool isCriticalChunk = !(chunkTypePointer[0] & 0x20);
+            bool isCriticalChunk = !IsBitSet(chunkTypePointer[0], 0x20));
             if (isCriticalChunk) {
                 break;
             }
