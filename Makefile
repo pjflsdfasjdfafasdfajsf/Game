@@ -18,7 +18,7 @@ ifeq ($(PLATFORM),Windows)
     SHELL = cmd.exe
     CC = cl.exe
     CFLAGS = /nologo /W3 /GS- /I $(GENERATED)
-    LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:WINDOWS
+    LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:CONSOLE
     LIBRARIES = kernel32.lib user32.lib d3d12.lib dxgi.lib dxguid.lib ole32.lib
     
     SOURCES = $(SRC)/win32.c $(SRC)/win32_d3d12.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c

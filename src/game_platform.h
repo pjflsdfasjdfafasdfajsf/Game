@@ -205,16 +205,26 @@ typedef struct {
     const u8 *memory;
     usize capacity;
     usize offset;
-    bool hasOverflowed;
-} BinaryStream;
 
-static inline void BinaryStreamInitialize(BinaryStream *stream, const void *memory, usize capacity) {
+    bool hasOverflowed;
+    bool isWritable;
+} MemoryStream;
+
+static inline void MemoryStreamInitializeReadOnly(MemoryStream *stream, const void *memory, usize capacity) {
     ZeroStruct(*stream);
     stream->memory = (const u8 *)memory;
     stream->capacity = capacity;
+    stream->isWritable = false;
 }
 
-static inline bool BinaryStreamHasSpace(BinaryStream *stream, usize readSize) {
+static inline void MemoryStreamInitializeWritable(MemoryStream *stream, void *memory, usize capacity) {
+    ZeroStruct(*stream);
+    stream->memory = (const u8 *)memory;
+    stream->capacity = capacity;
+    stream->isWritable = true;
+}
+
+static inline bool MemoryStreamHasSpace(MemoryStream *stream, usize readSize) {
     if (stream->hasOverflowed || !stream->memory || stream->offset + readSize > stream->capacity) {
         stream->hasOverflowed = true;
 
@@ -224,8 +234,8 @@ static inline bool BinaryStreamHasSpace(BinaryStream *stream, usize readSize) {
     return true;
 }
 
-static inline u8 BinaryStreamReadUInt8(BinaryStream *stream) {
-    if (!BinaryStreamHasSpace(stream, 1)) {
+static inline u8 MemoryStreamReadUInt8(MemoryStream *stream) {
+    if (!MemoryStreamHasSpace(stream, 1)) {
         return 0;
     }
     u8 result = stream->memory[stream->offset];
@@ -234,8 +244,8 @@ static inline u8 BinaryStreamReadUInt8(BinaryStream *stream) {
     return result;
 }
 
-static inline u16 BinaryStreamReadUInt16BigEndian(BinaryStream *stream) {
-    if (!BinaryStreamHasSpace(stream, 2)) {
+static inline u16 MemoryStreamReadUInt16BigEndian(MemoryStream *stream) {
+    if (!MemoryStreamHasSpace(stream, 2)) {
         return 0;
     }
     u16 result = ReadUInt16BigEndian(&stream->memory[stream->offset]);
@@ -244,12 +254,12 @@ static inline u16 BinaryStreamReadUInt16BigEndian(BinaryStream *stream) {
     return result;
 }
 
-static inline i16 BinaryStreamReadInt16BigEndian(BinaryStream *stream) {
-    return (i16)BinaryStreamReadUInt16BigEndian(stream);
+static inline i16 MemoryStreamReadInt16BigEndian(MemoryStream *stream) {
+    return (i16)MemoryStreamReadUInt16BigEndian(stream);
 }
 
-static inline u32 BinaryStreamReadUInt32BigEndian(BinaryStream *stream) {
-    if (!BinaryStreamHasSpace(stream, 4)) {
+static inline u32 MemoryStreamReadUInt32BigEndian(MemoryStream *stream) {
+    if (!MemoryStreamHasSpace(stream, 4)) {
         return 0;
     }
     u32 result = ReadUInt32BigEndian(&stream->memory[stream->offset]);
@@ -258,8 +268,8 @@ static inline u32 BinaryStreamReadUInt32BigEndian(BinaryStream *stream) {
     return result;
 }
 
-static inline i64 BinaryStreamReadInt64BigEndian(BinaryStream *stream) {
-    if (!BinaryStreamHasSpace(stream, 8)) {
+static inline i64 MemoryStreamReadInt64BigEndian(MemoryStream *stream) {
+    if (!MemoryStreamHasSpace(stream, 8)) {
         return 0;
     }
     i64 result = ReadInt64BigEndian(&stream->memory[stream->offset]);
@@ -267,6 +277,59 @@ static inline i64 BinaryStreamReadInt64BigEndian(BinaryStream *stream) {
 
     return result;
 }
+
+static inline bool MemoryStreamWriteBytes(MemoryStream *stream, const void *data, usize size) {
+    if (!stream->isWritable) {
+        stream->hasOverflowed = true;
+
+        return false;
+    }
+
+    if (!MemoryStreamHasSpace(stream, size)) {
+        return false;
+    }
+
+    u8 *writableMemory = (u8 *)stream->memory;
+    MemoryCopyForwards((void *)(writableMemory + stream->offset), data, size);
+    stream->offset += size;
+
+    return true;
+}
+
+static inline bool MemoryStreamWriteUInt8(MemoryStream *stream, u8 value) {
+    return MemoryStreamWriteBytes(stream, &value, 1);
+}
+
+static inline bool MemoryStreamWriteString(MemoryStream *stream, const char *string) {
+    if (!string) {
+        return false;
+    }
+    usize length = StringGetLength(string);
+    return MemoryStreamWriteBytes(stream, string, length);
+}
+
+static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *string) {
+    return MemoryStreamWriteString(stream, string) && MemoryStreamWriteUInt8(stream, '\n');
+}
+
+// NOTE: Platform must initialize those.
+extern MemoryStream *GlobalErrorStream;
+extern MemoryStream *GlobalInfoStream;
+
+#define GlobalErrorStreamWrite(message) \
+    do { \
+        MemoryStreamWriteLine(GlobalErrorStream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
+    } while (0)
+
+#define GlobalErrorStreamWriteOutOfMemory() GlobalErrorStreamWrite("Out of memory.")
+
+#define GlobalInfoStreamWrite(message) \
+    do { \
+        MemoryStreamWriteLine(GlobalInfoStream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
+    } while (0)
+
+#define Stringify(x) #x
+#define Stringify2(x) Stringify(x)
 
 // NOTE: Services that the game provides to platform.
 

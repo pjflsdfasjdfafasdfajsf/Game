@@ -159,18 +159,22 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
     ZeroStruct(result);
 
     if (!memory) {
+        GlobalErrorStreamWrite("Invalid parameter: memory.");
+
         return result;
     }
 
     const usize trueTypeOffsetSubtableLength = 12;
     if (length < trueTypeOffsetSubtableLength) {
+        GlobalErrorStreamWrite("Font file too small to contain offset subtable.");
+
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, memory, length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, memory, length);
 
-    u32 scalerTypeValue = BinaryStreamReadUInt32BigEndian(&stream);
+    u32 scalerTypeValue = MemoryStreamReadUInt32BigEndian(&stream);
 
     if (scalerTypeValue == 0x00010000) {
         result.scalerType = TrueTypeScalerTypeWindows;
@@ -181,24 +185,30 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
     } else if (scalerTypeValue == FOURCC('O', 'T', 'T', 'O')) {
         result.scalerType = TrueTypeScalerTypeOpenType;
     } else {
+        GlobalErrorStreamWrite("Unrecognized scaler type; not a supported TrueType/OpenType font.");
+
         return result;
     }
 
-    result.numberOfTables = BinaryStreamReadUInt16BigEndian(&stream);
-    result.searchRange = BinaryStreamReadUInt16BigEndian(&stream);
-    result.entrySelector = BinaryStreamReadUInt16BigEndian(&stream);
-    result.rangeShift = BinaryStreamReadUInt16BigEndian(&stream);
+    result.numberOfTables = MemoryStreamReadUInt16BigEndian(&stream);
+    result.searchRange = MemoryStreamReadUInt16BigEndian(&stream);
+    result.entrySelector = MemoryStreamReadUInt16BigEndian(&stream);
+    result.rangeShift = MemoryStreamReadUInt16BigEndian(&stream);
 
     const usize trueTypeTableDirectoryEntryLength = 16;
     usize expectedDirectorySize = trueTypeOffsetSubtableLength + ((usize)result.numberOfTables * trueTypeTableDirectoryEntryLength);
 
     if (length < expectedDirectorySize) {
+        GlobalErrorStreamWrite("Font file too small to contain full table directory.");
+
         return result;
     }
 
     if (result.numberOfTables > 0) {
         result.tables = MemoryArenaPushArray(arena, TrueTypeTableDirectoryEntry, result.numberOfTables);
         if (!result.tables) {
+            GlobalErrorStreamWriteOutOfMemory();
+
             return result;
         }
 
@@ -212,6 +222,8 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
             u32 tableLength = ReadUInt32BigEndian(&entryPointer[12]);
 
             if (tableOffset > length || tableLength > (length - tableOffset)) {
+                GlobalErrorStreamWrite("Table offset/length out of bounds.");
+
                 ReturnZeroed(result);
             }
 
@@ -221,6 +233,8 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
             u32 calculatedChecksum = TrueTypeCalculateTableChecksum(tableDataPointer, tableLength, isHeadTable);
 
             if (calculatedChecksum != expectedChecksum) {
+                GlobalErrorStreamWrite("Table checksum mismatch.");
+
                 ReturnZeroed(result);
             }
 
@@ -262,37 +276,37 @@ TrueTypeHeadTable TrueTypeHeadTableParse(const TrueTypeTableDirectoryEntry *head
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, headTableEntry->memory, headTableEntry->length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, headTableEntry->memory, headTableEntry->length);
 
-    result.version = BinaryStreamReadUInt32BigEndian(&stream);
-    result.fontRevision = BinaryStreamReadUInt32BigEndian(&stream);
-    result.checkSumAdjustment = BinaryStreamReadUInt32BigEndian(&stream);
-    result.magicNumber = BinaryStreamReadUInt32BigEndian(&stream);
+    result.version = MemoryStreamReadUInt32BigEndian(&stream);
+    result.fontRevision = MemoryStreamReadUInt32BigEndian(&stream);
+    result.checkSumAdjustment = MemoryStreamReadUInt32BigEndian(&stream);
+    result.magicNumber = MemoryStreamReadUInt32BigEndian(&stream);
 
     const u32 trueTypeHeadTableMagicNumber = 0x5F0F3CF5;
     if (result.magicNumber != trueTypeHeadTableMagicNumber) {
         ReturnZeroed(result);
     }
 
-    result.flags = BinaryStreamReadUInt16BigEndian(&stream);
-    result.unitsPerEm = BinaryStreamReadUInt16BigEndian(&stream);
+    result.flags = MemoryStreamReadUInt16BigEndian(&stream);
+    result.unitsPerEm = MemoryStreamReadUInt16BigEndian(&stream);
 
     if (result.unitsPerEm < 64 || result.unitsPerEm > 16384) {
         ReturnZeroed(result);
     }
 
-    result.created = BinaryStreamReadInt64BigEndian(&stream);
-    result.modified = BinaryStreamReadInt64BigEndian(&stream);
-    result.xMin = BinaryStreamReadInt16BigEndian(&stream);
-    result.yMin = BinaryStreamReadInt16BigEndian(&stream);
-    result.xMax = BinaryStreamReadInt16BigEndian(&stream);
-    result.yMax = BinaryStreamReadInt16BigEndian(&stream);
-    result.macStyle = BinaryStreamReadUInt16BigEndian(&stream);
-    result.lowestRecPPEM = BinaryStreamReadUInt16BigEndian(&stream);
-    result.fontDirectionHint = BinaryStreamReadInt16BigEndian(&stream);
-    result.indexToLocFormat = BinaryStreamReadInt16BigEndian(&stream);
-    result.glyphDataFormat = BinaryStreamReadInt16BigEndian(&stream);
+    result.created = MemoryStreamReadInt64BigEndian(&stream);
+    result.modified = MemoryStreamReadInt64BigEndian(&stream);
+    result.xMin = MemoryStreamReadInt16BigEndian(&stream);
+    result.yMin = MemoryStreamReadInt16BigEndian(&stream);
+    result.xMax = MemoryStreamReadInt16BigEndian(&stream);
+    result.yMax = MemoryStreamReadInt16BigEndian(&stream);
+    result.macStyle = MemoryStreamReadUInt16BigEndian(&stream);
+    result.lowestRecPPEM = MemoryStreamReadUInt16BigEndian(&stream);
+    result.fontDirectionHint = MemoryStreamReadInt16BigEndian(&stream);
+    result.indexToLocFormat = MemoryStreamReadInt16BigEndian(&stream);
+    result.glyphDataFormat = MemoryStreamReadInt16BigEndian(&stream);
 
     return result;
 }
@@ -312,11 +326,11 @@ TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTable
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, MaximumProfileTableEntry->memory, MaximumProfileTableEntry->length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, MaximumProfileTableEntry->memory, MaximumProfileTableEntry->length);
 
-    result.version = BinaryStreamReadUInt32BigEndian(&stream);
-    result.numGlyphs = BinaryStreamReadUInt16BigEndian(&stream);
+    result.version = MemoryStreamReadUInt32BigEndian(&stream);
+    result.numGlyphs = MemoryStreamReadUInt16BigEndian(&stream);
 
     const u32 trueTypeMaximumProfileVersion05 = 0x00005000;
     const u32 trueTypeMaximumProfileVersion10 = 0x00010000;
@@ -328,19 +342,19 @@ TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTable
             ReturnZeroed(result);
         }
 
-        result.MaxPoints = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxContours = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxComponentPoints = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxComponentContours = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxZones = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxTwilightPoints = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxStorage = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxFunctionDefs = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxInstructionDefs = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxStackElements = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxSizeOfInstructions = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxComponentElements = BinaryStreamReadUInt16BigEndian(&stream);
-        result.MaxComponentDepth = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxPoints = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxContours = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentPoints = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentContours = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxZones = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxTwilightPoints = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxStorage = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxFunctionDefs = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxInstructionDefs = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxStackElements = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxSizeOfInstructions = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentElements = MemoryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentDepth = MemoryStreamReadUInt16BigEndian(&stream);
     } else {
         ReturnZeroed(result);
     }
@@ -361,15 +375,15 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, cmapTableEntry->memory, cmapTableEntry->length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, cmapTableEntry->memory, cmapTableEntry->length);
 
-    u16 version = BinaryStreamReadUInt16BigEndian(&stream);
+    u16 version = MemoryStreamReadUInt16BigEndian(&stream);
     if (version != 0) {
         return result;
     }
 
-    u16 numberSubtables = BinaryStreamReadUInt16BigEndian(&stream);
+    u16 numberSubtables = MemoryStreamReadUInt16BigEndian(&stream);
 
     const usize TrueTypeCmapEncodingRecordLength = 8;
     if (cmapTableEntry->length < TrueTypeCmapHeaderLength + (numberSubtables * TrueTypeCmapEncodingRecordLength)) {
@@ -379,9 +393,9 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
     u32 selectedSubtableOffset = 0;
 
     for (u16 subtableIndex = 0; subtableIndex < numberSubtables; subtableIndex++) {
-        u16 platformID = BinaryStreamReadUInt16BigEndian(&stream);
-        u16 platformSpecificID = BinaryStreamReadUInt16BigEndian(&stream);
-        u32 subtableOffset = BinaryStreamReadUInt32BigEndian(&stream);
+        u16 platformID = MemoryStreamReadUInt16BigEndian(&stream);
+        u16 platformSpecificID = MemoryStreamReadUInt16BigEndian(&stream);
+        u32 subtableOffset = MemoryStreamReadUInt32BigEndian(&stream);
 
         if (subtableOffset > cmapTableEntry->length || subtableOffset + 2 > cmapTableEntry->length) {
             continue;
@@ -572,11 +586,15 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     ZeroStruct(result);
 
     if (!glyfTableEntry || !glyfTableEntry->memory) {
+        GlobalErrorStreamWrite("Invalid parameter: glyfTableEntry.");
+
         return result;
     }
 
     if (glyphLocation.offset > glyfTableEntry->length ||
         glyphLocation.length > (glyfTableEntry->length - glyphLocation.offset)) {
+        GlobalErrorStreamWrite("Glyph location out of bounds in glyf table.");
+
         return result;
     }
 
@@ -585,20 +603,22 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, &glyfTableEntry->memory[glyphLocation.offset], glyphLocation.length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, &glyfTableEntry->memory[glyphLocation.offset], glyphLocation.length);
 
     const usize TrueTypeGlyphHeaderLength = 10;
     if (glyphLocation.length < TrueTypeGlyphHeaderLength) {
+        GlobalErrorStreamWrite("Glyph data too small to contain header.");
+
         return result;
     }
 
-    result.numberOfContours = BinaryStreamReadInt16BigEndian(&stream);
+    result.numberOfContours = MemoryStreamReadInt16BigEndian(&stream);
 
-    result.xMin = BinaryStreamReadInt16BigEndian(&stream);
-    result.yMin = BinaryStreamReadInt16BigEndian(&stream);
-    result.xMax = BinaryStreamReadInt16BigEndian(&stream);
-    result.yMax = BinaryStreamReadInt16BigEndian(&stream);
+    result.xMin = MemoryStreamReadInt16BigEndian(&stream);
+    result.yMin = MemoryStreamReadInt16BigEndian(&stream);
+    result.xMax = MemoryStreamReadInt16BigEndian(&stream);
+    result.yMax = MemoryStreamReadInt16BigEndian(&stream);
 
     if (result.numberOfContours < 0) {
         result.isValid = true;
@@ -613,6 +633,8 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
     usize endPointsArrayByteLength = (usize)result.numberOfContours * 2;
     if (stream.offset + endPointsArrayByteLength > glyphLocation.length) {
+        GlobalErrorStreamWrite("End points array overruns glyph data.");
+
         return result;
     }
 
@@ -625,6 +647,8 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
     u8 *allocationBuffer = MemoryArenaPushBytes(arena, totalAllocationSize);
     if (!allocationBuffer) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
@@ -632,16 +656,18 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     result.points = (TrueTypeGlyphPoint *)(allocationBuffer + contoursAllocationSize);
 
     for (i16 contourIndex = 0; contourIndex < result.numberOfContours; contourIndex++) {
-        result.endPointsOfContours[contourIndex] = BinaryStreamReadUInt16BigEndian(&stream);
+        result.endPointsOfContours[contourIndex] = MemoryStreamReadUInt16BigEndian(&stream);
     }
 
     if (stream.offset + 2 > glyphLocation.length) {
+        GlobalErrorStreamWrite("Instruction length field overruns glyph data.");
         ReturnZeroed(result);
     }
 
-    result.instructionLength = BinaryStreamReadUInt16BigEndian(&stream);
+    result.instructionLength = MemoryStreamReadUInt16BigEndian(&stream);
 
     if (stream.offset + result.instructionLength > glyphLocation.length) {
+        GlobalErrorStreamWrite("Instructions overrun glyph data.");
         ReturnZeroed(result);
     }
 
@@ -650,12 +676,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
     u8 *unpackedFlags = MemoryArenaPushArray(arena, u8, result.numberOfPoints);
     if (!unpackedFlags) {
+        GlobalErrorStreamWriteOutOfMemory();
         ReturnZeroed(result);
     }
 
     u32 pointsProcessed = 0;
     while (pointsProcessed < result.numberOfPoints) {
         if (stream.offset + 1 > glyphLocation.length) {
+            GlobalErrorStreamWrite("Flags overrun glyph data.");
             ReturnZeroed(result);
         }
 
@@ -664,12 +692,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
         if (IsBitSet(currentFlag, TrueTypeGlyphFlag_Repeat)) {
             if (stream.offset + 1 > glyphLocation.length) {
+                GlobalErrorStreamWrite("Flag repeat count overruns glyph data.");
                 ReturnZeroed(result);
             }
 
             u8 repeatCount = stream.memory[stream.offset++];
 
             if (pointsProcessed + repeatCount > result.numberOfPoints) {
+                GlobalErrorStreamWrite("Flag repeat count exceeds point count.");
                 ReturnZeroed(result);
             }
 
@@ -686,6 +716,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_XShortVector)) {
             if (stream.offset + 1 > glyphLocation.length) {
+                GlobalErrorStreamWrite("X coordinate byte overruns glyph data.");
                 ReturnZeroed(result);
             }
 
@@ -698,10 +729,11 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         } else {
             if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
                 if (stream.offset + 2 > glyphLocation.length) {
+                    GlobalErrorStreamWrite("Y coordinate byte overruns glyph data.");
                     ReturnZeroed(result);
                 }
 
-                i16 deltaX = BinaryStreamReadInt16BigEndian(&stream);
+                i16 deltaX = MemoryStreamReadInt16BigEndian(&stream);
                 currentX += deltaX;
             }
         }
@@ -714,6 +746,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_YShortVector)) {
             if (stream.offset + 1 > glyphLocation.length) {
+                GlobalErrorStreamWrite("Y coordinate byte overruns glyph data.");
                 ReturnZeroed(result);
             }
 
@@ -726,10 +759,11 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         } else {
             if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
                 if (stream.offset + 2 > glyphLocation.length) {
+                    GlobalErrorStreamWrite("Y coordinate short overruns glyph data.");
                     ReturnZeroed(result);
                 }
 
-                i16 deltaY = BinaryStreamReadInt16BigEndian(&stream);
+                i16 deltaY = MemoryStreamReadInt16BigEndian(&stream);
                 currentY += deltaY;
             }
         }
@@ -769,6 +803,8 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyp
     }
 
     if (glyph->yMax <= glyph->yMin || glyph->xMax <= glyph->xMin) {
+        GlobalErrorStreamWrite("Weird glyph bounds.");
+
         return result;
     }
 
@@ -790,6 +826,8 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyp
     result.pixels = MemoryArenaPushBytes(arena, pixelsAllocationSize);
 
     if (!result.pixels) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
@@ -797,11 +835,15 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyp
 
     Vector2 *generatedPoints = MemoryArenaPushArray(arena, Vector2, MaxGeneratedPoints);
     if (!generatedPoints) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
     u32 *contourEndIndices = MemoryArenaPushArray(arena, u32, glyph->numberOfContours);
     if (!contourEndIndices) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
@@ -884,6 +926,10 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyp
     }
 
     u8 *coverageBuffer = MemoryArenaPushBytes(arena, result.size.x * result.size.y);
+    if (!coverageBuffer) {
+        GlobalErrorStreamWriteOutOfMemory();
+        ReturnZeroed(result);
+    }
 
     const u32 scanlineSubdivisions = 5;
     f32 alphaWeight = 255.0f / (f32)scanlineSubdivisions;
@@ -1029,6 +1075,8 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_GLYF);
 
     if (!headEntry || !MaxpEntry || !cmapEntry || !locaEntry || !glyfEntry) {
+        GlobalErrorStreamWrite("Could not get one or more tables.");
+
         return result;
     }
 
@@ -1038,6 +1086,8 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     TrueTypeIndexToLocationTable loca = TrueTypeIndexToLocationTableParse(locaEntry, head.indexToLocFormat, Maxp.numGlyphs);
 
     if (!cmap.isValid || !loca.isValid) {
+        GlobalErrorStreamWrite("cmap/loca table is invalid.");
+
         return result;
     }
 
@@ -1051,6 +1101,7 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     result.pixels = MemoryArenaPushBytes(permanentArena, pixelsAllocationSize);
 
     if (!result.pixels) {
+        GlobalErrorStreamWriteOutOfMemory();
         ReturnZeroed(result);
     }
 

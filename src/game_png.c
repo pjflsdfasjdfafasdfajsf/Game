@@ -396,10 +396,14 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     ZeroStruct(result);
 
     if (!memory) {
+        GlobalErrorStreamWrite("Invalid parameter: memory.");
+
         return result;
     }
 
     if (length < PNGFileSignatureLength) {
+        GlobalErrorStreamWrite("Most likely corrupted PNG file as it is too small to even contain a signature.");
+
         return result;
     }
 
@@ -407,11 +411,13 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     bool hasValidSignature = MemoryEquals(imageBufferPointer, PNGFileSignature, PNGFileSignatureLength);
     if (!hasValidSignature) {
+        GlobalErrorStreamWrite("Corrupted PNG file.");
+
         return result;
     }
 
-    BinaryStream stream;
-    BinaryStreamInitialize(&stream, memory, length);
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, memory, length);
     stream.offset = PNGFileSignatureLength;
 
     bool hasParsedIHDR = false;
@@ -421,6 +427,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
@@ -431,28 +439,30 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     bool isPreviousChunkIDAT = false;
 
     while (stream.offset < stream.capacity) {
-        if (!BinaryStreamHasSpace(&stream, PNGChunkLengthSize + PNGChunkTypeSize)) {
+        if (!MemoryStreamHasSpace(&stream, PNGChunkLengthSize + PNGChunkTypeSize)) {
             break;
         }
 
-        u32 chunkLength = BinaryStreamReadUInt32BigEndian(&stream);
+        u32 chunkLength = MemoryStreamReadUInt32BigEndian(&stream);
 
         const u8 *chunkTypePointer = &stream.memory[stream.offset];
         stream.offset += PNGChunkTypeSize;
 
-        if (!BinaryStreamHasSpace(&stream, chunkLength + PNGChunkCRCSize)) {
+        if (!MemoryStreamHasSpace(&stream, chunkLength + PNGChunkCRCSize)) {
             break;
         }
 
         const u8 *chunkDataPointer = &stream.memory[stream.offset];
         stream.offset += chunkLength;
 
-        u32 expectedCRC = BinaryStreamReadUInt32BigEndian(&stream);
+        u32 expectedCRC = MemoryStreamReadUInt32BigEndian(&stream);
 
         usize crcDataLength = PNGChunkTypeSize + chunkLength;
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
 
         if (calculatedCRC != expectedCRC) {
+            GlobalErrorStreamWrite("CRC mismatch in PNG chunk.");
+
             break;
         }
 
@@ -517,6 +527,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     }
 
     if (!hasParsedIHDR || totalIDATDataSize == 0) {
+        GlobalErrorStreamWrite("Missing IHDR or no IDAT data.");
+
         return result;
     }
 
@@ -531,6 +543,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     } else if (imageHeader.colorType == PNGColorTypeTrue_ColorAlpha) {
         bytesPerPixel = 4;
     } else {
+        GlobalErrorStreamWrite("Unsupported color type.");
+
         return result;
     }
 
@@ -539,11 +553,15 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     u8 *decompressedBuffer = MemoryArenaPushBytes(temporaryArena, decompressedCapacity);
     if (!decompressedBuffer) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
     bool succesfullyDecompressed = DecompressDeflate(idatChunks, idatChunkCount, decompressedBuffer, decompressedCapacity);
     if (!succesfullyDecompressed) {
+        GlobalErrorStreamWrite("Could not decompress.");
+
         return result;
     }
 
@@ -552,6 +570,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     const usize rawScanlineByteCount = (usize)imageWidth * bytesPerPixel;
     if (imageWidth != 0 && rawScanlineByteCount / imageWidth != bytesPerPixel) {
+        GlobalErrorStreamWrite("Scanline byte count overflow.");
+
         return result;
     }
 
@@ -559,12 +579,16 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     const usize expectedDecompressedByteCount = filteredScanlineByteCount * imageHeight;
 
     if (decompressedCapacity < expectedDecompressedByteCount) {
+        GlobalErrorStreamWrite("Decompressed PNG data is smaller than expected.");
+
         return result;
     }
 
     const usize totalRawPixelByteCount = rawScanlineByteCount * imageHeight;
     u8 *rawPixelDataBuffer = MemoryArenaPushBytes(permanentArena, totalRawPixelByteCount);
     if (!rawPixelDataBuffer) {
+        GlobalErrorStreamWriteOutOfMemory();
+
         return result;
     }
 
@@ -573,6 +597,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     for (u32 currentScanlineIndex = 0; currentScanlineIndex < imageHeight; currentScanlineIndex++) {
         if (sourceReadOffset + filteredScanlineByteCount > decompressedCapacity) {
+            GlobalErrorStreamWrite("Scanline data overruns decompressed buffer.");
+            
             return result;
         }
 
@@ -583,6 +609,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         const u8 *previousRawScanlineData = (currentScanlineIndex > 0) ? &rawPixelDataBuffer[destinationWriteOffset - rawScanlineByteCount] : 0;
 
         if (scanlineFilterType > 4) {
+            GlobalErrorStreamWrite("Unknown PNG filter type.");
+            
             return result;
         }
 

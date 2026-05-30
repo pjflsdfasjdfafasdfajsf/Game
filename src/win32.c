@@ -15,6 +15,9 @@
 #include "game_ttf.h"
 // #include "game_png.h"
 
+MemoryStream *GlobalErrorStream;
+MemoryStream *GlobalInfoStream;
+
 int _fltused = 0;
 
 void ErrorShowLast(const wchar_t *functionName) {
@@ -334,6 +337,30 @@ void DrawTextTEMP(Win32Direct12 *d3d12, u32 atlasTextureId, const TrueTypeBakedG
     }
 }
 
+static inline void GlobalStreamsDrain() {
+    if (GlobalInfoStream && GlobalInfoStream->offset > 0) {
+        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        if (stdOut && stdOut != INVALID_HANDLE_VALUE) {
+            DWORD written;
+            WriteFile(stdOut, GlobalInfoStream->memory, (DWORD)GlobalInfoStream->offset, &written, 0);
+        }
+
+        GlobalInfoStream->offset = 0;
+    }
+
+    if (GlobalErrorStream && GlobalErrorStream->offset > 0) {
+        HANDLE stdErr = GetStdHandle(STD_ERROR_HANDLE);
+
+        if (stdErr && stdErr != INVALID_HANDLE_VALUE) {
+            DWORD written;
+            WriteFile(stdErr, GlobalErrorStream->memory, (DWORD)GlobalErrorStream->offset, &written, 0);
+        }
+
+        GlobalErrorStream->offset = 0;
+    }
+}
+
 u32 textureIdTEMP = 0;
 
 void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
@@ -341,8 +368,8 @@ void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
     {
         f32 scaleToScreenX = 1.0f / (DEFAULT_WINDOW_WIDTH / 2.0f);
         f32 scaleToScreenY = 1.0f / (DEFAULT_WINDOW_HEIGHT / 2.0f);
-        
-        f32 scale = scaleToScreenY; 
+
+        f32 scale = scaleToScreenY;
 
         Vector2 startPosition = V2(-0.8f, 0.5f);
 
@@ -351,7 +378,7 @@ void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
     D3D12FrameEnd(d3d12);
 }
 
-void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP,  HWND windowHandle) {
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP, HWND windowHandle) {
     MSG message;
     ZeroStruct(message);
 
@@ -366,6 +393,8 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
             TranslateMessage(&message);
             DispatchMessageW(&message);
         } else {
+            GlobalStreamsDrain();
+
             // NOTE: This logic below is to stop playing sound when the window is alt-tabbed because I am a good programmer.
             bool isFocused = (GetForegroundWindow() == windowHandle);
 
@@ -386,7 +415,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
     }
 }
 
-void WINAPI WinMainCRTStartup() {
+void mainCRTStartup() {
     HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
@@ -413,6 +442,17 @@ void WINAPI WinMainCRTStartup() {
     MemoryArena temporaryArena;
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
+    usize globalErrorStreamSize = Kilobytes(64);
+    usize globalInfoStreamSize = Kilobytes(256);
+
+    GlobalErrorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+    GlobalInfoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+
+    MemoryStreamInitializeWritable(GlobalErrorStream, MemoryArenaPushBytes(&permanentArena, globalErrorStreamSize), globalErrorStreamSize);
+    MemoryStreamInitializeWritable(GlobalInfoStream, MemoryArenaPushBytes(&permanentArena, globalInfoStreamSize), globalInfoStreamSize);
+
+    GlobalInfoStreamWrite("Win32 says hello!");
+
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12, window);
 
@@ -433,7 +473,7 @@ void WINAPI WinMainCRTStartup() {
     TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
 
     Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
-    // textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+    textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     WindowShow(window);
 
