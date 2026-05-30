@@ -1,3 +1,4 @@
+# TODO: Make incremental building work :(
 ifeq ($(OS),Windows_NT)
     PLATFORM = Windows
 else
