@@ -1,6 +1,11 @@
 #include "game_platform.h"
 
 UPDATE_AND_RENDER(UpdateAndRender) {
+    if (!memory->isInitialized) {
+        MemoryStreamWriteString(memory->standardInfoStream, "Game says hi!");
+        
+        memory->isInitialized = true;
+    }
     RenderClearEntireScreen(commandBuffer, RED);
 }
 

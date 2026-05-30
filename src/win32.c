@@ -83,56 +83,7 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
     ExitProcess(1);
 }
 
-LRESULT CALLBACK WindowProcedure(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter) {
-    switch (message) {
-    case WM_DESTROY: {
-        PostQuitMessage(0);
-        return 0;
-    } break;
-    }
-
-    return DefWindowProcW(windowHandle, message, wordParameter, longParameter);
-}
-
-HWND WindowCreate(const wchar_t *title) {
-    HINSTANCE instance = GetModuleHandleW(0);
-    if (!instance) {
-        ErrorShowLast(L"GetModuleHandleW");
-        return 0;
-    }
-
-    const wchar_t *className = L"Win32";
-
-    HCURSOR cursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
-    if (!cursor) {
-        ErrorShowLast(L"LoadCursorW");
-        return 0;
-    }
-
-    WNDCLASSW windowClass;
-    ZeroStruct(windowClass);
-
-    windowClass.lpfnWndProc = WindowProcedure;
-    windowClass.hInstance = instance;
-    windowClass.lpszClassName = className;
-    windowClass.hCursor = cursor;
-    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClassW(&windowClass)) {
-        ErrorShowLast(L"RegisterClassW");
-        return 0;
-    }
-
-    HWND windowHandle = CreateWindowExW(0, className, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, instance, 0);
-    if (!windowHandle) {
-        ErrorShowLast(L"CreateWindowExW");
-        return 0;
-    }
-
-    return windowHandle;
-}
-
-// NOTE: Audio implementation
+// NOTE: Audio API
 
 void AudioUpdate(Win32Audio *audio) {
     if (!audio) {
@@ -306,6 +257,87 @@ void AudioResume(Win32Audio *audio) {
     audio->isPaused = false;
 }
 
+//
+
+void MemoryDumpStandardStreams(GameMemory *gameMemory) {
+    if (!gameMemory) {
+        return;
+    }
+
+    if (gameMemory->standardInfoStream && gameMemory->standardInfoStream->offset > 0) {
+        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        if (stdOut && stdOut != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(stdOut, gameMemory->standardInfoStream->memory, (DWORD)gameMemory->standardInfoStream->offset, &bytesWritten, 0);
+        }
+
+        gameMemory->standardInfoStream->offset = 0;
+    }
+
+    if (gameMemory->standardErrorStream && gameMemory->standardErrorStream->offset > 0) {
+        HANDLE stdErr = GetStdHandle(STD_ERROR_HANDLE);
+
+        if (stdErr && stdErr != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(stdErr, gameMemory->standardErrorStream->memory, (DWORD)gameMemory->standardErrorStream->offset, &bytesWritten, 0);
+        }
+
+        gameMemory->standardErrorStream->offset = 0;
+    }
+}
+
+// NOTE: Window API.
+
+LRESULT CALLBACK WindowProcedure(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter) {
+    switch (message) {
+    case WM_DESTROY: {
+        PostQuitMessage(0);
+        return 0;
+    } break;
+    }
+
+    return DefWindowProcW(windowHandle, message, wordParameter, longParameter);
+}
+
+HWND WindowCreate(const wchar_t *title) {
+    HINSTANCE instance = GetModuleHandleW(0);
+    if (!instance) {
+        ErrorShowLast(L"GetModuleHandleW");
+        return 0;
+    }
+
+    const wchar_t *className = L"Win32";
+
+    HCURSOR cursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
+    if (!cursor) {
+        ErrorShowLast(L"LoadCursorW");
+        return 0;
+    }
+
+    WNDCLASSW windowClass;
+    ZeroStruct(windowClass);
+
+    windowClass.lpfnWndProc = WindowProcedure;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = className;
+    windowClass.hCursor = cursor;
+    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    if (!RegisterClassW(&windowClass)) {
+        ErrorShowLast(L"RegisterClassW");
+        return 0;
+    }
+
+    HWND windowHandle = CreateWindowExW(0, className, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, instance, 0);
+    if (!windowHandle) {
+        ErrorShowLast(L"CreateWindowExW");
+        return 0;
+    }
+
+    return windowHandle;
+}
+
 void WindowShow(HWND windowHandle) {
     ShowWindow(windowHandle, SW_SHOWDEFAULT);
 
@@ -314,7 +346,7 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *commandBuffer, HWND window) {
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer, HWND window) {
     MSG message;
     ZeroStruct(message);
 
@@ -329,6 +361,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *com
             TranslateMessage(&message);
             DispatchMessageW(&message);
         } else {
+            MemoryDumpStandardStreams(gameMemory);
             // NOTE: This logic below is to stop playing sound when the window is alt-tabbed because I am a good programmer.
             bool isFocused = (GetForegroundWindow() == window);
 
@@ -344,7 +377,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *com
                 RenderCommandBufferReset(commandBuffer);
 
                 if (GameUpdateAndRender) {
-                    GameUpdateAndRender(commandBuffer);
+                    GameUpdateAndRender(gameMemory, commandBuffer);
                 }
 
                 D3D12FrameBegin(d3d12);
@@ -383,6 +416,20 @@ void mainCRTStartup() {
     MemoryArena temporaryArena;
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
+    usize errorStreamSize = Kilobytes(64);
+    usize infoStreamSize = Kilobytes(256);
+
+    MemoryStream *errorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+    MemoryStream *infoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+
+    MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
+    MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
+
+    GameMemory gameMemory = {0};
+    gameMemory.standardErrorStream = errorStream;
+    gameMemory.standardInfoStream = infoStream;
+    gameMemory.isInitialized = false;
+
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12, window);
 
@@ -402,7 +449,7 @@ void mainCRTStartup() {
 
     WindowShow(window);
 
-    RunUpdate(&d3d12, &audio, commandBuffer, window);
+    RunUpdate(&d3d12, &audio, &gameMemory, commandBuffer, window);
 
     ExitProcess(0);
 }

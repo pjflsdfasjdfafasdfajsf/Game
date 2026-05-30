@@ -159,14 +159,14 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
     ZeroStruct(result);
 
     if (!memory) {
-        Error(errorStream, "Invalid parameter: memory.");
+        MemoryStreamWriteString(errorStream, "Invalid parameter: memory.");
 
         return result;
     }
 
     const usize trueTypeOffsetSubtableLength = 12;
     if (length < trueTypeOffsetSubtableLength) {
-        Error(errorStream, "Font file too small to contain offset subtable.");
+        MemoryStreamWriteString(errorStream, "Font file too small to contain offset subtable.");
 
         return result;
     }
@@ -185,7 +185,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
     } else if (scalerTypeValue == FOURCC('O', 'T', 'T', 'O')) {
         result.scalerType = TrueTypeScalerTypeOpenType;
     } else {
-        Error(errorStream, "Unrecognized scaler type; not a supported TrueType/OpenType font.");
+        MemoryStreamWriteString(errorStream, "Unrecognized scaler type; not a supported TrueType/OpenType font.");
 
         return result;
     }
@@ -199,7 +199,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
     usize expectedDirectorySize = trueTypeOffsetSubtableLength + ((usize)result.numberOfTables * trueTypeTableDirectoryEntryLength);
 
     if (length < expectedDirectorySize) {
-        Error(errorStream, "Font file too small to contain full table directory.");
+        MemoryStreamWriteString(errorStream, "Font file too small to contain full table directory.");
 
         return result;
     }
@@ -207,7 +207,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
     if (result.numberOfTables > 0) {
         result.tables = MemoryArenaPushArray(arena, TrueTypeTableDirectoryEntry, result.numberOfTables);
         if (!result.tables) {
-            ErrorOutOfMemory(errorStream);
+            MemoryStreamWriteString(errorStream, "Out of memory.");
 
             return result;
         }
@@ -222,8 +222,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
             u32 tableLength = ReadUInt32BigEndian(&entryPointer[12]);
 
             if (tableOffset > length || tableLength > (length - tableOffset)) {
-                Error(errorStream, "Table offset/length out of bounds.");
-
+                MemoryStreamWriteString(errorStream, "Table offset/length out of bounds.");
                 ReturnZeroed(result);
             }
 
@@ -233,8 +232,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorS
             u32 calculatedChecksum = TrueTypeCalculateTableChecksum(tableDataPointer, tableLength, isHeadTable);
 
             if (calculatedChecksum != expectedChecksum) {
-                Error(errorStream, "Table checksum mismatch.");
-
+                MemoryStreamWriteString(errorStream, "Table checksum mismatch.");
                 ReturnZeroed(result);
             }
 
@@ -586,14 +584,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
     ZeroStruct(result);
 
     if (!glyfTableEntry || !glyfTableEntry->memory) {
-        Error(errorStream, "Invalid parameter: glyfTableEntry.");
+        MemoryStreamWriteString(errorStream, "Invalid parameter: glyfTableEntry.");
 
         return result;
     }
 
     if (glyphLocation.offset > glyfTableEntry->length ||
         glyphLocation.length > (glyfTableEntry->length - glyphLocation.offset)) {
-        Error(errorStream, "Glyph location out of bounds in glyf table.");
+        MemoryStreamWriteString(errorStream, "Glyph location out of bounds in glyf table.");
 
         return result;
     }
@@ -608,7 +606,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
     const usize TrueTypeGlyphHeaderLength = 10;
     if (glyphLocation.length < TrueTypeGlyphHeaderLength) {
-        Error(errorStream, "Glyph data too small to contain header.");
+        MemoryStreamWriteString(errorStream, "Glyph data too small to contain header.");
 
         return result;
     }
@@ -633,7 +631,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
     usize endPointsArrayByteLength = (usize)result.numberOfContours * 2;
     if (stream.offset + endPointsArrayByteLength > glyphLocation.length) {
-        Error(errorStream, "End points array overruns glyph data.");
+        MemoryStreamWriteString(errorStream, "End points array overruns glyph data.");
 
         return result;
     }
@@ -647,7 +645,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
     u8 *allocationBuffer = MemoryArenaPushBytes(arena, totalAllocationSize);
     if (!allocationBuffer) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
 
         return result;
     }
@@ -660,14 +658,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
     }
 
     if (stream.offset + 2 > glyphLocation.length) {
-        Error(errorStream, "Instruction length field overruns glyph data.");
+        MemoryStreamWriteString(errorStream, "Instruction length field overruns glyph data.");
         ReturnZeroed(result);
     }
 
     result.instructionLength = MemoryStreamReadUInt16BigEndian(&stream);
 
     if (stream.offset + result.instructionLength > glyphLocation.length) {
-        Error(errorStream, "Instructions overrun glyph data.");
+        MemoryStreamWriteString(errorStream, "Instructions overrun glyph data.");
         ReturnZeroed(result);
     }
 
@@ -676,14 +674,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
     u8 *unpackedFlags = MemoryArenaPushArray(arena, u8, result.numberOfPoints);
     if (!unpackedFlags) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
         ReturnZeroed(result);
     }
 
     u32 pointsProcessed = 0;
     while (pointsProcessed < result.numberOfPoints) {
         if (stream.offset + 1 > glyphLocation.length) {
-            Error(errorStream, "Flags overrun glyph data.");
+            MemoryStreamWriteString(errorStream, "Flags overrun glyph data.");
             ReturnZeroed(result);
         }
 
@@ -692,14 +690,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
         if (IsBitSet(currentFlag, TrueTypeGlyphFlag_Repeat)) {
             if (stream.offset + 1 > glyphLocation.length) {
-                Error(errorStream, "Flag repeat count overruns glyph data.");
+                MemoryStreamWriteString(errorStream, "Flag repeat count overruns glyph data.");
                 ReturnZeroed(result);
             }
 
             u8 repeatCount = stream.memory[stream.offset++];
 
             if (pointsProcessed + repeatCount > result.numberOfPoints) {
-                Error(errorStream, "Flag repeat count exceeds point count.");
+                MemoryStreamWriteString(errorStream, "Flag repeat count exceeds point count.");
                 ReturnZeroed(result);
             }
 
@@ -716,7 +714,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_XShortVector)) {
             if (stream.offset + 1 > glyphLocation.length) {
-                Error(errorStream, "X coordinate byte overruns glyph data.");
+                MemoryStreamWriteString(errorStream, "X coordinate byte overruns glyph data.");
                 ReturnZeroed(result);
             }
 
@@ -729,7 +727,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
         } else {
             if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
                 if (stream.offset + 2 > glyphLocation.length) {
-                    Error(errorStream, "Y coordinate byte overruns glyph data.");
+                    MemoryStreamWriteString(errorStream, "Y coordinate byte overruns glyph data.");
                     ReturnZeroed(result);
                 }
 
@@ -746,7 +744,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_YShortVector)) {
             if (stream.offset + 1 > glyphLocation.length) {
-                Error(errorStream, "Y coordinate byte overruns glyph data.");
+                MemoryStreamWriteString(errorStream, "Y coordinate byte overruns glyph data.");
                 ReturnZeroed(result);
             }
 
@@ -759,7 +757,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
         } else {
             if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
                 if (stream.offset + 2 > glyphLocation.length) {
-                    Error(errorStream, "Y coordinate short overruns glyph data.");
+                    MemoryStreamWriteString(errorStream, "Y coordinate short overruns glyph data.");
                     ReturnZeroed(result);
                 }
 
@@ -803,7 +801,7 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, cons
     }
 
     if (glyph->yMax <= glyph->yMin || glyph->xMax <= glyph->xMin) {
-        Error(errorStream, "Weird glyph bounds.");
+        MemoryStreamWriteString(errorStream, "Weird glyph bounds.");
 
         return result;
     }
@@ -826,7 +824,7 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, cons
     result.pixels = MemoryArenaPushBytes(arena, pixelsAllocationSize);
 
     if (!result.pixels) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
 
         return result;
     }
@@ -835,14 +833,14 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, cons
 
     Vector2 *generatedPoints = MemoryArenaPushArray(arena, Vector2, MaxGeneratedPoints);
     if (!generatedPoints) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
 
         return result;
     }
 
     u32 *contourEndIndices = MemoryArenaPushArray(arena, u32, glyph->numberOfContours);
     if (!contourEndIndices) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
 
         return result;
     }
@@ -927,7 +925,7 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, cons
 
     u8 *coverageBuffer = MemoryArenaPushBytes(arena, result.size.x * result.size.y);
     if (!coverageBuffer) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
         ReturnZeroed(result);
     }
 
@@ -1075,7 +1073,7 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_GLYF);
 
     if (!headEntry || !MaxpEntry || !cmapEntry || !locaEntry || !glyfEntry) {
-        Error(errorStream, "Could not get one or more tables.");
+        MemoryStreamWriteString(errorStream, "Could not get one or more tables.");
 
         return result;
     }
@@ -1086,7 +1084,7 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     TrueTypeIndexToLocationTable loca = TrueTypeIndexToLocationTableParse(locaEntry, head.indexToLocFormat, Maxp.numGlyphs);
 
     if (!cmap.isValid || !loca.isValid) {
-        Error(errorStream, "cmap/loca table is invalid.");
+        MemoryStreamWriteString(errorStream, "cmap/loca table is invalid.");
 
         return result;
     }
@@ -1101,7 +1099,7 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     result.pixels = MemoryArenaPushBytes(permanentArena, pixelsAllocationSize);
 
     if (!result.pixels) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteString(errorStream, "Out of memory.");
         ReturnZeroed(result);
     }
 

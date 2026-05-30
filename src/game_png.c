@@ -396,13 +396,13 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     ZeroStruct(result);
 
     if (!memory) {
-        Error(errorStream, "Invalid parameter: memory.");
+        MemoryStreamWriteLine(errorStream, "Invalid parameter: memory.");
 
         return result;
     }
 
     if (length < PNGFileSignatureLength) {
-        Error(errorStream, "Most likely corrupted PNG file as it is too small to even contain a signature.");
+        MemoryStreamWriteLine(errorStream, "Most likely corrupted PNG file as it is too small to even contain a signature.");
 
         return result;
     }
@@ -411,7 +411,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     bool hasValidSignature = MemoryEquals(imageBufferPointer, PNGFileSignature, PNGFileSignatureLength);
     if (!hasValidSignature) {
-        Error(errorStream, "Corrupted PNG file.");
+        MemoryStreamWriteLine(errorStream, "Corrupted PNG file.");
 
         return result;
     }
@@ -427,7 +427,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
 
         return result;
     }
@@ -461,7 +461,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
 
         if (calculatedCRC != expectedCRC) {
-            Error(errorStream, "CRC mismatch in PNG chunk.");
+            MemoryStreamWriteLine(errorStream, "CRC mismatch in PNG chunk.");
 
             break;
         }
@@ -527,7 +527,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     }
 
     if (!hasParsedIHDR || totalIDATDataSize == 0) {
-        Error(errorStream, "Missing IHDR or no IDAT data.");
+        MemoryStreamWriteLine(errorStream, "Missing IHDR or no IDAT data.");
 
         return result;
     }
@@ -543,7 +543,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     } else if (imageHeader.colorType == PNGColorTypeTrue_ColorAlpha) {
         bytesPerPixel = 4;
     } else {
-        Error(errorStream, "Unsupported color type.");
+        MemoryStreamWriteLine(errorStream, "Unsupported color type.");
 
         return result;
     }
@@ -553,14 +553,14 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     u8 *decompressedBuffer = MemoryArenaPushBytes(temporaryArena, decompressedCapacity);
     if (!decompressedBuffer) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
 
         return result;
     }
 
     bool succesfullyDecompressed = DecompressDeflate(idatChunks, idatChunkCount, decompressedBuffer, decompressedCapacity);
     if (!succesfullyDecompressed) {
-        Error(errorStream, "Could not decompress.");
+        MemoryStreamWriteLine(errorStream, "Could not decompress.");
 
         return result;
     }
@@ -570,7 +570,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     const usize rawScanlineByteCount = (usize)imageWidth * bytesPerPixel;
     if (imageWidth != 0 && rawScanlineByteCount / imageWidth != bytesPerPixel) {
-        Error(errorStream, "Scanline byte count overflow.");
+        MemoryStreamWriteLine(errorStream, "Scanline byte count overflow.");
 
         return result;
     }
@@ -579,7 +579,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     const usize expectedDecompressedByteCount = filteredScanlineByteCount * imageHeight;
 
     if (decompressedCapacity < expectedDecompressedByteCount) {
-        Error(errorStream, "Decompressed PNG data is smaller than expected.");
+        MemoryStreamWriteLine(errorStream, "Decompressed PNG data is smaller than expected.");
 
         return result;
     }
@@ -587,7 +587,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     const usize totalRawPixelByteCount = rawScanlineByteCount * imageHeight;
     u8 *rawPixelDataBuffer = MemoryArenaPushBytes(permanentArena, totalRawPixelByteCount);
     if (!rawPixelDataBuffer) {
-        ErrorOutOfMemory(errorStream);
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
 
         return result;
     }
@@ -597,7 +597,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     for (u32 currentScanlineIndex = 0; currentScanlineIndex < imageHeight; currentScanlineIndex++) {
         if (sourceReadOffset + filteredScanlineByteCount > decompressedCapacity) {
-            Error(errorStream, "Scanline data overruns decompressed buffer.");
+            MemoryStreamWriteLine(errorStream, "Scanline data overruns decompressed buffer.");
             
             return result;
         }
@@ -609,7 +609,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         const u8 *previousRawScanlineData = (currentScanlineIndex > 0) ? &rawPixelDataBuffer[destinationWriteOffset - rawScanlineByteCount] : 0;
 
         if (scanlineFilterType > 4) {
-            Error(errorStream, "Unknown PNG filter type.");
+            MemoryStreamWriteLine(errorStream, "Unknown PNG filter type.");
             
             return result;
         }

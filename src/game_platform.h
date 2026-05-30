@@ -312,18 +312,6 @@ static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *strin
     return MemoryStreamWriteString(stream, string) && MemoryStreamWriteUInt8(stream, '\n');
 }
 
-#define Error(stream, message) \
-    do { \
-        MemoryStreamWriteLine(stream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
-    } while (0)
-
-#define ErrorOutOfMemory(stream) Error(stream, "Out of memory.")
-
-#define Info(message) \
-    do { \
-        MemoryStreamWriteLine(GlobalInfoStream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
-    } while (0)
-
 #define Stringify(x) #x
 #define Stringify2(x) Stringify(x)
 
@@ -423,14 +411,22 @@ static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, V
 // NOTE: Services that the game provides to platform.
 
 typedef struct {
+    // NOTE: These two standard streams are dumped to console by the platform.
+    MemoryStream *standardErrorStream;
+    MemoryStream *standardInfoStream;
+    
+    bool isInitialized;
+} GameMemory;
+
+#define UPDATE_AND_RENDER(name) void name(GameMemory *memory, RenderCommandBuffer *commandBuffer)
+typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
+
+typedef struct {
     u32 samplesPerSecond;
     u32 channelCount;
     u32 frameCount;
     f32 *samples;
 } AudioBuffer;
-
-#define UPDATE_AND_RENDER(name) void name(RenderCommandBuffer *commandBuffer)
-typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
 
 #define GET_SOUND_SAMPLES(name) void name(AudioBuffer *audioBuffer)
 typedef GET_SOUND_SAMPLES(GetSoundSamplesFunc);
