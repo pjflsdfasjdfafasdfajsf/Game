@@ -5,3 +5,6 @@
 # NOTE: dxc artifacts.
 BasicGeometryPS.h
 BasicGeometryVS.h
+
+# NOTE: Processed assets
+*.png.h
