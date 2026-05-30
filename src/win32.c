@@ -14,6 +14,7 @@
 #include "game_types.h"
 #include "game_ttf.h"
 // #include "game_png.h"
+#include "game.h"
 
 MemoryStream *GlobalErrorStream;
 MemoryStream *GlobalInfoStream;
@@ -295,48 +296,6 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-void DrawTextTEMP(Win32Direct12 *d3d12, u32 atlasTextureId, const TrueTypeBakedGlyph *glyphs, u32 firstCharacter, u32 characterCount, const char *text, Vector2 startPosition, f32 scaleToScreen) {
-    if (!glyphs || !text) {
-        return;
-    }
-
-    Vector2 cursor = startPosition;
-
-    for (u32 stringIndex = 0; text[stringIndex] != '\0'; stringIndex++) {
-        u8 character = (u8)text[stringIndex];
-
-        if (character == '\n') {
-            cursor.x = startPosition.x;
-            cursor.y -= (64.0f * scaleToScreen);
-
-            continue;
-        }
-
-        if (character < firstCharacter || character >= (firstCharacter + characterCount)) {
-            continue;
-        }
-
-        u32 glyphIndex = character - firstCharacter;
-        const TrueTypeBakedGlyph *glyph = &glyphs[glyphIndex];
-
-        if (glyph->isValid) {
-            Vector2 position;
-            position.x = cursor.x + (glyph->offset.x * scaleToScreen);
-            position.y = cursor.y + (glyph->offset.y * scaleToScreen);
-
-            Vector2 size;
-            size.x = glyph->size.x * scaleToScreen;
-            size.y = glyph->size.y * scaleToScreen;
-
-            D3D12RectangleDrawEX(d3d12, atlasTextureId, position, size, glyph->uvMin, glyph->uvMax, V4(1.0f, 1.0f, 1.0f, 1.0f));
-
-            cursor.x += (glyph->size.x + 2.0f) * scaleToScreen;
-        } else if (character == ' ') {
-            cursor.x += 16.0f * scaleToScreen;
-        }
-    }
-}
-
 static inline void GlobalStreamsDrain() {
     if (GlobalInfoStream && GlobalInfoStream->offset > 0) {
         HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -361,24 +320,7 @@ static inline void GlobalStreamsDrain() {
     }
 }
 
-u32 textureIdTEMP = 0;
-
-void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
-    D3D12FrameBegin(d3d12);
-    {
-        f32 scaleToScreenX = 1.0f / (DEFAULT_WINDOW_WIDTH / 2.0f);
-        f32 scaleToScreenY = 1.0f / (DEFAULT_WINDOW_HEIGHT / 2.0f);
-
-        f32 scale = scaleToScreenY;
-
-        Vector2 startPosition = V2(-0.8f, 0.5f);
-
-        DrawTextTEMP(d3d12, textureIdTEMP, glyphsTEMP, 32, 95, "eeee omg ! = - ````", startPosition, scale);
-    }
-    D3D12FrameEnd(d3d12);
-}
-
-void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP, HWND windowHandle) {
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *commandBuffer, HWND window) {
     MSG message;
     ZeroStruct(message);
 
@@ -396,7 +338,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
             GlobalStreamsDrain();
 
             // NOTE: This logic below is to stop playing sound when the window is alt-tabbed because I am a good programmer.
-            bool isFocused = (GetForegroundWindow() == windowHandle);
+            bool isFocused = (GetForegroundWindow() == window);
 
             if (!isFocused && wasFocused) {
                 AudioPause(audio);
@@ -407,7 +349,11 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
             wasFocused = isFocused;
 
             if (isFocused) {
-                RunDraw(d3d12, glyphsTEMP);
+                RenderCommandBufferReset(commandBuffer);
+                UpdateAndRender(commandBuffer);
+
+                D3D12FrameBegin(d3d12);
+                D3D12FrameEnd(d3d12, commandBuffer);
             } else {
                 Sleep(10);
             }
@@ -459,25 +405,16 @@ void mainCRTStartup() {
     static Win32Audio audio;
     AudioInitialize(&audio);
 
-    //     static const char watermelon[] = {
-    // #include "watermelon.png.h"
-    //     };
+    RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
 
-    //     Image image = ImageLoadFromPNG(watermelon, sizeof(watermelon));
+    usize commandBufferSize = Megabytes(2);
+    void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
 
-    static const char arial[] = {
-#include "arial.ttf.h"
-    };
-
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(&temporaryArena, arial, sizeof(arial));
-    TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
-
-    Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
-    textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+    RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
 
     WindowShow(window);
 
-    RunUpdate(&d3d12, &audio, glyphs, window);
+    RunUpdate(&d3d12, &audio, commandBuffer, window);
 
     ExitProcess(0);
 }

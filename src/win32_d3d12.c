@@ -512,102 +512,136 @@ void D3D12FrameBegin(Win32Direct12 *d3d12) {
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
 
-    const f32 clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, clearColor, 0, 0);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color) {
-    if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
-        return;
-    }
+// void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color) {
+//     if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
+//         return;
+//     }
 
-    const UINT verticesPerRectangle = 6;
-    if (d3d12->vertexCount + verticesPerRectangle > d3d12->vertexCapacity) {
-        return;
-    }
+//     const UINT verticesPerRectangle = 6;
+//     if (d3d12->vertexCount + verticesPerRectangle > d3d12->vertexCapacity) {
+//         return;
+//     }
 
-    f32 leftEdge = origin.x;
-    f32 rightEdge = origin.x + size.width;
-    f32 topEdge = origin.y;
-    f32 bottomEdge = origin.y - size.height;
+//     f32 leftEdge = origin.x;
+//     f32 rightEdge = origin.x + size.width;
+//     f32 topEdge = origin.y;
+//     f32 bottomEdge = origin.y - size.height;
 
-    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 0.0f}};
-    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 0.0f}};
-    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 1.0f}};
-    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 1.0f}};
+//     Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 0.0f}};
+//     Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 0.0f}};
+//     Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 1.0f}};
+//     Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 1.0f}};
 
-    Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
+//     Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
 
-    currentVertexDestination[0] = topLeft;
-    currentVertexDestination[1] = topRight;
-    currentVertexDestination[2] = bottomLeft;
-    currentVertexDestination[3] = bottomLeft;
-    currentVertexDestination[4] = topRight;
-    currentVertexDestination[5] = bottomRight;
+//     currentVertexDestination[0] = topLeft;
+//     currentVertexDestination[1] = topRight;
+//     currentVertexDestination[2] = bottomLeft;
+//     currentVertexDestination[3] = bottomLeft;
+//     currentVertexDestination[4] = topRight;
+//     currentVertexDestination[5] = bottomRight;
 
-    UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
+//     UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
 
-    D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
-    rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
-    rectangleBufferView.StrideInBytes = sizeof(Vertex);
-    rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
+//     D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
+//     rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
+//     rectangleBufferView.StrideInBytes = sizeof(Vertex);
+//     rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
 
-    ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
-    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureId, 0);
+//     ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
+//     ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureId, 0);
 
-    ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
+//     ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
 
-    d3d12->vertexCount += verticesPerRectangle;
-}
+//     d3d12->vertexCount += verticesPerRectangle;
+// }
 
-void D3D12RectangleDrawEX(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector2 uvMin, Vector2 uvMax, Vector4 color) {
-    if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
-        return;
-    }
+// void D3D12RectangleDrawEX(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector2 uvMin, Vector2 uvMax, Vector4 color) {
+//     if (!d3d12 || !d3d12->commandList || !d3d12->vertexData) {
+//         return;
+//     }
 
-    const UINT verticesPerRectangle = 6;
-    if (d3d12->vertexCount + verticesPerRectangle > d3d12->vertexCapacity) {
-        return;
-    }
+//     const UINT verticesPerRectangle = 6;
+//     if (d3d12->vertexCount + verticesPerRectangle > d3d12->vertexCapacity) {
+//         return;
+//     }
 
-    f32 leftEdge = origin.x;
-    f32 rightEdge = origin.x + size.x;
-    f32 topEdge = origin.y;
-    f32 bottomEdge = origin.y - size.y;
+//     f32 leftEdge = origin.x;
+//     f32 rightEdge = origin.x + size.x;
+//     f32 topEdge = origin.y;
+//     f32 bottomEdge = origin.y - size.y;
 
-    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMin.x, uvMin.y}};
-    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMax.x, uvMin.y}};
-    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMin.x, uvMax.y}};
-    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMax.x, uvMax.y}};
+//     Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMin.x, uvMin.y}};
+//     Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMax.x, uvMin.y}};
+//     Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMin.x, uvMax.y}};
+//     Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {uvMax.x, uvMax.y}};
 
-    Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
+//     Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
 
-    currentVertexDestination[0] = topLeft;
-    currentVertexDestination[1] = topRight;
-    currentVertexDestination[2] = bottomLeft;
-    currentVertexDestination[3] = bottomLeft;
-    currentVertexDestination[4] = topRight;
-    currentVertexDestination[5] = bottomRight;
+//     currentVertexDestination[0] = topLeft;
+//     currentVertexDestination[1] = topRight;
+//     currentVertexDestination[2] = bottomLeft;
+//     currentVertexDestination[3] = bottomLeft;
+//     currentVertexDestination[4] = topRight;
+//     currentVertexDestination[5] = bottomRight;
 
-    UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
+//     UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
 
-    D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
-    rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
-    rectangleBufferView.StrideInBytes = sizeof(Vertex);
-    rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
+//     D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
+//     rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
+//     rectangleBufferView.StrideInBytes = sizeof(Vertex);
+//     rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
 
-    ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
-    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureId, 0);
+//     ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
+//     ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureId, 0);
 
-    ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
+//     ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
 
-    d3d12->vertexCount += verticesPerRectangle;
-}
+//     d3d12->vertexCount += verticesPerRectangle;
+// }
 
-void D3D12FrameEnd(Win32Direct12 *d3d12) {
+void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer) {
     if (!d3d12) {
         return;
+    }
+
+    if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
+        D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
+        ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+        renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
+
+        usize memoryOffset = 0;
+
+        while (memoryOffset < commandBuffer->currentOffset) {
+            RenderCommandHeader *header = (RenderCommandHeader *)(commandBuffer->basePointer + memoryOffset);
+
+            if (header->size == 0) {
+                break;
+            }
+
+            if (memoryOffset + header->size > commandBuffer->currentOffset) {
+                break;
+            }
+
+            // NOTE: Render command execution.
+            switch (header->type) {
+            case RenderCommandType_ClearEntireScreen: {
+                if (header->size >= sizeof(RenderCommandClearEntireScreen)) {
+                    RenderCommandClearEntireScreen *command = (RenderCommandClearEntireScreen *)header;
+                    ID3D12GraphicsCommandList_ClearRenderTargetView(d3d12->commandList, renderTargetViewHandle, command->color.e, 0, 0);
+                }
+            } break;
+
+            case RenderCommandType_None:
+            default: {
+            } break;
+            }
+
+            memoryOffset += header->size;
+        }
     }
 
     HRESULT hresult;
@@ -653,4 +687,3 @@ void D3D12Initialize(Win32Direct12 *d3d12, HWND window) {
     D3D12SynchronizationInitialize(d3d12);
     D3D12VertexBufferInitialize(d3d12, 4096);
 }
-

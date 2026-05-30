@@ -59,12 +59,19 @@ typedef struct {
             f32 z;
             f32 w;
         };
+
+        f32 e[4];
     };
 } Vector4;
 
 static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
     return (Vector4){{{x, y, z, w}}};
 }
+
+// NOTE: Colors
+
+#define BLACK V4(0.0f, 0.0f, 0.0f, 1.0f)
+#define RED V4(1.0f, 0.0f, 0.0f, 1.0f)
 
 typedef struct {
     union {

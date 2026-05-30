@@ -331,11 +331,6 @@ extern MemoryStream *GlobalInfoStream;
 #define Stringify(x) #x
 #define Stringify2(x) Stringify(x)
 
-// NOTE: Services that the game provides to platform.
-
-#define UPDATE_AND_RENDER(name) void name()
-typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
-
 // --------------------------------------------------
 
 // NOTE: Services that the platform provides to game.
@@ -412,3 +407,25 @@ static inline void *RenderCommandBufferAllocateBytes(RenderCommandBuffer *comman
 
     return allocatedMemory;
 }
+
+#define RenderCommandBufferPushCommand(buffer, commandName) (RenderCommand##commandName *)RenderCommandBufferAllocateBytes((buffer), RenderCommandType_##commandName, sizeof(RenderCommand##commandName))
+
+// NOTE: Even though without Render prefix it looks a bit less pretty, with it you can easily see all render commands by just typing in 'Render'
+// easily rather than guessing their names
+
+static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, Vector4 color) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    RenderCommandClearEntireScreen *clearEntireScreen = RenderCommandBufferPushCommand(commandBuffer, ClearEntireScreen);
+
+    if (clearEntireScreen) {
+        clearEntireScreen->color = color;
+    }
+}
+// NOTE: Services that the game provides to platform.
+
+#define UPDATE_AND_RENDER(name) void name(RenderCommandBuffer *commandBuffer)
+typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
+

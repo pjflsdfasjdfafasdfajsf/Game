@@ -21,7 +21,8 @@ ifeq ($(PLATFORM),Windows)
     LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:CONSOLE
     LIBRARIES = kernel32.lib user32.lib d3d12.lib dxgi.lib dxguid.lib ole32.lib
     
-    SOURCES = $(SRC)/win32.c $(SRC)/win32_d3d12.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
+    # TODO: Build game.c as a separate dynamic library
+    SOURCES = $(SRC)/game.c $(SRC)/win32.c $(SRC)/win32_d3d12.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
     
     TARGET = $(BUILD)/Game.exe
     ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess.exe
