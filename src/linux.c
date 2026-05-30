@@ -142,6 +142,9 @@ void AudioUpdate(LinuxAudio *audio) {
     if (framesWritten < 0) {
         snd_pcm_prepare(audio->pcmHandle);
     }
+
+    // NOTE: This is worth freeing since this is allocated every frame.
+    free(audioData);
 }
 
 void *AudioThreadRoutine(void *threadParameter) {
