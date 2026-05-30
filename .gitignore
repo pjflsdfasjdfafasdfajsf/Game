@@ -13,3 +13,4 @@ BasicGeometryVS.h
 
 # NOTE: Processed assets
 *.png.h
+*.ttf.h

@@ -10,16 +10,30 @@
 #define false 0
 
 typedef size_t usize;
+
 typedef uint8_t u8;
+typedef int8_t i8;
+
 typedef uint16_t u16;
+typedef int16_t i16;
+
 typedef uint32_t u32;
+typedef int32_t i32;
+
+typedef uint64_t u64;
+typedef int64_t i64;
+
 typedef float f32;
 
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
 #define ABS(x) (((x) < 0) ? -(x) : (x))
+#define MIN(x, y) ((x) > (y) ? (y) : (x))
+#define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define UNUSED(x) (void)x
+
+#define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
 typedef struct {
     union {
@@ -69,7 +83,7 @@ typedef struct {
             u32 y;
         };
     };
-} UnsignedVector2;
+} Vector2U;
 
 static inline Vector2 V2(f32 x, f32 y) {
     return (Vector2){{{x, y}}};
@@ -119,4 +133,37 @@ static inline usize StringGetLength(const char *string) {
     }
 
     return characterPointer - string;
+}
+
+// NOTE: Reading utilities.
+
+static inline u16 ReadUInt16BigEndian(const u8 *memory) {
+    return ((u16)memory[0] << 8) |
+           ((u16)memory[1] << 0);
+}
+
+static inline i16 ReadInt16BigEndian(const u8 *memory) {
+    return (i16)ReadUInt16BigEndian(memory);
+}
+
+static inline u32 ReadUInt32BigEndian(const u8 *memory) {
+    return ((u32)memory[0] << 24) |
+           ((u32)memory[1] << 16) |
+           ((u32)memory[2] << 8) |
+           ((u32)memory[3] << 0);
+}
+
+static inline u64 ReadUInt64BigEndian(const u8 *memory) {
+    return ((u64)memory[0] << 56) |
+           ((u64)memory[1] << 48) |
+           ((u64)memory[2] << 40) |
+           ((u64)memory[3] << 32) |
+           ((u64)memory[4] << 24) |
+           ((u64)memory[5] << 16) |
+           ((u64)memory[6] << 8) |
+           ((u64)memory[7] << 0);
+}
+
+static inline i64 ReadInt64BigEndian(const u8 *memory) {
+    return (i64)ReadUInt64BigEndian(memory);
 }

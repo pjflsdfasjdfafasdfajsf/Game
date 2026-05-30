@@ -56,11 +56,11 @@ static const u32 PNGIHDRChunkLength = 13;
 #define PNG_MAX_IDAT_CHUNKS 1024
 
 typedef enum {
-    PNGColorTypeGrayscale = 0,
-    PNGColorTypeTrueColor = 2,
-    PNGColorTypeIndexed = 3,
-    PNGColorTypeGrayscaleAlpha = 4,
-    PNGColorTypeTrueColorAlpha = 6
+    PNGColorType_Grayscale = 0,
+    PNGColorType_TrueColor = 2,
+    PNGColorType_Indexed = 3,
+    PNGColorType_GrayscaleAlpha = 4,
+    PNGColorTypeTrue_ColorAlpha = 6
 } PNGColorType;
 
 typedef struct {
@@ -77,13 +77,6 @@ typedef struct {
     const u8 *memory;
     u32 length;
 } PNGIDATChunk;
-
-static inline u32 ReadUInt32BigEndian(const u8 *memory) {
-    return ((u32)memory[0] << 24) |
-           ((u32)memory[1] << 16) |
-           ((u32)memory[2] << 8) |
-           ((u32)memory[3] << 0);
-}
 
 // NOTE: Deflating.
 
@@ -536,13 +529,13 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
 
     u32 bytesPerPixel = 0;
 
-    if (imageHeader.colorType == PNGColorTypeGrayscale) {
+    if (imageHeader.colorType == PNGColorType_Grayscale) {
         bytesPerPixel = 1;
-    } else if (imageHeader.colorType == PNGColorTypeTrueColor) {
+    } else if (imageHeader.colorType == PNGColorType_TrueColor) {
         bytesPerPixel = 3;
-    } else if (imageHeader.colorType == PNGColorTypeGrayscaleAlpha) {
+    } else if (imageHeader.colorType == PNGColorType_GrayscaleAlpha) {
         bytesPerPixel = 2;
-    } else if (imageHeader.colorType == PNGColorTypeTrueColorAlpha) {
+    } else if (imageHeader.colorType == PNGColorTypeTrue_ColorAlpha) {
         bytesPerPixel = 4;
     } else {
         return result;

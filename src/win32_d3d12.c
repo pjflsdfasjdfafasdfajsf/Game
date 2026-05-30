@@ -200,6 +200,14 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     pipelineStateDescription.PS.pShaderBytecode = g_PSMain;
     pipelineStateDescription.PS.BytecodeLength = sizeof(g_PSMain);
 
+    pipelineStateDescription.BlendState.RenderTarget[0].BlendEnable = TRUE;
+    pipelineStateDescription.BlendState.RenderTarget[0].LogicOpEnable = FALSE;
+    pipelineStateDescription.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    pipelineStateDescription.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    pipelineStateDescription.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    pipelineStateDescription.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    pipelineStateDescription.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+    pipelineStateDescription.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     pipelineStateDescription.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     pipelineStateDescription.SampleMask = UINT_MAX;
     pipelineStateDescription.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -405,7 +413,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPer
                 destinationRow[x * 4 + 0] = sourceRow[x * 3 + 0];
                 destinationRow[x * 4 + 1] = sourceRow[x * 3 + 1];
                 destinationRow[x * 4 + 2] = sourceRow[x * 3 + 2];
-                destinationRow[x * 4 + 3] = 255;                 
+                destinationRow[x * 4 + 3] = 255;
             }
         }
     }

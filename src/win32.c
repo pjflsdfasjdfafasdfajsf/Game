@@ -5,12 +5,14 @@
 //
 
 #include "win32.h"
+#include "game_ttf.h"
 #include "game_png.h"
 #include "win32_d3d12.h"
 
 #include "game_platform.h"
 
 #include <windows.h>
+#include <wingdi.h>
 
 int _fltused = 0;
 
@@ -364,11 +366,35 @@ void WINAPI WinMainCRTStartup() {
     D3D12SynchronizationInitialize(&d3d12);
     D3D12VertexBufferInitialize(&d3d12, 4096);
 
-    static const char watermelon[] = {
-#include "watermelon.png.h"
-    };
+    //     static const char watermelon[] = {
+    // #include "watermelon.png.h"
+    //     };
 
-    Image image = ImageLoadFromPNG(watermelon, sizeof(watermelon));
+    //     Image image = ImageLoadFromPNG(watermelon, sizeof(watermelon));
+
+    static const char arial[] = {
+#include "arial.ttf.h"
+    };
+    TrueTypeFont font = TrueTypeFontLoadFromMemory(arial, sizeof(arial));
+
+    const TrueTypeTableDirectoryEntry *headEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_HEAD);
+    const TrueTypeTableDirectoryEntry *maxpEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_MAXP);
+    const TrueTypeTableDirectoryEntry *cmapEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_CMAP);
+    const TrueTypeTableDirectoryEntry *locaEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_LOCA);
+    const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_GLYF);
+
+    TrueTypeHeadTable head = TrueTypeHeadTableParse(headEntry);
+    TrueTypeMaximumProfileTable maxp = TrueTypeMaximumProfileTableParse(maxpEntry);
+    TrueTypeCmapFormat4 cmap = TrueTypeCmapTableParseFormat4(cmapEntry);
+    TrueTypeIndexToLocationTable loca = TrueTypeIndexToLocationTableParse(locaEntry, head.indexToLocFormat, maxp.numGlyphs);
+
+    u32 character = 'A';
+    u32 glyphIndex = TrueTypeCmapFormat4GetGlyphIndex(&cmap, character);
+
+    TrueTypeGlyphLocation glyphLocation = TrueTypeIndexToLocationGetGlyphLocation(&loca, (u16)glyphIndex);
+    TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(glyfEntry, glyphLocation);
+
+    Image image = TrueTypeGlyphRasterize(&glyph, 400);
     textureId = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     WindowShow(mainWindowHandle);

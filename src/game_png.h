@@ -3,7 +3,7 @@
 #include "game_platform.h"
 
 typedef struct {
-    UnsignedVector2 size;
+    Vector2U size;
     u32 bytesPerPixel;
     u8 *pixels;
 } Image;
