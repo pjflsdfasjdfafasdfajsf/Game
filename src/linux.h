@@ -17,6 +17,9 @@ typedef struct {
     struct xdg_surface *xdgSurface;
     struct xdg_toplevel *xdgToplevel;
 
+    u32 width;
+    u32 height;
+
     bool isRunning;
     bool isFocused;
     bool isConfigured;

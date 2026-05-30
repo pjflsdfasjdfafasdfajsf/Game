@@ -6,6 +6,7 @@
 //
 
 #include "linux.h"
+#include "linux_vulkan.h"
 #include "game_platform.h"
 
 #include <alsa/asoundlib.h>
@@ -28,6 +29,13 @@ static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdg
         if (*state == XDG_TOPLEVEL_STATE_ACTIVATED) {
             isActivated = true;
         }
+    }
+
+    if (width > 0) {
+        wayland->width = width;
+    }
+    if (height > 0) {
+        wayland->height = height;
     }
 
     wayland->isFocused = isActivated;
@@ -277,11 +285,13 @@ void AudioInitialize(LinuxAudio *audio) {
     }
 }
 
-void RunDraw() {
-    // TODO
+void RunDraw(LinuxWayland *wayland, Vulkan *vulkan) {
+    VulkanFrameBegin(vulkan, wayland);
+
+    VulkanFrameEnd(vulkan);
 }
 
-void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio) {
+void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan) {
     if (!wayland || !wayland->display) {
         return;
     }
@@ -300,7 +310,7 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio) {
         wasFocused = wayland->isFocused;
 
         if (wayland->isFocused) {
-            RunDraw();
+            RunDraw(wayland, vulkan);
         } else {
             usleep(100000);
         }
@@ -317,7 +327,10 @@ int main() {
     LinuxAudio audio;
     AudioInitialize(&audio);
 
-    RunUpdate(&wayland, &audio);
+    Vulkan vulkan;
+    VulkanInitialize(&vulkan, &wayland);
+
+    RunUpdate(&wayland, &audio, &vulkan);
 
     return 0;
 }

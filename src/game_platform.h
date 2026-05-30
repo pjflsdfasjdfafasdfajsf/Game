@@ -2,6 +2,7 @@
 
 // NOTE: This header does not require CRT/libc so we're fine.
 #include <stdint.h>
+#include <stddef.h>
 
 // TODO: game_types.h once it becomes a problem
 
@@ -32,6 +33,7 @@ typedef float f32;
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define UNUSED(x) (void)x
+#define ARRAY_COUNT(arr) (sizeof((arr)) / sizeof((arr)[0]))
 
 #define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
