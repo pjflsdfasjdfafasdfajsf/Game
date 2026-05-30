@@ -138,7 +138,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     D3D12_STATIC_SAMPLER_DESC staticSamplerDescription;
     ZeroStruct(staticSamplerDescription);
 
-    staticSamplerDescription.Filter = D3D12_FILTER_Min_MAG_MIP_LINEAR;
+    staticSamplerDescription.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplerDescription.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -202,7 +202,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     pipelineStateDescription.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
     pipelineStateDescription.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     pipelineStateDescription.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-    pipelineStateDescription.SampleMask = UINT_Max;
+    pipelineStateDescription.SampleMask = UINT_MAX;
     pipelineStateDescription.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pipelineStateDescription.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
     pipelineStateDescription.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;

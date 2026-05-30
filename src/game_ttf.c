@@ -218,7 +218,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
             const u8 *tableDataPointer = &stream.memory[tableOffset];
             bool isHeadTable = (tag == TrueTypeTableTag_HEAD);
 
-            u32 calculatedChecksum = TrueTypeCalculateTableChecksum(stream.memory, tableLength, isHeadTable);
+            u32 calculatedChecksum = TrueTypeCalculateTableChecksum(tableDataPointer, tableLength, isHeadTable);
 
             if (calculatedChecksum != expectedChecksum) {
                 ReturnZeroed(result);
@@ -663,20 +663,20 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         unpackedFlags[pointsProcessed++] = currentFlag;
 
         if (IsBitSet(currentFlag, TrueTypeGlyphFlag_Repeat)) {
-                if (stream.offset + 1 > glyphLocation.length) {
-                    ReturnZeroed(result);
-                }
-
-                u8 repeatCount = stream.memory[stream.offset++];
-
-                if (pointsProcessed + repeatCount > result.numberOfPoints) {
-                    ReturnZeroed(result);
-                }
-
-                for (u8 repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
-                    unpackedFlags[pointsProcessed++] = currentFlag;
-                }
+            if (stream.offset + 1 > glyphLocation.length) {
+                ReturnZeroed(result);
             }
+
+            u8 repeatCount = stream.memory[stream.offset++];
+
+            if (pointsProcessed + repeatCount > result.numberOfPoints) {
+                ReturnZeroed(result);
+            }
+
+            for (u8 repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
+                unpackedFlags[pointsProcessed++] = currentFlag;
+            }
+        }
     }
 
     i16 currentX = 0;
@@ -685,27 +685,25 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         result.points[pointIndex].isOnCurve = IsBitSet(flag, TrueTypeGlyphFlag_OnCurve);
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_XShortVector)) {
-                if (stream.offset + 1 > glyphLocation.length) {
+            if (stream.offset + 1 > glyphLocation.length) {
+                ReturnZeroed(result);
+            }
+
+            u8 deltaX = stream.memory[stream.offset++];
+            if (IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
+                currentX += deltaX;
+            } else {
+                currentX -= deltaX;
+            }
+        } else {
+            if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
+                if (stream.offset + 2 > glyphLocation.length) {
                     ReturnZeroed(result);
                 }
 
-                u8 deltaX = stream.memory[stream.offset++];
-                if (IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
-                        currentX += deltaX;
-                    }
-                else {
-                    currentX -= deltaX;
-                }
+                i16 deltaX = BinaryStreamReadInt16BigEndian(&stream);
+                currentX += deltaX;
             }
-        else {
-            if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
-                    if (stream.offset + 2 > glyphLocation.length) {
-                        ReturnZeroed(result);
-                    }
-
-                    i16 deltaX = BinaryStreamReadInt16BigEndian(&stream);
-                    currentX += deltaX;
-                }
         }
         result.points[pointIndex].x = currentX;
     }
@@ -715,27 +713,25 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         u8 flag = unpackedFlags[pointIndex];
 
         if (IsBitSet(flag, TrueTypeGlyphFlag_YShortVector)) {
-                if (stream.offset + 1 > glyphLocation.length) {
+            if (stream.offset + 1 > glyphLocation.length) {
+                ReturnZeroed(result);
+            }
+
+            u8 deltaY = stream.memory[stream.offset++];
+            if (IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
+                currentY += deltaY;
+            } else {
+                currentY -= deltaY;
+            }
+        } else {
+            if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
+                if (stream.offset + 2 > glyphLocation.length) {
                     ReturnZeroed(result);
                 }
 
-                u8 deltaY = stream.memory[stream.offset++];
-                if (IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
-                        currentY += deltaY;
-                    }
-                else {
-                    currentY -= deltaY;
-                }
+                i16 deltaY = BinaryStreamReadInt16BigEndian(&stream);
+                currentY += deltaY;
             }
-        else {
-            if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
-                    if (stream.offset + 2 > glyphLocation.length) {
-                        ReturnZeroed(result);
-                    }
-
-                    i16 deltaY = BinaryStreamReadInt16BigEndian(&stream);
-                    currentY += deltaY;
-                }
         }
         result.points[pointIndex].y = currentY;
     }

@@ -14,6 +14,7 @@ ASSETS = assets
 
 # NOTE: Windows configuration.
 ifeq ($(PLATFORM),Windows)
+    SHELL = cmd.exe
     CC = cl.exe
     CFLAGS = /nologo /W3 /GS- /I $(GENERATED)
     LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:WINDOWS
@@ -22,7 +23,9 @@ ifeq ($(PLATFORM),Windows)
     SOURCES = $(SRC)/win32.c $(SRC)/win32_d3d12.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
     
     TARGET = $(BUILD)/Game.exe
-    ASSET_TOOL = $(TOOLS)/AssetPreprocess.exe
+    ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess.exe
+    
+    RUN_ASSET_PREPROCESS = $(subst /,\,$(ASSET_PREPROCESS))
 
     MKDIR = if not exist $(subst /,\,$1) mkdir $(subst /,\,$1)
 endif
@@ -36,7 +39,8 @@ ifeq ($(PLATFORM),Linux)
     SOURCES = $(SRC)/linux.c $(GENERATED)/xdg-shell-client-protocol.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
     
     TARGET = $(BUILD)/Game
-    ASSET_TOOL = $(TOOLS)/AssetPreprocess
+    ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess
+    RUN_ASSET_PREPROCESS = $(ASSET_PREPROCESS)
 
     WAYLAND_PROTOCOLS = $(shell pkg-config --variable=pkgdatadir wayland-protocols)
     XDG_SHELL_XML = $(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml
@@ -53,22 +57,20 @@ directories:
 
 # NOTE: Asset processing.
 
-assets: $(ASSET_TOOL) $(GENERATED)/watermelon.png.h $(GENERATED)/arial.ttf.h
+assets: $(ASSET_PREPROCESS) $(GENERATED)/watermelon.png.h $(GENERATED)/arial.ttf.h
 
-$(ASSET_TOOL): $(SRC)/game_asset_preprocess.c
+$(ASSET_PREPROCESS): $(SRC)/game_asset_preprocess.c
 ifeq ($(PLATFORM),Windows)
 	@cl.exe /nologo /W3 /GS- /Fe:$@ /Fo$(TOOLS)/ $<
-
 else # Linux
-
 	@$(CC) -O2 -o $@ $<
 endif # ($(PLATFORM),Windows)
 
 $(GENERATED)/watermelon.png.h: $(ASSETS)/images/watermelon.png
-	@$(ASSET_TOOL) $< $@
+	@$(RUN_ASSET_PREPROCESS) $< $@
 
 $(GENERATED)/arial.ttf.h: $(ASSETS)/fonts/arial.ttf
-	@$(ASSET_TOOL) $< $@
+	@$(RUN_ASSET_PREPROCESS) $< $@
 
 # NOTE: OS-specific stuff.
 

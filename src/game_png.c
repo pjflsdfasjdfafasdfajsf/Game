@@ -17,10 +17,9 @@ static void CRC32TableInitialize(void) {
     for (u32 i = 0; i < 256; i++) {
         u32 crc = i;
         for (u32 j = 0; j < 8; j++) {
-            if (IsBitSet(crc, 1))) {
-                    crc = CRC32Polynomial ^ (crc >> 1);
-                }
-            else {
+            if (IsBitSet(crc, 1)) {
+                crc = CRC32Polynomial ^ (crc >> 1);
+            } else {
                 crc = (crc >> 1);
             }
         }
@@ -213,10 +212,10 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
         // NOTE: Checksum failed
         return false;
     }
-    if (IsBitSet(zlibAdditionalFlags, 0x20))) {
-            // NOTE: Preset dictionaries are not allowed in PNG
-            return false;
-        }
+    if (IsBitSet(zlibAdditionalFlags, 0x20)) {
+        // NOTE: Preset dictionaries are not allowed in PNG
+        return false;
+    }
 
     usize outputPosition = 0;
     bool isFinalBlock = false;
@@ -411,7 +410,9 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         return result;
     }
 
-    usize stream.offset = PNGFileSignatureLength;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, memory, length);
+    stream.offset = PNGFileSignatureLength;
 
     bool hasParsedIHDR = false;
 
@@ -429,30 +430,24 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     bool hasSeenIDAT = false;
     bool isPreviousChunkIDAT = false;
 
-    while (stream.offset < length) {
-        usize remainingBytes = length - stream.offset;
-        usize headerSize = PNGChunkLengthSize + PNGChunkTypeSize;
-
-        if (remainingBytes < headerSize) {
+    while (stream.offset < stream.capacity) {
+        if (!BinaryStreamHasSpace(&stream, PNGChunkLengthSize + PNGChunkTypeSize)) {
             break;
         }
 
-        u32 chunkLength = ReadUInt32BigEndian(&imageBufferPointer[stream.offset]);
-        stream.offset += PNGChunkLengthSize;
+        u32 chunkLength = BinaryStreamReadUInt32BigEndian(&stream);
 
-        const u8 *chunkTypePointer = &imageBufferPointer[stream.offset];
+        const u8 *chunkTypePointer = &stream.memory[stream.offset];
         stream.offset += PNGChunkTypeSize;
 
-        remainingBytes = length - stream.offset;
-        if (remainingBytes < chunkLength + PNGChunkCRCSize) {
+        if (!BinaryStreamHasSpace(&stream, chunkLength + PNGChunkCRCSize)) {
             break;
         }
 
-        const u8 *chunkDataPointer = &imageBufferPointer[stream.offset];
+        const u8 *chunkDataPointer = &stream.memory[stream.offset];
         stream.offset += chunkLength;
 
-        u32 expectedCRC = ReadUInt32BigEndian(&imageBufferPointer[stream.offset]);
-        stream.offset += PNGChunkCRCSize;
+        u32 expectedCRC = BinaryStreamReadUInt32BigEndian(&stream);
 
         usize crcDataLength = PNGChunkTypeSize + chunkLength;
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
@@ -512,7 +507,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
             break;
         } else {
-            bool isCriticalChunk = !IsBitSet(chunkTypePointer[0], 0x20));
+            bool isCriticalChunk = !IsBitSet(chunkTypePointer[0], 0x20);
             if (isCriticalChunk) {
                 break;
             }

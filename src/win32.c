@@ -5,12 +5,7 @@
 //     * Separate game and platform
 //
 
-
-
-#include <memoryapi.h>
 #include <windows.h>
-#include <wingdi.h>
-#include <winnt.h>
 
 #include "win32.h"
 #include "win32_d3d12.h"
@@ -438,7 +433,7 @@ void WINAPI WinMainCRTStartup() {
     TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
 
     Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
-    textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+    // textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     WindowShow(window);
 
