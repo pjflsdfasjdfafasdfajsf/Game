@@ -2,10 +2,103 @@
 #include "game_platform.h"
 // TODO: Make this crossplatform and do not depend on this header.
 #include "game_png.h"
+#include "game_rectangle_pack.h"
 #include "win32.h"
 
 // NOTE: You can find the spec here:  https://developer.apple.com/fonts/TrueType-Reference-Manual
 //
+
+// NOTE: Table parsing.
+
+typedef struct {
+    u32 version;
+    u32 fontRevision;
+    u32 checkSumAdjustment;
+    u32 magicNumber;
+    u16 flags;
+    u16 unitsPerEm;
+    i64 created;
+    i64 modified;
+    i16 xMin;
+    i16 yMin;
+    i16 xMax;
+    i16 yMax;
+    u16 macStyle;
+    u16 lowestRecPPEM;
+    i16 fontDirectionHint;
+    i16 indexToLocFormat;
+    i16 glyphDataFormat;
+} TrueTypeHeadTable;
+
+typedef struct {
+    u32 version;
+    u16 numGlyphs;
+    // NOTE: the following fields are only valid if version is 0x00010000 (1.0).
+    u16 maxPoints;
+    u16 maxContours;
+    u16 maxComponentPoints;
+    u16 maxComponentContours;
+    u16 maxZones;
+    u16 maxTwilightPoints;
+    u16 maxStorage;
+    u16 maxFunctionDefs;
+    u16 maxInstructionDefs;
+    u16 maxStackElements;
+    u16 maxSizeOfInstructions;
+    u16 maxComponentElements;
+    u16 maxComponentDepth;
+} TrueTypeMaximumProfileTable;
+
+typedef struct {
+    bool isValid;
+    u16 segCount;
+    usize endCodeOffset;
+    usize startCodeOffset;
+    usize idDeltaOffset;
+    usize idRangeOffsetOffset;
+    const u8 *memory;
+    usize length;
+} TrueTypeCmapFormat4;
+
+typedef struct {
+    bool isValid;
+    i16 indexToLocFormat;
+    u16 numGlyphs;
+    const u8 *memory;
+    usize length;
+} TrueTypeIndexToLocationTable;
+
+typedef struct {
+    // NOTE: this is relative to the start of the 'glyf' table
+    u32 offset;
+    u32 length;
+} TrueTypeGlyphLocation;
+
+typedef struct {
+    i16 x;
+    i16 y;
+    bool isOnCurve;
+} TrueTypeGlyphPoint;
+
+typedef struct {
+    bool isValid;
+    // NOTE: they are rejected :)
+    bool isCompound;
+
+    i16 numberOfContours;
+    i16 xMin;
+    i16 yMin;
+    i16 xMax;
+    i16 yMax;
+
+    u32 numberOfPoints;
+    u16 *endPointsOfContours;
+
+    u16 instructionLength;
+    const u8 *instructions;
+
+    TrueTypeGlyphPoint *points;
+} TrueTypeSimpleGlyph;
 
 // NOTE: Glyph outline flags
 enum {
@@ -15,6 +108,15 @@ enum {
     TrueTypeGlyphFlag_Repeat = (1 << 3),
     TrueTypeGlyphFlag_XIsSameOrPositiveXShort = (1 << 4),
     TrueTypeGlyphFlag_YIsSameOrPositiveYShort = (1 << 5),
+};
+
+// NOTE: Table tags
+enum {
+    TrueTypeTableTag_HEAD = FOURCC('h', 'e', 'a', 'd'),
+    TrueTypeTableTag_MAXP = FOURCC('m', 'a', 'x', 'p'),
+    TrueTypeTableTag_CMAP = FOURCC('c', 'm', 'a', 'p'),
+    TrueTypeTableTag_LOCA = FOURCC('l', 'o', 'c', 'a'),
+    TrueTypeTableTag_GLYF = FOURCC('g', 'l', 'y', 'f'),
 };
 
 typedef struct {
@@ -778,23 +880,26 @@ static void TrueTypeTessellateBezier(Vector2 *outputPoints, u32 *outputSize, Vec
     }
 }
 
-Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, u32 targetPixelHeight) {
+Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
-    if (!glyph || !glyph->isValid || glyph->isCompound || glyph->numberOfContours <= 0 || targetPixelHeight == 0) {
+    if (!glyph || !glyph->isValid || glyph->isCompound || glyph->numberOfContours <= 0 || scale <= 0.0f) {
         return result;
     }
 
-    if (glyph->yMax <= glyph->yMin) {
+    if (glyph->yMax <= glyph->yMin || glyph->xMax <= glyph->xMin) {
         return result;
     }
 
-    f32 scale = (f32)targetPixelHeight / (f32)(glyph->yMax - glyph->yMin);
-
-    u32 targetPixelWidth = (u32)(i32)((f32)(glyph->xMax - glyph->xMin) * scale);
+    u32 targetPixelWidth = (u32)(((f32)(glyph->xMax - glyph->xMin) * scale) + 0.999f);
+    u32 targetPixelHeight = (u32)(((f32)(glyph->yMax - glyph->yMin) * scale) + 0.999f);
     if (targetPixelWidth == 0) {
         targetPixelWidth = 1;
+    }
+
+    if (targetPixelHeight == 0) {
+        targetPixelHeight = 1;
     }
 
     result.size.x = targetPixelWidth;
@@ -1034,6 +1139,113 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, u32 targetPixelHe
     VirtualFree(contourEndIndices, 0, MEM_RELEASE);
     VirtualFree(edges, 0, MEM_RELEASE);
     VirtualFree(coverageBuffer, 0, MEM_RELEASE);
+
+    return result;
+}
+
+Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
+    Image result;
+    MemoryZero(&result, sizeof(result));
+
+    if (!font || atlasWidth == 0 || atlasHeight == 0 || characterCount == 0 || !outGlyphs) {
+        return result;
+    }
+
+    MemoryZero(outGlyphs, sizeof(TrueTypeBakedGlyph) * characterCount);
+
+    const TrueTypeTableDirectoryEntry *headEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_HEAD);
+    const TrueTypeTableDirectoryEntry *maxpEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_MAXP);
+    const TrueTypeTableDirectoryEntry *cmapEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_CMAP);
+    const TrueTypeTableDirectoryEntry *locaEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_LOCA);
+    const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_GLYF);
+
+    if (!headEntry || !maxpEntry || !cmapEntry || !locaEntry || !glyfEntry) {
+        return result;
+    }
+
+    TrueTypeHeadTable head = TrueTypeHeadTableParse(headEntry);
+    TrueTypeMaximumProfileTable maxp = TrueTypeMaximumProfileTableParse(maxpEntry);
+    TrueTypeCmapFormat4 cmap = TrueTypeCmapTableParseFormat4(cmapEntry);
+    TrueTypeIndexToLocationTable loca = TrueTypeIndexToLocationTableParse(locaEntry, head.indexToLocFormat, maxp.numGlyphs);
+
+    if (!cmap.isValid || !loca.isValid) {
+        return result;
+    }
+
+    f32 scale = (f32)targetPixelHeight / (f32)head.unitsPerEm;
+
+    result.size.x = atlasWidth;
+    result.size.y = atlasHeight;
+    result.bytesPerPixel = 4;
+
+    usize pixelsAllocationSize = (usize)result.size.x * (usize)result.size.y * result.bytesPerPixel;
+    result.pixels = (u8 *)VirtualAlloc(0, pixelsAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+    if (!result.pixels) {
+        MemoryZero(&result, sizeof(result));
+        return result;
+    }
+
+    MemoryZero(result.pixels, pixelsAllocationSize);
+
+    Pack2D atlasPack2D = Pack2DCreate(atlasWidth, atlasHeight);
+    const u32 padding = 1;
+
+    for (u32 index = 0; index < characterCount; index++) {
+        u32 characterCode = firstCharacter + index;
+        outGlyphs[index].characterCode = characterCode;
+
+        u32 glyphIndex = TrueTypeCmapFormat4GetGlyphIndex(&cmap, characterCode);
+        if (glyphIndex == 0) {
+            continue;
+        }
+
+        TrueTypeGlyphLocation glyphLocation = TrueTypeIndexToLocationGetGlyphLocation(&loca, (u16)glyphIndex);
+        TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(glyfEntry, glyphLocation);
+
+        if (!glyph.isValid) {
+            continue;
+        }
+
+        Image image = TrueTypeGlyphRasterize(&glyph, scale);
+
+        if (image.pixels && image.size.x > 0 && image.size.y > 0) {
+            u32 positionX = 0;
+            u32 positionY = 0;
+
+            bool isPacked = Pack2DAdd(&atlasPack2D, image.size.x + padding, image.size.y + padding, &positionX, &positionY);
+
+            if (isPacked) {
+                for (u32 y = 0; y < (u32)image.size.y; y++) {
+                    for (u32 x = 0; x < (u32)image.size.x; x++) {
+                        u32 sourceIndex = (y * (u32)image.size.x + x) * result.bytesPerPixel;
+                        u32 destinationIndex = ((positionY + y) * atlasWidth + (positionX + x)) * result.bytesPerPixel;
+
+                        result.pixels[destinationIndex + 0] = image.pixels[sourceIndex + 0];
+                        result.pixels[destinationIndex + 1] = image.pixels[sourceIndex + 1];
+                        result.pixels[destinationIndex + 2] = image.pixels[sourceIndex + 2];
+                        result.pixels[destinationIndex + 3] = image.pixels[sourceIndex + 3];
+                    }
+                }
+
+                outGlyphs[index].isValid = true;
+                outGlyphs[index].uvMin.x = (f32)positionX / (f32)atlasWidth;
+                outGlyphs[index].uvMin.y = (f32)positionY / (f32)atlasHeight;
+                outGlyphs[index].uvMax.x = (f32)(positionX + image.size.x) / (f32)atlasWidth;
+                outGlyphs[index].uvMax.y = (f32)(positionY + image.size.y) / (f32)atlasHeight;
+                outGlyphs[index].size.x = (f32)image.size.x;
+                outGlyphs[index].size.y = (f32)image.size.y;
+                outGlyphs[index].offset.x = (f32)glyph.xMin * scale;
+                outGlyphs[index].offset.y = (f32)glyph.yMax * scale;
+            }
+
+            VirtualFree(image.pixels, 0, MEM_RELEASE);
+        }
+    }
+
+    if (atlasPack2D.points) {
+        VirtualFree(atlasPack2D.points, 0, MEM_RELEASE);
+    }
 
     return result;
 }

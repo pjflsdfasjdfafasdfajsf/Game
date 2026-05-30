@@ -10,7 +10,7 @@ set CFLAGS=/nologo /W3 /GS-
 set LDFLAGS=/link /NODEFAULTLIB /SUBSYSTEM:WINDOWS
 
 set LIBRARIES=kernel32.lib user32.lib d3d12.lib dxgi.lib dxguid.lib ole32.lib
-set SOURCES=win32.c win32_d3d12.c game_png.c game_ttf.c
+set SOURCES=win32.c win32_d3d12.c game_png.c game_ttf.c game_rectangle_pack.c
 
 cl.exe %CFLAGS% game_asset_preprocess.c /Fe:AssetPreprocess.exe
 

@@ -377,24 +377,11 @@ void WINAPI WinMainCRTStartup() {
     };
     TrueTypeFont font = TrueTypeFontLoadFromMemory(arial, sizeof(arial));
 
-    const TrueTypeTableDirectoryEntry *headEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_HEAD);
-    const TrueTypeTableDirectoryEntry *maxpEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_MAXP);
-    const TrueTypeTableDirectoryEntry *cmapEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_CMAP);
-    const TrueTypeTableDirectoryEntry *locaEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_LOCA);
-    const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(&font, TrueTypeTableTag_GLYF);
+    static TrueTypeBakedGlyph glyphs[95];
+    u32 firstCharacter = 32;
+    u32 characterCount = 95;
 
-    TrueTypeHeadTable head = TrueTypeHeadTableParse(headEntry);
-    TrueTypeMaximumProfileTable maxp = TrueTypeMaximumProfileTableParse(maxpEntry);
-    TrueTypeCmapFormat4 cmap = TrueTypeCmapTableParseFormat4(cmapEntry);
-    TrueTypeIndexToLocationTable loca = TrueTypeIndexToLocationTableParse(locaEntry, head.indexToLocFormat, maxp.numGlyphs);
-
-    u32 character = 'A';
-    u32 glyphIndex = TrueTypeCmapFormat4GetGlyphIndex(&cmap, character);
-
-    TrueTypeGlyphLocation glyphLocation = TrueTypeIndexToLocationGetGlyphLocation(&loca, (u16)glyphIndex);
-    TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(glyfEntry, glyphLocation);
-
-    Image image = TrueTypeGlyphRasterize(&glyph, 400);
+    Image image = TrueTypeFontBakeAtlas(&font, 64, 1024, 1024, firstCharacter, characterCount, glyphs);
     textureId = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     WindowShow(mainWindowHandle);

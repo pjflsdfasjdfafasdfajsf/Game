@@ -24,6 +24,8 @@ int main(int argumentCount, const char *arguments[]) {
     const char *inputFilePath = arguments[1];
     const char *outputFilePath = arguments[2];
 
+    printf("%s\n", outputFilePath);
+
     FILE *inputFile = fopen(inputFilePath, "rb");
     if (!inputFile) {
         fprintf(stderr, "ERROR: Could not open input file at path: '%s'\n", inputFilePath);
