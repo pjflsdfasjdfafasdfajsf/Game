@@ -3,7 +3,6 @@
 // TODO: Make this crossplatform and do not depend on this header.
 #include "game_png.h"
 #include "game_rectangle_pack.h"
-#include "win32.h"
 
 // NOTE: You can find the spec here:  https://developer.apple.com/fonts/TrueType-Reference-Manual
 //
@@ -155,7 +154,7 @@ static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength
     return checksum;
 }
 
-TrueTypeFont TrueTypeFontLoadFromMemory(const void *memory, usize length) {
+TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, usize length) {
     TrueTypeFont result;
     MemoryZero(&result, sizeof(result));
 
@@ -207,8 +206,8 @@ TrueTypeFont TrueTypeFontLoadFromMemory(const void *memory, usize length) {
 
     if (result.numberOfTables > 0) {
         usize tablesAllocationSize = sizeof(TrueTypeTableDirectoryEntry) * result.numberOfTables;
-        result.tables = (TrueTypeTableDirectoryEntry *)VirtualAlloc(0, tablesAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
+        result.tables = MemoryArenaPushArray(arena, TrueTypeTableDirectoryEntry, result.numberOfTables);
         if (!result.tables) {
             return result;
         }
@@ -658,7 +657,7 @@ TrueTypeGlyphLocation TrueTypeIndexToLocationGetGlyphLocation(const TrueTypeInde
     return result;
 }
 
-TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirectoryEntry *glyfTableEntry, TrueTypeGlyphLocation glyphLocation) {
+TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const TrueTypeTableDirectoryEntry *glyfTableEntry, TrueTypeGlyphLocation glyphLocation) {
     TrueTypeSimpleGlyph result;
     MemoryZero(&result, sizeof(result));
 
@@ -722,7 +721,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
     usize pointsAllocationSize = sizeof(TrueTypeGlyphPoint) * result.numberOfPoints;
     usize totalAllocationSize = contoursAllocationSize + pointsAllocationSize;
 
-    u8 *allocationBuffer = (u8 *)VirtualAlloc(0, totalAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *allocationBuffer = MemoryArenaPushBytes(arena, totalAllocationSize);
     if (!allocationBuffer) {
         return result;
     }
@@ -753,7 +752,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
     result.instructions = &glyphDataPointer[currentReadOffset];
     currentReadOffset += result.instructionLength;
 
-    u8 *unpackedFlags = (u8 *)VirtualAlloc(0, result.numberOfPoints, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *unpackedFlags = MemoryArenaPushArray(arena, u8, result.numberOfPoints);
     if (!unpackedFlags) {
         MemoryZero(&result, sizeof(TrueTypeSimpleGlyph));
 
@@ -859,8 +858,6 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
         result.points[pointIndex].y = currentY;
     }
 
-    VirtualFree(unpackedFlags, 0, MEM_RELEASE);
-
     result.isValid = true;
     return result;
 }
@@ -885,7 +882,7 @@ static void TrueTypeTessellateBezier(Vector2 *outputPoints, u32 *outputSize, Vec
     }
 }
 
-Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
+Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyph, f32 scale) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
@@ -912,7 +909,7 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
     result.bytesPerPixel = 4;
 
     usize pixelsAllocationSize = (usize)result.size.x * (usize)result.size.y * result.bytesPerPixel;
-    result.pixels = (u8 *)VirtualAlloc(0, pixelsAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    result.pixels = MemoryArenaPushBytes(arena, pixelsAllocationSize);
 
     if (!result.pixels) {
         return result;
@@ -920,21 +917,13 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
 
     u32 maxGeneratedPoints = glyph->numberOfPoints * 10;
 
-    Vector2 *generatedPoints = (Vector2 *)VirtualAlloc(0, sizeof(Vector2) * maxGeneratedPoints, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    u32 *contourEndIndices = (u32 *)VirtualAlloc(0, sizeof(u32) * glyph->numberOfContours, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Vector2 *generatedPoints = MemoryArenaPushArray(arena, Vector2, maxGeneratedPoints);
+    if (!generatedPoints) {
+        return result;
+    }
 
-    if (!generatedPoints || !contourEndIndices) {
-        if (generatedPoints) {
-            VirtualFree(generatedPoints, 0, MEM_RELEASE);
-        }
-
-        if (contourEndIndices) {
-            VirtualFree(contourEndIndices, 0, MEM_RELEASE);
-        }
-
-        VirtualFree(result.pixels, 0, MEM_RELEASE);
-        MemoryZero(&result, sizeof(result));
-
+    u32 *contourEndIndices = MemoryArenaPushArray(arena, u32, glyph->numberOfContours);
+    if (!contourEndIndices) {
         return result;
     }
 
@@ -1002,7 +991,7 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         generatedPoints[i].y = ((f32)glyph->yMax - generatedPoints[i].y) * scale;
     }
 
-    TrueTypeEdge *edges = (TrueTypeEdge *)VirtualAlloc(0, sizeof(TrueTypeEdge) * generatedPointCount, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    TrueTypeEdge *edges = MemoryArenaPushArray(arena, TrueTypeEdge, generatedPointCount);
     u32 edgeCount = 0;
     u32 readPointIndex = 0;
 
@@ -1016,8 +1005,7 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         readPointIndex++;
     }
 
-    u8 *coverageBuffer = (u8 *)VirtualAlloc(0, result.size.x * result.size.y, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    MemoryZero(coverageBuffer, result.size.x * result.size.y);
+    u8 *coverageBuffer = MemoryArenaPushBytes(arena, result.size.x * result.size.y);
 
     const u32 scanlineSubdivisions = 5;
     f32 alphaWeight = 255.0f / (f32)scanlineSubdivisions;
@@ -1143,15 +1131,10 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         result.pixels[i * 4 + 3] = alpha;
     }
 
-    VirtualFree(generatedPoints, 0, MEM_RELEASE);
-    VirtualFree(contourEndIndices, 0, MEM_RELEASE);
-    VirtualFree(edges, 0, MEM_RELEASE);
-    VirtualFree(coverageBuffer, 0, MEM_RELEASE);
-
     return result;
 }
 
-Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
+Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryArena, const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
@@ -1187,19 +1170,20 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
     result.bytesPerPixel = 4;
 
     usize pixelsAllocationSize = (usize)result.size.x * (usize)result.size.y * result.bytesPerPixel;
-    result.pixels = (u8 *)VirtualAlloc(0, pixelsAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    result.pixels = MemoryArenaPushBytes(permanentArena, pixelsAllocationSize);
 
     if (!result.pixels) {
         MemoryZero(&result, sizeof(result));
+
         return result;
     }
 
-    MemoryZero(result.pixels, pixelsAllocationSize);
-
-    Pack2D atlasPack2D = Pack2DCreate(atlasWidth, atlasHeight);
+    Pack2D atlasPack2D = Pack2DCreate(temporaryArena, atlasWidth, atlasHeight);
     const u32 padding = 1;
 
     for (u32 index = 0; index < characterCount; index++) {
+        MemoryArenaCheckpoint glyphCheckpoint = MemoryArenaCreateCheckpoint(temporaryArena);
+
         u32 characterCode = firstCharacter + index;
         outGlyphs[index].characterCode = characterCode;
 
@@ -1209,13 +1193,15 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
         }
 
         TrueTypeGlyphLocation glyphLocation = TrueTypeIndexToLocationGetGlyphLocation(&loca, (u16)glyphIndex);
-        TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(glyfEntry, glyphLocation);
+        TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(temporaryArena, glyfEntry, glyphLocation);
 
         if (!glyph.isValid) {
+            MemoryArenaRestoreCheckpoint(glyphCheckpoint);
+
             continue;
         }
 
-        Image image = TrueTypeGlyphRasterize(&glyph, scale);
+        Image image = TrueTypeGlyphRasterize(temporaryArena, &glyph, scale);
 
         if (image.pixels && image.size.x > 0 && image.size.y > 0) {
             u32 positionX = 0;
@@ -1246,13 +1232,9 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
                 outGlyphs[index].offset.x = (f32)glyph.xMin * scale;
                 outGlyphs[index].offset.y = (f32)glyph.yMax * scale;
             }
-
-            VirtualFree(image.pixels, 0, MEM_RELEASE);
         }
-    }
 
-    if (atlasPack2D.points) {
-        VirtualFree(atlasPack2D.points, 0, MEM_RELEASE);
+        MemoryArenaRestoreCheckpoint(glyphCheckpoint);
     }
 
     return result;

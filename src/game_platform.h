@@ -33,6 +33,11 @@ typedef float f32;
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define UNUSED(x) (void)x
 
+#define KILOBYTES(value) ((value) * 1024ULL)
+#define MEGABYTES(value) (KILOBYTES(value) * 1024ULL)
+#define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
+#define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
+
 #define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
 typedef struct {
@@ -167,3 +172,97 @@ static inline u64 ReadUInt64BigEndian(const u8 *memory) {
 static inline i64 ReadInt64BigEndian(const u8 *memory) {
     return (i64)ReadUInt64BigEndian(memory);
 }
+
+// NOTE: Memory arena.
+
+typedef struct {
+    u8 *basePointer;
+    usize totalCapacity;
+    usize currentOffset;
+} MemoryArena;
+
+typedef struct {
+    MemoryArena *arena;
+    usize savedOffset;
+} MemoryArenaCheckpoint;
+
+static inline void MemoryArenaInitialize(MemoryArena *arena, void *backingMemory, usize totalCapacity) {
+    if (!arena) {
+        return;
+    }
+
+    arena->basePointer = (u8 *)backingMemory;
+    arena->totalCapacity = totalCapacity;
+    arena->currentOffset = 0;
+}
+
+static inline usize MemoryArenaGetRemainingCapacity(const MemoryArena *arena) {
+    if (!arena) {
+        return 0;
+    }
+
+    return arena->totalCapacity - arena->currentOffset;
+}
+
+static inline void *MemoryArenaAllocateBytesAligned(MemoryArena *arena, usize allocationSize, usize alignment) {
+    if (!arena || !arena->basePointer || allocationSize == 0 || alignment == 0) {
+        return 0;
+    }
+
+    if ((alignment & (alignment - 1)) != 0) {
+        return 0;
+    }
+
+    usize alignmentMask = alignment - 1;
+    usize alignedOffset = (arena->currentOffset + alignmentMask) & ~alignmentMask;
+
+    if (alignedOffset + allocationSize > arena->totalCapacity) {
+        return 0;
+    }
+
+    void *allocatedMemory = (void *)(arena->basePointer + alignedOffset);
+    arena->currentOffset = alignedOffset + allocationSize;
+
+    return allocatedMemory;
+}
+
+static inline void *MemoryArenaAllocateBytes(MemoryArena *arena, usize allocationSize) {
+    return MemoryArenaAllocateBytesAligned(arena, allocationSize, 8);
+}
+
+static inline void *MemoryArenaAllocateBytesAndZero(MemoryArena *arena, usize allocationSize) {
+    void *allocatedMemory = MemoryArenaAllocateBytes(arena, allocationSize);
+    
+    if (allocatedMemory) {
+        MemoryZero(allocatedMemory, allocationSize);
+    }
+    
+    return allocatedMemory;
+}
+
+static inline void MemoryArenaClear(MemoryArena *arena) {
+    if (arena) {
+        arena->currentOffset = 0;
+    }
+}
+
+static inline MemoryArenaCheckpoint MemoryArenaCreateCheckpoint(MemoryArena *arena) {
+    MemoryArenaCheckpoint result;
+    MemoryZero(&result, sizeof(result));
+
+    if (arena) {
+        result.arena = arena;
+        result.savedOffset = arena->currentOffset;
+    }
+
+    return result;
+}
+
+static inline void MemoryArenaRestoreCheckpoint(MemoryArenaCheckpoint checkpoint) {
+    if (checkpoint.arena) {
+        checkpoint.arena->currentOffset = checkpoint.savedOffset;
+    }
+}
+
+#define MemoryArenaPushArray(arena, type, count) (type *)MemoryArenaAllocateBytesAndZero((arena), sizeof(type) * (count))
+#define MemoryArenaPushBytes(arena, size) MemoryArenaAllocateBytesAndZero((arena), (size))

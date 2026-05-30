@@ -11,8 +11,10 @@
 
 #include "game_platform.h"
 
+#include <memoryapi.h>
 #include <windows.h>
 #include <wingdi.h>
+#include <winnt.h>
 
 int _fltused = 0;
 
@@ -400,6 +402,18 @@ void WINAPI WinMainCRTStartup() {
         ExitProcess(1);
     }
 
+    usize permanentArenaSize = MEGABYTES(64);
+    usize temporaryArenaSize = MEGABYTES(256);
+
+    void *permanentMemoryBlock = VirtualAlloc(0, permanentArenaSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void *temporaryMemoryBlock = VirtualAlloc(0, temporaryArenaSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+    MemoryArena permanentArena;
+    MemoryArenaInitialize(&permanentArena, permanentMemoryBlock, permanentArenaSize);
+
+    MemoryArena temporaryArena;
+    MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
+
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12);
 
@@ -423,13 +437,11 @@ void WINAPI WinMainCRTStartup() {
     static const char arial[] = {
 #include "arial.ttf.h"
     };
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(arial, sizeof(arial));
 
-    static TrueTypeBakedGlyph glyphs[95];
-    u32 firstCharacter = 32;
-    u32 characterCount = 95;
+    TrueTypeFont font = TrueTypeFontLoadFromMemory(&temporaryArena, arial, sizeof(arial));
+    TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
 
-    Image image = TrueTypeFontBakeAtlas(&font, 64, 1024, 1024, firstCharacter, characterCount, glyphs);
+    Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
     textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     WindowShow(mainWindowHandle);
