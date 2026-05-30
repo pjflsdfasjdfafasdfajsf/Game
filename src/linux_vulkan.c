@@ -102,8 +102,16 @@ static void VulkanQueueFamiliesFind(Vulkan *vulkan, VkPhysicalDevice physicalDev
     vulkan->queueFamilies.graphicsIndex = 0xffffffff;
     vulkan->queueFamilies.presentIndex = 0xffffffff;
 
+<<<<<<< HEAD
     u32 count = 0;
     vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, 0);
+=======
+	u32 count = 0;
+	vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, 0);
+	if (count > 16) {
+		count = 16;
+	}
+>>>>>>> 27f99c8cd372f8e604ffe11b153a7e806c6f066d
 
     count = MIN(count, 16);
 
@@ -132,10 +140,17 @@ static bool VulkanPhysicalDeviceSuitable(Vulkan *vulkan, VkPhysicalDevice physic
     VkPhysicalDeviceProperties properties;
     vulkan->vkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
+<<<<<<< HEAD
     VkPhysicalDeviceFeatures features;
     vulkan->vkGetPhysicalDeviceFeatures(physicalDevice, &features);
     VulkanQueueFamiliesFind(vulkan, physicalDevice);
     return (properties.deviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
+=======
+	VkPhysicalDeviceFeatures features;
+	vulkan->vkGetPhysicalDeviceFeatures(physicalDevice, &features);
+	VulkanQueueFamiliesFind(vulkan, physicalDevice);
+	return (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
+>>>>>>> 27f99c8cd372f8e604ffe11b153a7e806c6f066d
 }
 
 static void VulkanPhysicalDevicePick(Vulkan *vulkan) {
@@ -227,16 +242,34 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
     if (!result.formatCount) {
         printf("ERROR: failed to get vulkan surface formats.\n");
 
+<<<<<<< HEAD
         return result;
     }
+=======
+		return result;
+	}
+	if (result.formatCount > 32) {
+		result.formatCount = 32;
+	}
+	vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
+>>>>>>> 27f99c8cd372f8e604ffe11b153a7e806c6f066d
 
     // NOTE: There will be a segmentation fault if we don't clamp this because drivers can sometimes return just a lot of them.
     result.formatCount = MIN(result.formatCount, 32);
     vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
 
+<<<<<<< HEAD
     vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
     if (!result.presentModeCount) {
         printf("ERROR: failed to get vulkan surface present modes.\n");
+=======
+		return result;
+	}
+	if (result.presentModeCount > 8) {
+		result.presentModeCount = 8;
+	}
+	vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
+>>>>>>> 27f99c8cd372f8e604ffe11b153a7e806c6f066d
 
         return result;
     }
