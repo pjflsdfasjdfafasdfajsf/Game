@@ -1,7 +1,8 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Text rendering
+//     * Define a proper cross-platform renderer interface
+//     * Separate game and platform
 //
 
 #include "win32.h"
@@ -11,8 +12,10 @@
 
 #include "game_platform.h"
 
+#include <memoryapi.h>
 #include <windows.h>
 #include <wingdi.h>
+#include <winnt.h>
 
 int _fltused = 0;
 
@@ -291,18 +294,66 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-u32 textureId = 0;
+void DrawTextTEMP(Win32Direct12 *d3d12, u32 atlasTextureId, const TrueTypeBakedGlyph *glyphs, u32 firstCharacter, u32 characterCount, const char *text, Vector2 startPosition, f32 scaleToScreen) {
+    if (!glyphs || !text) {
+        return;
+    }
 
-void RunDraw(Win32Direct12 *d3d12) {
+    Vector2 cursor = startPosition;
+
+    for (u32 stringIndex = 0; text[stringIndex] != '\0'; stringIndex++) {
+        u8 character = (u8)text[stringIndex];
+
+        if (character == '\n') {
+            cursor.x = startPosition.x;
+            cursor.y -= (64.0f * scaleToScreen);
+
+            continue;
+        }
+
+        if (character < firstCharacter || character >= (firstCharacter + characterCount)) {
+            continue;
+        }
+
+        u32 glyphIndex = character - firstCharacter;
+        const TrueTypeBakedGlyph *glyph = &glyphs[glyphIndex];
+
+        if (glyph->isValid) {
+            Vector2 position;
+            position.x = cursor.x + (glyph->offset.x * scaleToScreen);
+            position.y = cursor.y + (glyph->offset.y * scaleToScreen);
+
+            Vector2 size;
+            size.x = glyph->size.x * scaleToScreen;
+            size.y = glyph->size.y * scaleToScreen;
+
+            D3D12RectangleDrawEX(d3d12, atlasTextureId, position, size, glyph->uvMin, glyph->uvMax, V4(1.0f, 1.0f, 1.0f, 1.0f));
+
+            cursor.x += (glyph->size.x + 2.0f) * scaleToScreen;
+        } else if (character == ' ') {
+            cursor.x += 16.0f * scaleToScreen;
+        }
+    }
+}
+
+u32 textureIdTEMP = 0;
+
+void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
     D3D12FrameBegin(d3d12);
     {
+        f32 scaleToScreenX = 1.0f / (DEFAULT_WINDOW_WIDTH / 2.0f);
+        f32 scaleToScreenY = 1.0f / (DEFAULT_WINDOW_HEIGHT / 2.0f);
+        
+        f32 scale = scaleToScreenY; 
 
-        D3D12RectangleDraw(d3d12, textureId, V2(-0.5f, 0.5f), V2(1.0f, 1.0f), V4(1.0f, 1.0f, 1.0f, 1.0f));
+        Vector2 startPosition = V2(-0.8f, 0.5f);
+
+        DrawTextTEMP(d3d12, textureIdTEMP, glyphsTEMP, 32, 95, "eeee omg ! = - ````", startPosition, scale);
     }
     D3D12FrameEnd(d3d12);
 }
 
-void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP,  HWND windowHandle) {
     MSG message;
     MemoryZero(&message, sizeof(message));
 
@@ -329,7 +380,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
             wasFocused = isFocused;
 
             if (isFocused) {
-                RunDraw(d3d12);
+                RunDraw(d3d12, glyphsTEMP);
             } else {
                 Sleep(10);
             }
@@ -338,7 +389,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, HWND windowHandle) {
 }
 
 void WINAPI WinMainCRTStartup() {
-    HWND mainWindowHandle = WindowCreate(L"Win32");
+    HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
 #if 0
@@ -348,23 +399,27 @@ void WINAPI WinMainCRTStartup() {
     ExitProcess(1);
 #endif
 
-    if (!mainWindowHandle) {
+    if (!window) {
         ExitProcess(1);
     }
 
+    usize permanentArenaSize = MEGABYTES(64);
+    usize temporaryArenaSize = MEGABYTES(256);
+
+    void *permanentMemoryBlock = VirtualAlloc(0, permanentArenaSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void *temporaryMemoryBlock = VirtualAlloc(0, temporaryArenaSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+    MemoryArena permanentArena;
+    MemoryArenaInitialize(&permanentArena, permanentMemoryBlock, permanentArenaSize);
+
+    MemoryArena temporaryArena;
+    MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
+
     static Win32Direct12 d3d12;
-    D3D12Initialize(&d3d12);
+    D3D12Initialize(&d3d12, window);
 
     static Win32Audio audio;
     AudioInitialize(&audio);
-
-    D3D12DeviceInitialize(&d3d12);
-    D3D12CommandsInitialize(&d3d12);
-    D3D12SwapChainInitialize(&d3d12, mainWindowHandle);
-    D3D12HeapInitialize(&d3d12);
-    D3D12PipelineInitialize(&d3d12);
-    D3D12SynchronizationInitialize(&d3d12);
-    D3D12VertexBufferInitialize(&d3d12, 4096);
 
     //     static const char watermelon[] = {
     // #include "watermelon.png.h"
@@ -375,20 +430,16 @@ void WINAPI WinMainCRTStartup() {
     static const char arial[] = {
 #include "arial.ttf.h"
     };
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(arial, sizeof(arial));
 
-    static TrueTypeBakedGlyph glyphs[95];
-    u32 firstCharacter = 32;
-    u32 characterCount = 95;
+    TrueTypeFont font = TrueTypeFontLoadFromMemory(&temporaryArena, arial, sizeof(arial));
+    TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
 
-    Image image = TrueTypeFontBakeAtlas(&font, 64, 1024, 1024, firstCharacter, characterCount, glyphs);
-    textureId = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+    Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
+    textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
-    WindowShow(mainWindowHandle);
+    WindowShow(window);
 
-    RunUpdate(&d3d12, &audio, mainWindowHandle);
-
-    D3D12DeviceWaitForGPU(&d3d12);
+    RunUpdate(&d3d12, &audio, glyphs, window);
 
     ExitProcess(0);
 }

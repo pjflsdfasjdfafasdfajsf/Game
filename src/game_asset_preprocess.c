@@ -24,7 +24,14 @@ int main(int argumentCount, const char *arguments[]) {
     const char *inputFilePath = arguments[1];
     const char *outputFilePath = arguments[2];
 
-    printf("%s\n", outputFilePath);
+    // NOTE: Yes, there is really this chunk of code just to print only the file name instead of the full path.
+    const char *fileName = outputFilePath;
+    for (const char *scan = outputFilePath; *scan != '\0'; scan++) {
+        if (*scan == '/' || *scan == '\\') {
+            fileName = scan + 1;
+        }
+    }
+    printf("%s\n", fileName);
 
     FILE *inputFile = fopen(inputFilePath, "rb");
     if (!inputFile) {

@@ -39,28 +39,12 @@ typedef struct {
     ID3D12DescriptorHeap *descriptorHeap;
 } Win32Direct12;
 
-void D3D12Initialize(Win32Direct12 *d3d12);
-
-void D3D12DeviceInitialize(Win32Direct12 *d3d12);
-
-void D3D12CommandsInitialize(Win32Direct12 *d3d12);
-
-void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle);
-
-void D3D12PipelineInitialize(Win32Direct12 *d3d12);
-
-void D3D12SynchronizationInitialize(Win32Direct12 *d3d12);
-
-void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12);
-
-void D3D12HeapInitialize(Win32Direct12 *d3d12);
-
-void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT maximumVertexCapacity);
-
+void D3D12Initialize(Win32Direct12 *d3d12, HWND window);
 u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
 void D3D12FrameBegin(Win32Direct12 *d3d12);
 
 void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color);
+void D3D12RectangleDrawEX(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector2 uvMin, Vector2 uvMax, Vector4 color);
 
 void D3D12FrameEnd(Win32Direct12 *d3d12);

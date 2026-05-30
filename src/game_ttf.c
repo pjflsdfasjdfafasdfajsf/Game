@@ -3,7 +3,6 @@
 // TODO: Make this crossplatform and do not depend on this header.
 #include "game_png.h"
 #include "game_rectangle_pack.h"
-#include "win32.h"
 
 // NOTE: You can find the spec here:  https://developer.apple.com/fonts/TrueType-Reference-Manual
 //
@@ -124,6 +123,11 @@ typedef struct {
     Vector2 p2;
 } TrueTypeEdge;
 
+typedef struct {
+    f32 x;
+    i32 direction;
+} TrueTypeScanlineIntersection;
+
 static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength, bool isHeadTable) {
     u32 checksum = 0;
     u32 numberOfLongs = (tableLength + 3) / 4;
@@ -150,7 +154,7 @@ static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength
     return checksum;
 }
 
-TrueTypeFont TrueTypeFontLoadFromMemory(const void *memory, usize length) {
+TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, usize length) {
     TrueTypeFont result;
     MemoryZero(&result, sizeof(result));
 
@@ -201,9 +205,7 @@ TrueTypeFont TrueTypeFontLoadFromMemory(const void *memory, usize length) {
     }
 
     if (result.numberOfTables > 0) {
-        usize tablesAllocationSize = sizeof(TrueTypeTableDirectoryEntry) * result.numberOfTables;
-        result.tables = (TrueTypeTableDirectoryEntry *)VirtualAlloc(0, tablesAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-
+        result.tables = MemoryArenaPushArray(arena, TrueTypeTableDirectoryEntry, result.numberOfTables);
         if (!result.tables) {
             return result;
         }
@@ -499,11 +501,7 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
     }
 
     u16 length = ReadUInt16BigEndian(&subtablePointer[2]);
-    u16 language = ReadUInt16BigEndian(&subtablePointer[4]);
     u16 segCountX2 = ReadUInt16BigEndian(&subtablePointer[6]);
-    u16 searchRange = ReadUInt16BigEndian(&subtablePointer[8]);
-    u16 entrySelector = ReadUInt16BigEndian(&subtablePointer[10]);
-    u16 rangeShift = ReadUInt16BigEndian(&subtablePointer[12]);
 
     u16 segCount = segCountX2 / 2;
 
@@ -653,7 +651,7 @@ TrueTypeGlyphLocation TrueTypeIndexToLocationGetGlyphLocation(const TrueTypeInde
     return result;
 }
 
-TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirectoryEntry *glyfTableEntry, TrueTypeGlyphLocation glyphLocation) {
+TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const TrueTypeTableDirectoryEntry *glyfTableEntry, TrueTypeGlyphLocation glyphLocation) {
     TrueTypeSimpleGlyph result;
     MemoryZero(&result, sizeof(result));
 
@@ -717,7 +715,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
     usize pointsAllocationSize = sizeof(TrueTypeGlyphPoint) * result.numberOfPoints;
     usize totalAllocationSize = contoursAllocationSize + pointsAllocationSize;
 
-    u8 *allocationBuffer = (u8 *)VirtualAlloc(0, totalAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *allocationBuffer = MemoryArenaPushBytes(arena, totalAllocationSize);
     if (!allocationBuffer) {
         return result;
     }
@@ -748,7 +746,7 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
     result.instructions = &glyphDataPointer[currentReadOffset];
     currentReadOffset += result.instructionLength;
 
-    u8 *unpackedFlags = (u8 *)VirtualAlloc(0, result.numberOfPoints, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *unpackedFlags = MemoryArenaPushArray(arena, u8, result.numberOfPoints);
     if (!unpackedFlags) {
         MemoryZero(&result, sizeof(TrueTypeSimpleGlyph));
 
@@ -854,8 +852,6 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(const TrueTypeTableDirecto
         result.points[pointIndex].y = currentY;
     }
 
-    VirtualFree(unpackedFlags, 0, MEM_RELEASE);
-
     result.isValid = true;
     return result;
 }
@@ -880,7 +876,7 @@ static void TrueTypeTessellateBezier(Vector2 *outputPoints, u32 *outputSize, Vec
     }
 }
 
-Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
+Image TrueTypeGlyphRasterize(MemoryArena *arena, const TrueTypeSimpleGlyph *glyph, f32 scale) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
@@ -907,7 +903,7 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
     result.bytesPerPixel = 4;
 
     usize pixelsAllocationSize = (usize)result.size.x * (usize)result.size.y * result.bytesPerPixel;
-    result.pixels = (u8 *)VirtualAlloc(0, pixelsAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    result.pixels = MemoryArenaPushBytes(arena, pixelsAllocationSize);
 
     if (!result.pixels) {
         return result;
@@ -915,93 +911,73 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
 
     u32 maxGeneratedPoints = glyph->numberOfPoints * 10;
 
-    Vector2 *generatedPoints = (Vector2 *)VirtualAlloc(0, sizeof(Vector2) * maxGeneratedPoints, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    u32 *contourEndIndices = (u32 *)VirtualAlloc(0, sizeof(u32) * glyph->numberOfContours, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-
-    if (!generatedPoints || !contourEndIndices) {
-        if (generatedPoints) {
-            VirtualFree(generatedPoints, 0, MEM_RELEASE);
-        }
-
-        if (contourEndIndices) {
-            VirtualFree(contourEndIndices, 0, MEM_RELEASE);
-        }
-
-        VirtualFree(result.pixels, 0, MEM_RELEASE);
-        MemoryZero(&result, sizeof(result));
-
+    Vector2 *generatedPoints = MemoryArenaPushArray(arena, Vector2, maxGeneratedPoints);
+    if (!generatedPoints) {
         return result;
     }
 
-    u32 pointIndex = 0;
+    u32 *contourEndIndices = MemoryArenaPushArray(arena, u32, glyph->numberOfContours);
+    if (!contourEndIndices) {
+        return result;
+    }
+
     u32 generatedPointCount = 0;
+    u32 currentPointIndex = 0;
 
     for (i16 contourIndex = 0; contourIndex < glyph->numberOfContours; contourIndex++) {
-        u32 contourStartIndex = pointIndex;
-        u32 generatedStartIndex = generatedPointCount;
+        u32 contourStartIndex = currentPointIndex;
+        u32 contourEndIndex = glyph->endPointsOfContours[contourIndex];
+        u32 contourLength = contourEndIndex - contourStartIndex + 1;
 
-        bool isContourStart = true;
-        bool contourStartedOffCurve = false;
+        Vector2 startAnchor;
+        bool firstIsOnCurve = glyph->points[contourStartIndex].isOnCurve;
+        bool lastIsOnCurve = glyph->points[contourEndIndex].isOnCurve;
 
-        for (; pointIndex <= glyph->endPointsOfContours[contourIndex]; pointIndex++) {
-            bool isOnCurve = glyph->points[pointIndex].isOnCurve;
-            f32 x = (f32)glyph->points[pointIndex].x;
-            f32 y = (f32)glyph->points[pointIndex].y;
+        if (firstIsOnCurve) {
+            startAnchor = V2((f32)glyph->points[contourStartIndex].x, (f32)glyph->points[contourStartIndex].y);
+        } else if (lastIsOnCurve) {
+            startAnchor = V2((f32)glyph->points[contourEndIndex].x, (f32)glyph->points[contourEndIndex].y);
+        } else {
+            startAnchor = V2(
+                (f32)(glyph->points[contourStartIndex].x + glyph->points[contourEndIndex].x) / 2.0f,
+                (f32)(glyph->points[contourStartIndex].y + glyph->points[contourEndIndex].y) / 2.0f);
+        }
 
-            u32 contourLength = glyph->endPointsOfContours[contourIndex] - contourStartIndex + 1;
-            u32 nextIndex = ((pointIndex + 1 - contourStartIndex) % contourLength) + contourStartIndex;
+        generatedPoints[generatedPointCount++] = startAnchor;
 
-            if (isOnCurve) {
-                generatedPoints[generatedPointCount++] = V2(x, y);
+        for (u32 i = 0; i <= contourLength; i++) {
+            u32 currentIndex = contourStartIndex + (i % contourLength);
+            u32 nextIndex = contourStartIndex + ((i + 1) % contourLength);
+
+            bool currentIsOnCurve = glyph->points[currentIndex].isOnCurve;
+            bool nextIsOnCurve = glyph->points[nextIndex].isOnCurve;
+
+            Vector2 pointCurrent = V2((f32)glyph->points[currentIndex].x, (f32)glyph->points[currentIndex].y);
+            Vector2 pointNext = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
+
+            if (currentIsOnCurve) {
+                generatedPoints[generatedPointCount++] = pointCurrent;
             } else {
-                if (isContourStart) {
-                    contourStartedOffCurve = true;
-                    if (glyph->points[nextIndex].isOnCurve) {
-                        generatedPoints[generatedPointCount++] = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
-                        pointIndex++;
-                        continue;
-                    }
-
-                    x = x + ((f32)glyph->points[nextIndex].x - x) / 2.0f;
-                    y = y + ((f32)glyph->points[nextIndex].y - y) / 2.0f;
-
-                    generatedPoints[generatedPointCount++] = V2(x, y);
-                }
-
                 Vector2 p0 = generatedPoints[generatedPointCount - 1];
-                Vector2 p1 = V2(x, y);
-                Vector2 p2 = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
+                Vector2 p1 = pointCurrent;
+                Vector2 p2;
 
-                if (!glyph->points[nextIndex].isOnCurve) {
-                    p2.x = p1.x + (p2.x - p1.x) / 2.0f;
-                    p2.y = p1.y + (p2.y - p1.y) / 2.0f;
+                if (nextIsOnCurve) {
+                    p2 = pointNext;
                 } else {
-                    pointIndex++;
+                    p2 = V2((pointCurrent.x + pointNext.x) / 2.0f, (pointCurrent.y + pointNext.y) / 2.0f);
                 }
 
                 u32 addedPoints = 0;
                 TrueTypeTessellateBezier(generatedPoints + generatedPointCount, &addedPoints, p0, p1, p2);
                 generatedPointCount += addedPoints;
             }
-
-            isContourStart = false;
         }
 
-        if (glyph->points[pointIndex - 1].isOnCurve) {
-            generatedPoints[generatedPointCount++] = generatedPoints[generatedStartIndex];
-        }
-
-        if (contourStartedOffCurve) {
-            Vector2 p0 = generatedPoints[generatedPointCount - 1];
-            Vector2 p1 = V2((f32)glyph->points[contourStartIndex].x, (f32)glyph->points[contourStartIndex].y);
-            Vector2 p2 = generatedPoints[generatedStartIndex];
-
-            u32 addedPoints = 0;
-            TrueTypeTessellateBezier(generatedPoints + generatedPointCount, &addedPoints, p0, p1, p2);
-            generatedPointCount += addedPoints;
-        }
+        generatedPoints[generatedPointCount++] = startAnchor;
 
         contourEndIndices[contourIndex] = generatedPointCount;
+        currentPointIndex = contourEndIndex + 1;
     }
 
     for (u32 i = 0; i < generatedPointCount; i++) {
@@ -1009,28 +985,28 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         generatedPoints[i].y = ((f32)glyph->yMax - generatedPoints[i].y) * scale;
     }
 
-    TrueTypeEdge *edges = (TrueTypeEdge *)VirtualAlloc(0, sizeof(TrueTypeEdge) * generatedPointCount, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    TrueTypeEdge *edges = MemoryArenaPushArray(arena, TrueTypeEdge, generatedPointCount);
     u32 edgeCount = 0;
-    u32 currentPointIndex = 0;
+    u32 readPointIndex = 0;
 
     for (i16 contourIndex = 0; contourIndex < glyph->numberOfContours; contourIndex++) {
-        for (; currentPointIndex < contourEndIndices[contourIndex] - 1; currentPointIndex++) {
-            edges[edgeCount].p1 = generatedPoints[currentPointIndex];
-            edges[edgeCount].p2 = generatedPoints[currentPointIndex + 1];
+        for (; readPointIndex < contourEndIndices[contourIndex] - 1; readPointIndex++) {
+            edges[edgeCount].p1 = generatedPoints[readPointIndex];
+            edges[edgeCount].p2 = generatedPoints[readPointIndex + 1];
             edgeCount++;
         }
-        currentPointIndex++;
+
+        readPointIndex++;
     }
 
-    u8 *coverageBuffer = (u8 *)VirtualAlloc(0, result.size.x * result.size.y, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    MemoryZero(coverageBuffer, result.size.x * result.size.y);
+    u8 *coverageBuffer = MemoryArenaPushBytes(arena, result.size.x * result.size.y);
 
     const u32 scanlineSubdivisions = 5;
     f32 alphaWeight = 255.0f / (f32)scanlineSubdivisions;
     f32 stepPerScanline = 1.0f / (f32)scanlineSubdivisions;
 
     const u32 maxIntersections = 256;
-    f32 intersections[256];
+    TrueTypeScanlineIntersection intersections[256];
 
     for (u32 y = 0; y < result.size.y; y++) {
         for (u32 subY = 0; subY < scanlineSubdivisions; subY++) {
@@ -1054,6 +1030,8 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                     continue;
                 }
 
+                i32 direction = (deltaY > 0.0f) ? 1 : -1;
+
                 f32 intersectionX = 0.0f;
                 if (deltaX == 0.0f) {
                     intersectionX = edge->p1.x;
@@ -1066,15 +1044,17 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                 }
 
                 if (intersectionCount < maxIntersections) {
-                    intersections[intersectionCount++] = intersectionX;
+                    intersections[intersectionCount].x = intersectionX;
+                    intersections[intersectionCount].direction = direction;
+                    intersectionCount++;
                 }
             }
 
             for (u32 i = 1; i < intersectionCount; i++) {
-                f32 key = intersections[i];
+                TrueTypeScanlineIntersection key = intersections[i];
                 i32 j = (i32)i - 1;
 
-                while (j >= 0 && intersections[j] > key) {
+                while (j >= 0 && intersections[j].x > key.x) {
                     intersections[j + 1] = intersections[j];
                     j--;
                 }
@@ -1082,46 +1062,56 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                 intersections[j + 1] = key;
             }
 
-            if (intersectionCount > 1) {
-                for (u32 m = 0; m + 1 < intersectionCount; m += 2) {
-                    f32 startIntersection = intersections[m];
-                    i32 startIndex = (i32)startIntersection;
-                    f32 startCovered = ((f32)(startIndex + 1)) - startIntersection;
+            i32 windingNumber = 0;
+            f32 startX = 0.0f;
 
-                    f32 endIntersection = intersections[m + 1];
-                    i32 endIndex = (i32)endIntersection;
-                    f32 endCovered = endIntersection - (f32)endIndex;
+            for (u32 m = 0; m < intersectionCount; m++) {
+                i32 nextWindingNumber = windingNumber + intersections[m].direction;
 
-                    if (startIndex < 0) {
-                        startIndex = 0;
-                        startCovered = 1.0f;
-                    }
-                    if (endIndex >= (i32)result.size.x) {
-                        endIndex = result.size.x - 1;
-                        endCovered = 1.0f;
-                    }
-                    if (startIndex >= (i32)result.size.x || endIndex < 0) {
-                        continue;
-                    }
+                if (windingNumber == 0 && nextWindingNumber != 0) {
+                    startX = intersections[m].x;
+                } else if (windingNumber != 0 && nextWindingNumber == 0) {
+                    f32 endX = intersections[m].x;
 
-                    usize bufferIndexY = (usize)y * result.size.x;
+                    if (endX > startX) {
+                        i32 startIndex = (i32)startX;
+                        f32 startCovered = ((f32)(startIndex + 1)) - startX;
 
-                    if (startIndex == endIndex) {
-                        f32 value = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
-                        coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(value, 255.0f);
-                    } else {
-                        f32 valueStart = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
-                        coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(valueStart, 255.0f);
+                        i32 endIndex = (i32)endX;
+                        f32 endCovered = endX - (f32)endIndex;
 
-                        f32 valueEnd = (f32)coverageBuffer[endIndex + bufferIndexY] + (alphaWeight * endCovered);
-                        coverageBuffer[endIndex + bufferIndexY] = (u8)MIN(valueEnd, 255.0f);
-                    }
+                        if (startIndex < 0) {
+                            startIndex = 0;
+                            startCovered = 1.0f;
+                        }
+                        if (endIndex >= (i32)result.size.x) {
+                            endIndex = result.size.x - 1;
+                            endCovered = 1.0f;
+                        }
 
-                    for (i32 j = startIndex + 1; j < endIndex; j++) {
-                        f32 val = (f32)coverageBuffer[j + bufferIndexY] + alphaWeight;
-                        coverageBuffer[j + bufferIndexY] = (u8)MIN(val, 255.0f);
+                        if (startIndex < (i32)result.size.x && endIndex >= 0) {
+                            usize bufferIndexY = (usize)y * result.size.x;
+
+                            if (startIndex == endIndex) {
+                                f32 value = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * (startCovered + endCovered - 1.0f));
+                                coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(value, 255.0f);
+                            } else {
+                                f32 valueStart = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
+                                coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(valueStart, 255.0f);
+
+                                f32 valueEnd = (f32)coverageBuffer[endIndex + bufferIndexY] + (alphaWeight * endCovered);
+                                coverageBuffer[endIndex + bufferIndexY] = (u8)MIN(valueEnd, 255.0f);
+
+                                for (i32 j = startIndex + 1; j < endIndex; j++) {
+                                    f32 val = (f32)coverageBuffer[j + bufferIndexY] + alphaWeight;
+                                    coverageBuffer[j + bufferIndexY] = (u8)MIN(val, 255.0f);
+                                }
+                            }
+                        }
                     }
                 }
+
+                windingNumber = nextWindingNumber;
             }
         }
     }
@@ -1135,15 +1125,10 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         result.pixels[i * 4 + 3] = alpha;
     }
 
-    VirtualFree(generatedPoints, 0, MEM_RELEASE);
-    VirtualFree(contourEndIndices, 0, MEM_RELEASE);
-    VirtualFree(edges, 0, MEM_RELEASE);
-    VirtualFree(coverageBuffer, 0, MEM_RELEASE);
-
     return result;
 }
 
-Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
+Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryArena, const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
@@ -1179,19 +1164,20 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
     result.bytesPerPixel = 4;
 
     usize pixelsAllocationSize = (usize)result.size.x * (usize)result.size.y * result.bytesPerPixel;
-    result.pixels = (u8 *)VirtualAlloc(0, pixelsAllocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    result.pixels = MemoryArenaPushBytes(permanentArena, pixelsAllocationSize);
 
     if (!result.pixels) {
         MemoryZero(&result, sizeof(result));
+
         return result;
     }
 
-    MemoryZero(result.pixels, pixelsAllocationSize);
-
-    Pack2D atlasPack2D = Pack2DCreate(atlasWidth, atlasHeight);
+    Pack2D atlasPack2D = Pack2DCreate(temporaryArena, atlasWidth, atlasHeight);
     const u32 padding = 1;
 
     for (u32 index = 0; index < characterCount; index++) {
+        MemoryArenaCheckpoint glyphCheckpoint = MemoryArenaCreateCheckpoint(temporaryArena);
+
         u32 characterCode = firstCharacter + index;
         outGlyphs[index].characterCode = characterCode;
 
@@ -1201,13 +1187,15 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
         }
 
         TrueTypeGlyphLocation glyphLocation = TrueTypeIndexToLocationGetGlyphLocation(&loca, (u16)glyphIndex);
-        TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(glyfEntry, glyphLocation);
+        TrueTypeSimpleGlyph glyph = TrueTypeGlyfTableParseSimpleGlyph(temporaryArena, glyfEntry, glyphLocation);
 
         if (!glyph.isValid) {
+            MemoryArenaRestoreCheckpoint(glyphCheckpoint);
+
             continue;
         }
 
-        Image image = TrueTypeGlyphRasterize(&glyph, scale);
+        Image image = TrueTypeGlyphRasterize(temporaryArena, &glyph, scale);
 
         if (image.pixels && image.size.x > 0 && image.size.y > 0) {
             u32 positionX = 0;
@@ -1238,13 +1226,9 @@ Image TrueTypeFontBakeAtlas(const TrueTypeFont *font, u32 targetPixelHeight, u32
                 outGlyphs[index].offset.x = (f32)glyph.xMin * scale;
                 outGlyphs[index].offset.y = (f32)glyph.yMax * scale;
             }
-
-            VirtualFree(image.pixels, 0, MEM_RELEASE);
         }
-    }
 
-    if (atlasPack2D.points) {
-        VirtualFree(atlasPack2D.points, 0, MEM_RELEASE);
+        MemoryArenaRestoreCheckpoint(glyphCheckpoint);
     }
 
     return result;

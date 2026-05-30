@@ -1,13 +1,11 @@
 #include "game_rectangle_pack.h"
 #include "game_platform.h"
 
-#include "win32.h"
-
-// Skyline packing algortihm I borrowed from Julien Vernay thank you love you twin mwha 
+// Skyline packing algortihm I borrowed from Julien Vernay thank you love you twin mwha
 //
 // https://jvernay.fr/blog/skyline-2d-packer/implementation/
 
-Pack2D Pack2DCreate(u32 maximumWidth, u32 maximumHeight) {
+Pack2D Pack2DCreate(MemoryArena *arena, u32 maximumWidth, u32 maximumHeight) {
     Pack2D result;
     MemoryZero(&result, sizeof(result));
 
@@ -19,9 +17,8 @@ Pack2D Pack2DCreate(u32 maximumWidth, u32 maximumHeight) {
     result.maximumHeight = maximumHeight;
 
     usize maximumSkylinePoints = (usize)maximumWidth * 2;
-    usize allocationSize = sizeof(Vector2U) * maximumSkylinePoints;
 
-    result.points = (Vector2U *)VirtualAlloc(0, allocationSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    result.points = MemoryArenaPushArray(arena, Vector2U, maximumSkylinePoints);
 
     return result;
 }
@@ -56,11 +53,11 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
         u32 currentY = packer->points[currentIndex].y;
 
         if (rectangleWidth > maximumWidth - currentX) {
-            break; 
+            break;
         }
 
         if (currentY >= bestPositionY) {
-            continue; 
+            continue;
         }
 
         u32 rectangleRightEdge = currentX + rectangleWidth;
@@ -77,11 +74,11 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
         }
 
         if (currentY >= bestPositionY) {
-            continue; 
+            continue;
         }
 
         if (rectangleHeight > maximumHeight - currentY) {
-            continue; 
+            continue;
         }
 
         bestIndexStart = currentIndex;

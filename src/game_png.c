@@ -1,7 +1,5 @@
 #include "game_png.h"
 #include "game_platform.h"
-// TODO: Make this crossplatform and do not depend on this header.
-#include "win32.h"
 
 // NOTE: CRC32.
 
@@ -51,9 +49,7 @@ static const usize PNGChunkLengthSize = 4;
 static const usize PNGChunkTypeSize = 4;
 static const usize PNGChunkCRCSize = 4;
 static const u32 PNGIHDRChunkLength = 13;
-
-// NOTE: This must be a macro since it's used for array initialization.
-#define PNG_MAX_IDAT_CHUNKS 1024
+static const u32 PNGMaxIDATChunks = 1024;
 
 typedef enum {
     PNGColorType_Grayscale = 0,
@@ -394,7 +390,7 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
     }
 }
 
-Image ImageLoadFromPNG(const void *memory, usize length) {
+Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, const void *memory, usize length) {
     Image result;
     MemoryZero(&result, sizeof(result));
 
@@ -420,7 +416,7 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
     PNGHeader imageHeader;
     MemoryZero(&imageHeader, sizeof(imageHeader));
 
-    PNGIDATChunk *idatChunks = (PNGIDATChunk *)VirtualAlloc(0, sizeof(PNGIDATChunk) * PNG_MAX_IDAT_CHUNKS, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {
         return result;
     }
@@ -497,7 +493,7 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
                 break;
             }
 
-            if (idatChunkCount >= PNG_MAX_IDAT_CHUNKS) {
+            if (idatChunkCount >= PNGMaxIDATChunks) {
                 break;
             }
 
@@ -544,7 +540,7 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
     usize scanlineStride = 1 + (usize)imageHeader.width * bytesPerPixel;
     usize decompressedCapacity = scanlineStride * imageHeader.height;
 
-    u8 *decompressedBuffer = (u8 *)VirtualAlloc(0, decompressedCapacity, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *decompressedBuffer = MemoryArenaPushBytes(temporaryArena, decompressedCapacity);
     if (!decompressedBuffer) {
         return result;
     }
@@ -570,7 +566,7 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
     }
 
     const usize totalRawPixelByteCount = rawScanlineByteCount * imageHeight;
-    u8 *rawPixelDataBuffer = (u8 *)VirtualAlloc(0, totalRawPixelByteCount, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    u8 *rawPixelDataBuffer = MemoryArenaPushBytes(permanentArena, totalRawPixelByteCount);
     if (!rawPixelDataBuffer) {
         return result;
     }
