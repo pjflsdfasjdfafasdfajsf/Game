@@ -311,6 +311,10 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                         lengths[index++] = (u8)symbol;
                     } else if (symbol == 16) {
                         u32 repeatCount = StreamReadBits(&stream, 2) + 3;
+
+                        if (index == 0) {
+                            return false;
+                        }
                         u8 repeatValue = lengths[index - 1];
 
                         while (repeatCount--) {
@@ -347,10 +351,17 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                 } else if (symbol == 256) {
                     break;
                 } else {
+                    if (symbol > 285 || symbol < 257) {
+                        return false;
+                    }
                     symbol -= 257;
                     u32 length = deflateLengthBases[symbol] + StreamReadBits(&stream, deflateLengthExtraBits[symbol]);
 
                     u32 distanceSymbol = StreamDecodeSymbol(&stream, &distanceTree);
+                    if (distanceSymbol >= 30) {
+                        return false;
+                    }
+
                     u32 distance = deflateDistanceBases[distanceSymbol] + StreamReadBits(&stream, deflateDistanceExtraBits[distanceSymbol]);
 
                     for (u32 i = 0; i < length; i++) {
@@ -480,7 +491,7 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
                 break;
             }
 
-            if (imageHeader.compressionMethod != 0 || imageHeader.filterMethod != 0) {
+            if (imageHeader.compressionMethod != 0 || imageHeader.filterMethod != 0 || imageHeader.bitDepth != 8 || imageHeader.interlaceMethod != 0) {
                 break;
             }
 
@@ -509,6 +520,13 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
             isPreviousChunkIDAT = false;
 
             break;
+        } else {
+            bool isCriticalChunk = !(chunkTypePointer[0] & 0x20);
+            if (isCriticalChunk) {
+                break;
+            }
+
+            isPreviousChunkIDAT = false;
         }
     }
 
@@ -530,8 +548,8 @@ Image ImageLoadFromPNG(const void *memory, usize length) {
         return result;
     }
 
-    u32 scanlineStride = 1 + (imageHeader.width * bytesPerPixel);
-    usize decompressedCapacity = (usize)scanlineStride * imageHeader.height;
+    usize scanlineStride = 1 + (usize)imageHeader.width * bytesPerPixel;
+    usize decompressedCapacity = scanlineStride * imageHeader.height;
 
     u8 *decompressedBuffer = (u8 *)VirtualAlloc(0, decompressedCapacity, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (!decompressedBuffer) {
