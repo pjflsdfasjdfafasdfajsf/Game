@@ -3,7 +3,7 @@
 set -eu
 
 CC="clang"
-CCFLAGS="-Wall -Wextra -Wpedantic -Wno-strict-prototypes -g"
+CCFLAGS="-g -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g"
 DEBUG_FLAGS="-g -fsanitize=address -DDEBUG"
 
 WAYLAND_PROTOCOLS=$(pkg-config --variable=pkgdatadir wayland-protocols)

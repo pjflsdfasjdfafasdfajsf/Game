@@ -104,6 +104,9 @@ static void VulkanQueueFamiliesFind(Vulkan *vulkan, VkPhysicalDevice physicalDev
 
 	u32 count = 0;
 	vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, 0);
+	if (count > 16) {
+		count = 16;
+	}
 
 	VkQueueFamilyProperties families[16];
 	vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, families);
@@ -133,7 +136,7 @@ static bool VulkanPhysicalDeviceSuitable(Vulkan *vulkan, VkPhysicalDevice physic
 	VkPhysicalDeviceFeatures features;
 	vulkan->vkGetPhysicalDeviceFeatures(physicalDevice, &features);
 	VulkanQueueFamiliesFind(vulkan, physicalDevice);
-	return (properties.deviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
+	return (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
 }
 
 static void VulkanPhysicalDevicePick(Vulkan *vulkan) {
@@ -225,6 +228,9 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 
 		return result;
 	}
+	if (result.formatCount > 32) {
+		result.formatCount = 32;
+	}
 	vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
 
 	vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
@@ -232,6 +238,9 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 		printf("ERROR: failed to get vulkan surface present modes.\n");
 
 		return result;
+	}
+	if (result.presentModeCount > 8) {
+		result.presentModeCount = 8;
 	}
 	vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
 
