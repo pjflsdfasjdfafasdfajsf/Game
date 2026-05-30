@@ -7,14 +7,6 @@
 #include "BasicGeometryVS.h"
 #include "BasicGeometryPS.h"
 
-void D3D12Initialize(Win32Direct12 *d3d12) {
-    if (!d3d12) {
-        return;
-    }
-
-    MemoryZero(d3d12, sizeof(Win32Direct12));
-}
-
 void D3D12DeviceInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
         return;
@@ -644,3 +636,20 @@ void D3D12FrameEnd(Win32Direct12 *d3d12) {
 
     D3D12DeviceWaitForGPU(d3d12);
 }
+
+void D3D12Initialize(Win32Direct12 *d3d12, HWND window) {
+    if (!d3d12) {
+        return;
+    }
+
+    MemoryZero(d3d12, sizeof(Win32Direct12));
+
+    D3D12DeviceInitialize(d3d12);
+    D3D12CommandsInitialize(d3d12);
+    D3D12SwapChainInitialize(d3d12, window);
+    D3D12HeapInitialize(d3d12);
+    D3D12PipelineInitialize(d3d12);
+    D3D12SynchronizationInitialize(d3d12);
+    D3D12VertexBufferInitialize(d3d12, 4096);
+}
+

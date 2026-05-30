@@ -388,7 +388,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
 }
 
 void WINAPI WinMainCRTStartup() {
-    HWND mainWindowHandle = WindowCreate(L"Win32");
+    HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
 #if 0
@@ -398,7 +398,7 @@ void WINAPI WinMainCRTStartup() {
     ExitProcess(1);
 #endif
 
-    if (!mainWindowHandle) {
+    if (!window) {
         ExitProcess(1);
     }
 
@@ -415,18 +415,10 @@ void WINAPI WinMainCRTStartup() {
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
     static Win32Direct12 d3d12;
-    D3D12Initialize(&d3d12);
+    D3D12Initialize(&d3d12, window);
 
     static Win32Audio audio;
     AudioInitialize(&audio);
-
-    D3D12DeviceInitialize(&d3d12);
-    D3D12CommandsInitialize(&d3d12);
-    D3D12SwapChainInitialize(&d3d12, mainWindowHandle);
-    D3D12HeapInitialize(&d3d12);
-    D3D12PipelineInitialize(&d3d12);
-    D3D12SynchronizationInitialize(&d3d12);
-    D3D12VertexBufferInitialize(&d3d12, 4096);
 
     //     static const char watermelon[] = {
     // #include "watermelon.png.h"
@@ -444,11 +436,9 @@ void WINAPI WinMainCRTStartup() {
     Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
     textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
-    WindowShow(mainWindowHandle);
+    WindowShow(window);
 
-    RunUpdate(&d3d12, &audio, glyphs, mainWindowHandle);
-
-    D3D12DeviceWaitForGPU(&d3d12);
+    RunUpdate(&d3d12, &audio, glyphs, window);
 
     ExitProcess(0);
 }
