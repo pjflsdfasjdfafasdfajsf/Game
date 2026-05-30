@@ -9,4 +9,4 @@ typedef struct {
     u8 *pixels;
 } Image;
 
-Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, const void *memory, usize length);
+Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const void *memory, usize length);

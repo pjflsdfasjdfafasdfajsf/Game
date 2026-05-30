@@ -312,18 +312,14 @@ static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *strin
     return MemoryStreamWriteString(stream, string) && MemoryStreamWriteUInt8(stream, '\n');
 }
 
-// NOTE: Platform must initialize those.
-extern MemoryStream *GlobalErrorStream;
-extern MemoryStream *GlobalInfoStream;
-
-#define GlobalErrorStreamWrite(message) \
+#define Error(stream, message) \
     do { \
-        MemoryStreamWriteLine(GlobalErrorStream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
+        MemoryStreamWriteLine(stream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
     } while (0)
 
-#define GlobalErrorStreamWriteOutOfMemory() GlobalErrorStreamWrite("Out of memory.")
+#define ErrorOutOfMemory(stream) Error(stream, "Out of memory.")
 
-#define GlobalInfoStreamWrite(message) \
+#define Info(message) \
     do { \
         MemoryStreamWriteLine(GlobalInfoStream, __FILE__ ":" Stringify2(__LINE__) ": " message); \
     } while (0)

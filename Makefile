@@ -5,7 +5,14 @@ else
     PLATFORM = $(shell uname -s)
 endif
 
-$(info Building for $(PLATFORM))
+CONFIG ?= Debug
+
+# NOTE: only print the info if we are not just forwarding to the release target since otherwise it would print:
+#  Building for Windows in Debug
+#  Building for Windows in Release
+ifneq ($(MAKECMDGOALS),release)
+    $(info Building for $(PLATFORM) in $(CONFIG))
+endif
 
 BUILD = build
 GENERATED = build/Generated
@@ -13,23 +20,39 @@ TOOLS = build/Tools
 SRC = src
 ASSETS = assets
 
+GAME_SOURCES = $(SRC)/game.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
+
 # NOTE: Windows configuration.
 ifeq ($(PLATFORM),Windows)
     SHELL = cmd.exe
     CC = cl.exe
-    CFLAGS = /nologo /W3 /GS- /I $(GENERATED)
-    LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:CONSOLE
+
+    BASE_CFLAGS = /nologo /W3 /GS- /I $(GENERATED)
+    BASE_LDFLAGS = /link /NODEFAULTLIB /SUBSYSTEM:CONSOLE
     LIBRARIES = kernel32.lib user32.lib d3d12.lib dxgi.lib dxguid.lib ole32.lib
     
-    # TODO: Build game.c as a separate dynamic library
-    SOURCES = $(SRC)/game.c $(SRC)/win32.c $(SRC)/win32_d3d12.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
-    
+    PLATFORM_SOURCES = $(SRC)/win32.c $(SRC)/win32_d3d12.c
+    MSVC = $(SRC)/msvc.c
+
     TARGET = $(BUILD)/Game.exe
-    ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess.exe
+    GAME_DLL = $(BUILD)/Game.dll
     
+    ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess.exe
     RUN_ASSET_PREPROCESS = $(subst /,\,$(ASSET_PREPROCESS))
 
     MKDIR = if not exist $(subst /,\,$1) mkdir $(subst /,\,$1)
+
+    ifeq ($(CONFIG),Release)
+        CFLAGS = $(BASE_CFLAGS) /O2 /D RELEASE
+        LDFLAGS = $(BASE_LDFLAGS)
+        SOURCES = $(PLATFORM_SOURCES) $(GAME_SOURCES) $(MSVC)
+    else
+        CFLAGS = $(BASE_CFLAGS) /Od /Z7 /D DEBUG
+        LDFLAGS = $(BASE_LDFLAGS) /DEBUG
+        SOURCES = $(PLATFORM_SOURCES) $(MSVC)
+        
+        DLL_LDFLAGS = /link /NODEFAULTLIB /NOENTRY /DEBUG /EXPORT:UpdateAndRender /EXPORT:GetSoundSamples
+    endif
 endif
 
 # NOTE: Linux configuration.
@@ -38,7 +61,10 @@ ifeq ($(PLATFORM),Linux)
     CFLAGS = -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -I $(GENERATED)
     LIBRARIES = -lwayland-client -lasound -pthread
     
-    SOURCES = $(SRC)/linux.c $(GENERATED)/xdg-shell-client-protocol.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
+    PLATFORM_SOURCES = $(SRC)/linux.c $(GENERATED)/xdg-shell-client-protocol.c
+    
+    # TODO: Separate game and platform 
+    SOURCES = $(PLATFORM_SOURCES) $(GAME_SOURCES)
     
     TARGET = $(BUILD)/Game
     ASSET_PREPROCESS = $(TOOLS)/AssetPreprocess
@@ -50,7 +76,12 @@ ifeq ($(PLATFORM),Linux)
     MKDIR = mkdir -p $1
 endif
 
+.PHONY: all release directories os_prerequisites assets game
+
 all: directories os_prerequisites assets game
+
+release:
+	@$(MAKE) --no-print-directory CONFIG=Release
 
 directories:
 	@$(call MKDIR,$(BUILD))
@@ -103,14 +134,33 @@ endif # ($(PLATFORM),Windows)
 
 # NOTE: Executable.
 
+ifeq ($(PLATFORM),Windows)
+
+ifeq ($(CONFIG),Release)
+
+# NOTE: Release
 game: $(TARGET)
 
-ifeq ($(PLATFORM),Windows)
 $(TARGET): $(SOURCES) os_prerequisites assets
 	@cl.exe $(CFLAGS) /Fo$(BUILD)/ /Fe:$@ $(SOURCES) $(BUILD)/app.res $(LIBRARIES) $(LDFLAGS)
 
+else 
+
+# NOTE: Debug
+game: $(GAME_DLL) $(TARGET)
+
+$(GAME_DLL): $(GAME_SOURCES) $(MSVC) os_prerequisites assets
+	@cl.exe $(CFLAGS) /Fo$(BUILD)/ /Fe:$@ /LD $(GAME_SOURCES) $(MSVC) $(LIBRARIES) $(DLL_LDFLAGS)
+
+$(TARGET): $(PLATFORM_SOURCES) $(MSVC) os_prerequisites assets
+	@cl.exe $(CFLAGS) /Fo$(BUILD)/ /Fe:$@ $(PLATFORM_SOURCES) $(MSVC) $(BUILD)/app.res $(LIBRARIES) $(LDFLAGS)
+
+endif # ($(CONFIG),Release)
+
 else # Linux
 
+game: $(TARGET)
 $(TARGET): $(SOURCES) os_prerequisites assets
 	@$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LIBRARIES)
+
 endif # ($(PLATFORM),Windows)

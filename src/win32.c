@@ -1,8 +1,7 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Define a proper cross-platform renderer interface
-//     * Separate game and platform
+//     * If we're in a different directory than the executable, set it to the executable directory.
 //
 
 #include <windows.h>
@@ -12,14 +11,36 @@
 
 #include "game_platform.h"
 #include "game_types.h"
-#include "game_ttf.h"
+// #include "game_ttf.h"
 // #include "game_png.h"
 #include "game.h"
 
-MemoryStream *GlobalErrorStream;
-MemoryStream *GlobalInfoStream;
+#if defined(DEBUG)
+static HMODULE GameDLL = 0;
+static UpdateAndRenderFunction *GameUpdateAndRender = 0;
+static GetSoundSamplesFunc *GameGetSoundSamples = 0;
 
-int _fltused = 0;
+static void GameCodeLoad() {
+    if (GameDLL) {
+        FreeLibrary(GameDLL);
+
+        GameDLL = 0;
+        GameUpdateAndRender = 0;
+        GameGetSoundSamples = 0;
+    }
+
+    CopyFileW(L"Game.dll", L"GameTEMP.dll", FALSE);
+    GameDLL = LoadLibraryW(L"GameTEMP.dll");
+
+    if (GameDLL) {
+        GameUpdateAndRender = (UpdateAndRenderFunction *)GetProcAddress(GameDLL, "UpdateAndRender");
+        GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");
+    }
+}
+#else
+#define GameUpdateAndRender UpdateAndRender
+#define GameGetSoundSamples GetSoundSamples
+#endif
 
 void ErrorShowLast(const wchar_t *functionName) {
     if (!functionName) {
@@ -146,7 +167,9 @@ void AudioUpdate(Win32Audio *audio) {
     audioBuffer.frameCount = availableFrameCount;
     audioBuffer.samples = (f32 *)audioData;
 
-    GetSoundSamples(&audioBuffer);
+    if (GameGetSoundSamples) {
+        GameGetSoundSamples(&audioBuffer);
+    }
 
     hresult = IAudioRenderClient_ReleaseBuffer(audio->renderClient, availableFrameCount, 0);
     if (FAILED(hresult)) {
@@ -291,30 +314,6 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-static inline void GlobalStreamsDrain() {
-    if (GlobalInfoStream && GlobalInfoStream->offset > 0) {
-        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-        if (stdOut && stdOut != INVALID_HANDLE_VALUE) {
-            DWORD written;
-            WriteFile(stdOut, GlobalInfoStream->memory, (DWORD)GlobalInfoStream->offset, &written, 0);
-        }
-
-        GlobalInfoStream->offset = 0;
-    }
-
-    if (GlobalErrorStream && GlobalErrorStream->offset > 0) {
-        HANDLE stdErr = GetStdHandle(STD_ERROR_HANDLE);
-
-        if (stdErr && stdErr != INVALID_HANDLE_VALUE) {
-            DWORD written;
-            WriteFile(stdErr, GlobalErrorStream->memory, (DWORD)GlobalErrorStream->offset, &written, 0);
-        }
-
-        GlobalErrorStream->offset = 0;
-    }
-}
-
 void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *commandBuffer, HWND window) {
     MSG message;
     ZeroStruct(message);
@@ -330,8 +329,6 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *com
             TranslateMessage(&message);
             DispatchMessageW(&message);
         } else {
-            GlobalStreamsDrain();
-
             // NOTE: This logic below is to stop playing sound when the window is alt-tabbed because I am a good programmer.
             bool isFocused = (GetForegroundWindow() == window);
 
@@ -345,7 +342,10 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, RenderCommandBuffer *com
 
             if (isFocused) {
                 RenderCommandBufferReset(commandBuffer);
-                UpdateAndRender(commandBuffer);
+
+                if (GameUpdateAndRender) {
+                    GameUpdateAndRender(commandBuffer);
+                }
 
                 D3D12FrameBegin(d3d12);
                 D3D12FrameEnd(d3d12, commandBuffer);
@@ -383,17 +383,6 @@ void mainCRTStartup() {
     MemoryArena temporaryArena;
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
-    usize globalErrorStreamSize = Kilobytes(64);
-    usize globalInfoStreamSize = Kilobytes(256);
-
-    GlobalErrorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
-    GlobalInfoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
-
-    MemoryStreamInitializeWritable(GlobalErrorStream, MemoryArenaPushBytes(&permanentArena, globalErrorStreamSize), globalErrorStreamSize);
-    MemoryStreamInitializeWritable(GlobalInfoStream, MemoryArenaPushBytes(&permanentArena, globalInfoStreamSize), globalInfoStreamSize);
-
-    GlobalInfoStreamWrite("Win32 says hello!");
-
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12, window);
 
@@ -406,6 +395,10 @@ void mainCRTStartup() {
     void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
 
     RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
+
+#if defined(DEBUG)
+    GameCodeLoad();
+#endif
 
     WindowShow(window);
 
