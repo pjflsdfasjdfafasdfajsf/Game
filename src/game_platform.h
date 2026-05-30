@@ -181,8 +181,7 @@ static inline void MemoryArenaClear(MemoryArena *arena) {
 }
 
 static inline MemoryArenaCheckpoint MemoryArenaCreateCheckpoint(MemoryArena *arena) {
-    MemoryArenaCheckpoint result;
-    ZeroStruct(result);
+    MemoryArenaCheckpoint result = {0};
 
     if (arena) {
         result.arena = arena;

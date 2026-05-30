@@ -155,8 +155,7 @@ static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength
 }
 
 TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorStream, const void *memory, usize length) {
-    TrueTypeFont result;
-    ZeroStruct(result);
+    TrueTypeFont result = {0};
 
     if (!memory) {
         MemoryStreamWriteString(errorStream, "Invalid parameter: memory.");
@@ -262,8 +261,7 @@ const TrueTypeTableDirectoryEntry *TrueTypeFontGetTable(const TrueTypeFont *font
 }
 
 TrueTypeHeadTable TrueTypeHeadTableParse(const TrueTypeTableDirectoryEntry *headTableEntry) {
-    TrueTypeHeadTable result;
-    ZeroStruct(result);
+    TrueTypeHeadTable result = {0};
 
     if (!headTableEntry || !headTableEntry->memory) {
         return result;
@@ -310,8 +308,7 @@ TrueTypeHeadTable TrueTypeHeadTableParse(const TrueTypeTableDirectoryEntry *head
 }
 
 TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTableDirectoryEntry *MaximumProfileTableEntry) {
-    TrueTypeMaximumProfileTable result;
-    ZeroStruct(result);
+    TrueTypeMaximumProfileTable result = {0};
 
     if (!MaximumProfileTableEntry || !MaximumProfileTableEntry->memory) {
         return result;
@@ -361,8 +358,7 @@ TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTable
 }
 
 TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEntry *cmapTableEntry) {
-    TrueTypeCmapFormat4 result;
-    ZeroStruct(result);
+    TrueTypeCmapFormat4 result = {0};
 
     if (!cmapTableEntry || !cmapTableEntry->memory) {
         return result;
@@ -509,8 +505,7 @@ u32 TrueTypeCmapFormat4GetGlyphIndex(const TrueTypeCmapFormat4 *cmap, u32 charac
     }
 }
 TrueTypeIndexToLocationTable TrueTypeIndexToLocationTableParse(const TrueTypeTableDirectoryEntry *indexToLocationTableEntry, i16 indexToLocFormat, u16 numGlyphs) {
-    TrueTypeIndexToLocationTable result;
-    ZeroStruct(result);
+    TrueTypeIndexToLocationTable result = {0};
 
     if (!indexToLocationTableEntry || !indexToLocationTableEntry->memory) {
         return result;
@@ -542,8 +537,7 @@ TrueTypeIndexToLocationTable TrueTypeIndexToLocationTableParse(const TrueTypeTab
 }
 
 TrueTypeGlyphLocation TrueTypeIndexToLocationGetGlyphLocation(const TrueTypeIndexToLocationTable *loca, u16 glyphIndex) {
-    TrueTypeGlyphLocation result;
-    ZeroStruct(result);
+    TrueTypeGlyphLocation result = {0};
 
     if (!loca || !loca->isValid || !loca->memory) {
         return result;
@@ -580,8 +574,7 @@ TrueTypeGlyphLocation TrueTypeIndexToLocationGetGlyphLocation(const TrueTypeInde
 }
 
 TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, MemoryStream *errorStream, const TrueTypeTableDirectoryEntry *glyfTableEntry, TrueTypeGlyphLocation glyphLocation) {
-    TrueTypeSimpleGlyph result;
-    ZeroStruct(result);
+    TrueTypeSimpleGlyph result = {0};
 
     if (!glyfTableEntry || !glyfTableEntry->memory) {
         MemoryStreamWriteString(errorStream, "Invalid parameter: glyfTableEntry.");
@@ -793,8 +786,7 @@ static void TrueTypeTessellateBezier(Vector2 *outputPoints, u32 *outputSize, Vec
 }
 
 Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, const TrueTypeSimpleGlyph *glyph, f32 scale) {
-    Image result;
-    ZeroStruct(result);
+    Image result = {0};
 
     if (!glyph || !glyph->isValid || glyph->isCompound || glyph->numberOfContours <= 0 || scale <= 0.0f) {
         return result;
@@ -1057,8 +1049,7 @@ Image TrueTypeGlyphRasterize(MemoryArena *arena, MemoryStream *errorStream, cons
 }
 
 Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs) {
-    Image result;
-    ZeroStruct(result);
+    Image result = {0};
 
     if (!font || atlasWidth == 0 || atlasHeight == 0 || characterCount == 0 || !outGlyphs) {
         return result;

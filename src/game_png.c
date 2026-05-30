@@ -195,8 +195,7 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
 }
 
 static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *outputBuffer, usize outputCapacity) {
-    BitStream stream;
-    ZeroStruct(stream);
+    BitStream stream = {0};
 
     stream.chunks = chunks;
     stream.chunkCount = chunkCount;
@@ -242,11 +241,9 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                 outputBuffer[outputPosition++] = (u8)StreamReadBits(&stream, 8);
             }
         } else if (blockType == 1 || blockType == 2) {
-            HuffmanTree literalTree;
-            ZeroStruct(literalTree);
+            HuffmanTree literalTree = {0};
 
-            HuffmanTree distanceTree;
-            ZeroStruct(distanceTree);
+            HuffmanTree distanceTree = {0};
 
             // NOTE: Fixed huffman
             if (blockType == 1) {
@@ -284,8 +281,7 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                     codeLengthLengths[deflateCodeLengthOrder[i]] = (u8)StreamReadBits(&stream, 3);
                 }
 
-                HuffmanTree codeLengthTree;
-                ZeroStruct(codeLengthTree);
+                HuffmanTree codeLengthTree = {0};
 
                 HuffmanTreeInitialize(&codeLengthTree, codeLengthLengths, 19);
 
@@ -392,8 +388,7 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
 }
 
 Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const void *memory, usize length) {
-    Image result;
-    ZeroStruct(result);
+    Image result = {0};
 
     if (!memory) {
         MemoryStreamWriteLine(errorStream, "Invalid parameter: memory.");
@@ -422,8 +417,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     bool hasParsedIHDR = false;
 
-    PNGHeader imageHeader;
-    ZeroStruct(imageHeader);
+    PNGHeader imageHeader = {0};
 
     PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {

@@ -7,8 +7,7 @@
 // https://jvernay.fr/blog/skyline-2d-packer/implementation/
 
 Pack2D Pack2DCreate(MemoryArena *arena, u32 MaximumWidth, u32 MaximumHeight) {
-    Pack2D result;
-    ZeroStruct(result);
+    Pack2D result = {0};
 
     if (MaximumWidth == 0 || MaximumHeight == 0) {
         return result;

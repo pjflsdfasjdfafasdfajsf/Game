@@ -101,8 +101,7 @@ static const struct wl_registry_listener registryListener = {
 };
 
 LinuxWayland WindowCreate(const char *title) {
-    LinuxWayland wayland;
-    ZeroStruct(wayland);
+    LinuxWayland wayland = {0};
 
     wayland.display = wl_display_connect(0);
     if (!wayland.display) {

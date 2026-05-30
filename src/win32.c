@@ -110,8 +110,7 @@ void AudioUpdate(Win32Audio *audio) {
         ErrorShowHRESULT(hresult, L"GetBuffer");
     }
 
-    AudioBuffer audioBuffer;
-    ZeroStruct(audioBuffer);
+    AudioBuffer audioBuffer = {0};
 
     audioBuffer.samplesPerSecond = audio->samplesPerSecond;
     audioBuffer.channelCount = audio->channels;
@@ -315,8 +314,7 @@ HWND WindowCreate(const wchar_t *title) {
         return 0;
     }
 
-    WNDCLASSW windowClass;
-    ZeroStruct(windowClass);
+    WNDCLASSW windowClass = {0};
 
     windowClass.lpfnWndProc = WindowProcedure;
     windowClass.hInstance = instance;
@@ -347,8 +345,7 @@ void WindowShow(HWND windowHandle) {
 }
 
 void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer, HWND window) {
-    MSG message;
-    ZeroStruct(message);
+    MSG message = {0};
 
     bool isRunning = true;
     bool wasFocused = true;
