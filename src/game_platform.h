@@ -19,6 +19,7 @@ typedef float f32;
 #define DEFAULT_WINDOW_HEIGHT 720
 
 #define ABS(x) (((x) < 0) ? -(x) : (x))
+#define UNUSED(x) (void)x
 
 typedef struct {
     union {

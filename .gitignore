@@ -4,6 +4,8 @@
 
 # NOTE: Linux artifacts
 Game
+xdg-shell-client-protocol.h
+xdg-shell-client-protocol.c
 
 # NOTE: dxc artifacts.
 BasicGeometryPS.h

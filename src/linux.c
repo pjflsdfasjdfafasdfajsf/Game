@@ -8,64 +8,131 @@
 #include "linux.h"
 #include "game_platform.h"
 
-// TODO: Can we get rid of it?
-#include <X11/X.h>
-#include <X11/Xlib.h>
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
 
-LinuxX11 WindowCreate(const char *title) {
-    LinuxX11 x11;
-    MemoryZero(&x11, sizeof(x11));
+static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
+    UNUSED(xdgToplevel), UNUSED(width), UNUSED(height);
 
-    Display *display = XOpenDisplay(0);
-    if (!display) {
-        fprintf(stderr, "Could not open X11 display.\n");
+    LinuxWayland *wayland = (LinuxWayland *)userData;
 
-        return x11;
-    }
-
-    int defaultScreen = DefaultScreen(display);
-    Window rootWindow = RootWindow(display, defaultScreen);
-
-    unsigned long blackPixel = BlackPixel(display, defaultScreen);
-    unsigned long whitePixel = WhitePixel(display, defaultScreen);
-
-    Window window = XCreateSimpleWindow(display, rootWindow, 0, 0, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 1, blackPixel, whitePixel);
-    if (!window) {
-        fprintf(stderr, "Could not create X11 window.\n");
-
-        return x11;
-    }
-
-    XStoreName(display, window, title);
-
-    Atom wmDeleteMessage = XInternAtom(display, "WM_DELETE_WINDOW", false);
-    if (!XSetWMProtocols(display, window, &wmDeleteMessage, 1)) {
-        fprintf(stderr, "Could not set WM_DELETE_WINDOW protocol.\n");
-
-        return x11;
-    }
-
-    long eventMask = ExposureMask | KeyPressMask | KeyReleaseMask | FocusChangeMask | StructureNotifyMask;
-    XSelectInput(display, window, eventMask);
-
-    x11.display = display;
-    x11.window = window;
-    x11.wmDeleteMessage = wmDeleteMessage;
-
-    return x11;
-}
-
-void WindowShow(LinuxX11 *x11) {
-    if (!x11 || !x11->display) {
+    if (!wayland) {
         return;
     }
 
-    XMapWindow(x11->display, x11->window);
-    XFlush(x11->display);
+    bool isActivated = false;
+    uint32_t *state;
+    wl_array_for_each(state, states) {
+        if (*state == XDG_TOPLEVEL_STATE_ACTIVATED) {
+            isActivated = true;
+        }
+    }
+
+    wayland->isFocused = isActivated;
+}
+
+static void XdgToplevelCloseHandler(void *userData, struct xdg_toplevel *xdgToplevel) {
+    UNUSED(xdgToplevel);
+    
+    LinuxWayland *wayland = (LinuxWayland *)userData;
+
+    if (wayland) {
+        wayland->isRunning = false;
+    }
+}
+
+static const struct xdg_toplevel_listener xdgToplevelListener = {
+    .configure = XdgToplevelConfigureHandler,
+    .close = XdgToplevelCloseHandler,
+};
+
+static void XdgSurfaceConfigureHandler(void *userData, struct xdg_surface *xdgSurface, uint32_t serial) {
+    LinuxWayland *wayland = (LinuxWayland *)userData;
+
+    xdg_surface_ack_configure(xdgSurface, serial);
+
+    if (wayland) {
+        wayland->isConfigured = true;
+    }
+}
+
+static const struct xdg_surface_listener xdgSurfaceListener = {
+    .configure = XdgSurfaceConfigureHandler,
+};
+
+static void XdgWindowManagerBasePingHandler(void *userData, struct xdg_wm_base *xdgWmBase, uint32_t serial) {
+    UNUSED(userData);
+    
+    xdg_wm_base_pong(xdgWmBase, serial);
+}
+
+static const struct xdg_wm_base_listener xdgWmBaseListener = {
+    .ping = XdgWindowManagerBasePingHandler,
+};
+
+static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
+    UNUSED(version);
+    
+    LinuxWayland *wayland = (LinuxWayland *)userData;
+
+    bool isCompositor = (strcmp(interface, wl_compositor_interface.name) == 0);
+    bool isXdgWmBase = (strcmp(interface, xdg_wm_base_interface.name) == 0);
+
+    if (isCompositor) {
+        wayland->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
+    } else if (isXdgWmBase) {
+        wayland->xdgWmBase = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+        xdg_wm_base_add_listener(wayland->xdgWmBase, &xdgWmBaseListener, wayland);
+    }
+}
+
+static void RegistryGlobalRemoveHandler(void *userData, struct wl_registry *registry, uint32_t name) {
+    UNUSED(userData), UNUSED(registry), UNUSED(name);
+}
+
+static const struct wl_registry_listener registryListener = {
+    .global = RegistryGlobalHandler,
+    .global_remove = RegistryGlobalRemoveHandler,
+};
+
+LinuxWayland WindowCreate(const char *title) {
+    LinuxWayland wayland;
+    MemoryZero(&wayland, sizeof(LinuxWayland));
+
+    wayland.display = wl_display_connect(0);
+    if (!wayland.display) {
+        fprintf(stderr, "Could not connect to Wayland display.\n");
+        return wayland;
+    }
+
+    wayland.registry = wl_display_get_registry(wayland.display);
+    wl_registry_add_listener(wayland.registry, &registryListener, &wayland);
+
+    wl_display_roundtrip(wayland.display);
+
+    if (!wayland.compositor || !wayland.xdgWmBase) {
+        fprintf(stderr, "Failed to bind Wayland compositor or xdg_wm_base.\n");
+        return wayland;
+    }
+
+    wayland.surface = wl_compositor_create_surface(wayland.compositor);
+    wayland.xdgSurface = xdg_wm_base_get_xdg_surface(wayland.xdgWmBase, wayland.surface);
+    xdg_surface_add_listener(wayland.xdgSurface, &xdgSurfaceListener, &wayland);
+
+    wayland.xdgToplevel = xdg_surface_get_toplevel(wayland.xdgSurface);
+    xdg_toplevel_add_listener(wayland.xdgToplevel, &xdgToplevelListener, &wayland);
+
+    xdg_toplevel_set_title(wayland.xdgToplevel, title);
+
+    wl_surface_commit(wayland.surface);
+    wl_display_roundtrip(wayland.display);
+
+    wayland.isRunning = true;
+    wayland.isFocused = true;
+
+    return wayland;
 }
 
 // NOTE: Audio
@@ -211,46 +278,25 @@ void RunDraw() {
     // TODO
 }
 
-void RunUpdate(LinuxX11 *x11, LinuxAudio *audio) {
-    if (!x11 || !x11->display) {
+void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio) {
+    if (!wayland || !wayland->display) {
         return;
     }
 
-    bool isRunning = true;
-    bool wasFocused = true;
-    bool isFocused = true;
+    bool wasFocused = wayland->isFocused;
 
-    while (isRunning) {
-        while (XPending(x11->display) > 0) {
-            XEvent event;
-            XNextEvent(x11->display, &event);
+    while (wayland->isRunning) {
+        wl_display_dispatch_pending(wayland->display);
 
-            switch (event.type) {
-            case ClientMessage: {
-                if ((Atom)event.xclient.data.l[0] == x11->wmDeleteMessage) {
-                    isRunning = false;
-                }
-            } break;
-
-            case FocusIn: {
-                isFocused = true;
-            } break;
-
-            case FocusOut: {
-                isFocused = false;
-            } break;
-            }
-        }
-
-        if (!isFocused && wasFocused) {
+        if (!wayland->isFocused && wasFocused) {
             AudioPause(audio);
-        } else if (isFocused && !wasFocused) {
+        } else if (wayland->isFocused && !wasFocused) {
             AudioResume(audio);
         }
 
-        wasFocused = isFocused;
+        wasFocused = wayland->isFocused;
 
-        if (isFocused) {
+        if (wayland->isFocused) {
             RunDraw();
         } else {
             usleep(100000);
@@ -259,16 +305,16 @@ void RunUpdate(LinuxX11 *x11, LinuxAudio *audio) {
 }
 
 int main() {
-    LinuxX11 x11 = WindowCreate("Linux");
+    LinuxWayland wayland = WindowCreate("Linux Wayland");
 
-    if (!x11.display) {
+    if (!wayland.display) {
         return 1;
     }
 
     LinuxAudio audio;
     AudioInitialize(&audio);
 
-    WindowShow(&x11);
+    RunUpdate(&wayland, &audio);
 
-    RunUpdate(&x11, &audio);
+    return 0;
 }
