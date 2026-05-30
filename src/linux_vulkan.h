@@ -3,6 +3,7 @@
 
 #include "game_platform.h"
 #include "linux.h"
+#include <vulkan/vulkan_core.h>
 
 #define VK_USE_PLATFORM_WAYLAND_KHR
 #include <vulkan/vulkan.h>
@@ -40,8 +41,11 @@
     DEVICE_FUNCTION(vkCmdCopyBufferToImage);        \
     DEVICE_FUNCTION(vkCmdBindDescriptorSets);       \
     DEVICE_FUNCTION(vkCreateCommandPool);           \
+    DEVICE_FUNCTION(vkDestroyCommandPool);          \
     DEVICE_FUNCTION(vkAllocateCommandBuffers);      \
     DEVICE_FUNCTION(vkCreateSemaphore);             \
+    DEVICE_FUNCTION(vkFreeMemory);                  \
+    DEVICE_FUNCTION(vkDestroyBuffer);               \
     DEVICE_FUNCTION(vkCreateFence);                 \
     DEVICE_FUNCTION(vkCreateRenderPass);            \
     DEVICE_FUNCTION(vkCreateFramebuffer);           \
@@ -53,6 +57,7 @@
     DEVICE_FUNCTION(vkEndCommandBuffer);            \
     DEVICE_FUNCTION(vkCmdBeginRenderPass);          \
     DEVICE_FUNCTION(vkCmdEndRenderPass);            \
+    DEVICE_FUNCTION(vkQueueWaitIdle);               \
     DEVICE_FUNCTION(vkQueueSubmit);                 \
     DEVICE_FUNCTION(vkQueuePresentKHR);             \
     DEVICE_FUNCTION(vkDeviceWaitIdle);              \
@@ -65,6 +70,7 @@
     DEVICE_FUNCTION(vkAllocateMemory);              \
     DEVICE_FUNCTION(vkBindBufferMemory);            \
     DEVICE_FUNCTION(vkMapMemory);                   \
+    DEVICE_FUNCTION(vkUnmapMemory);                 \
     DEVICE_FUNCTION(vkCreateShaderModule);          \
     DEVICE_FUNCTION(vkCreatePipelineLayout);        \
     DEVICE_FUNCTION(vkCreateGraphicsPipelines);     \
@@ -73,6 +79,9 @@
     DEVICE_FUNCTION(vkCmdSetScissor);               \
     DEVICE_FUNCTION(vkCmdBindPipeline);             \
     DEVICE_FUNCTION(vkCmdBindVertexBuffers);        \
+    DEVICE_FUNCTION(vkCmdBeginRendering);           \
+    DEVICE_FUNCTION(vkCmdEndRendering);             \
+    DEVICE_FUNCTION(vkCmdPushConstants);            \
     DEVICE_FUNCTION(vkCmdDraw);
 
 #define VULKAN_DEBUG_FUNCTIONS \
@@ -80,6 +89,7 @@
 
 #define VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT 8
 #define FRAME_COUNT 3
+#define MAX_TEXTURES 128
 
 typedef struct {
     u32 graphicsIndex;
@@ -105,6 +115,12 @@ typedef struct {
 } VulkanFrameData;
 
 typedef struct {
+    VkImage handle;
+    VkImageView view;
+    VkDeviceMemory memory;
+} VulkanImage;
+
+typedef struct {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkSurfaceKHR surface;
@@ -122,8 +138,17 @@ typedef struct {
     VkPipeline pipeline;
     VkPipelineLayout pipelineLayout;
 
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSetLayout descriptorLayout;
+    VkDescriptorSet descriptorSets[FRAME_COUNT];
+
+    VkSampler textureSampler;
+
     u32 imageIndex;
     u32 frameIndex;
+
+    VulkanImage textures[MAX_TEXTURES];
+    u32 textureCount;
 
 #if defined(DEBUG)
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -141,7 +166,10 @@ typedef struct {
 } Vulkan;
 
 void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
+u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window);
 
 void VulkanFrameEnd(Vulkan *vulkan);
+
+

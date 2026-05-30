@@ -8,12 +8,14 @@
 #include "linux.h"
 #include "linux_vulkan.h"
 #include "game_platform.h"
+#include "game_png.h"
 #include "xdg-shell-client-protocol.h"
 
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <wayland-client-core.h>
 
@@ -345,6 +347,25 @@ int main() {
 
     Vulkan vulkan;
     VulkanInitialize(&vulkan, &wayland);
+
+    usize permanentArenaSize = MEGABYTES(64);
+    usize temporaryArenaSize = MEGABYTES(256);
+
+    void *permanentMemoryBlock = malloc(permanentArenaSize);
+    void *temporaryMemoryBlock = malloc(temporaryArenaSize);
+
+    MemoryArena permanentArena;
+    MemoryArenaInitialize(&permanentArena, permanentMemoryBlock, permanentArenaSize);
+
+    MemoryArena temporaryArena;
+    MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
+
+    static const u8 watermelonImage[] = {
+#include "watermelon.png.h"  
+    };
+
+    Image image = ImageLoadFromPNG(&permanentArena, &temporaryArena, watermelonImage, sizeof(watermelonImage));
+    u32 watermelonTexture = VulkanTextureCreate(&vulkan, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
 
     RunUpdate(&wayland, &audio, &vulkan);
 

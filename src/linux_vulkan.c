@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <assert.h>
+#include <vulkan/vulkan_core.h>
 
 typedef struct {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -16,6 +17,10 @@ typedef struct {
     u32 presentModeCount;
     VkPresentModeKHR presentModes[8];
 } VulkanSwapchainSupport;
+
+typedef struct {
+    u32 textureIndex;
+} VulkanPushConstant;
 
 static u8 vertexShaderData[] = {
 #include "BasicGeometry.vert.h"
@@ -72,6 +77,7 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
 #if defined(DEBUG)
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userData) {
+    UNUSED(severity); UNUSED(type); UNUSED(userData);
     printf("%s\n", data->pMessage);
 
     return VK_FALSE;
@@ -203,9 +209,16 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .dynamicRendering = VK_TRUE,
     };
 
+    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+        .pNext = &dynamicRendering,
+        .descriptorBindingPartiallyBound = VK_TRUE,
+        .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+    };
+
     VkDeviceCreateInfo deviceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &dynamicRendering,
+        .pNext = &indexingFeatures,
         .pQueueCreateInfos = queueCreateInfos,
         .queueCreateInfoCount = uniqueCount,
         .enabledExtensionCount = ARRAY_COUNT(extensions),
@@ -217,6 +230,19 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 
         return;
     }
+}
+
+static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vulkan->vkGetPhysicalDeviceMemoryProperties(vulkan->physicalDevice, &memoryProperties);
+
+    for (u32 i = 0; i < memoryProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    return 0;
 }
 
 static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
@@ -453,6 +479,79 @@ static void VulkanFrameResourcesCreate(Vulkan *vulkan) {
     }
 }
 
+static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
+    VkDescriptorPoolSize poolSizes[] = {
+        {
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = MAX_TEXTURES * FRAME_COUNT,
+        },  
+    };
+    
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = FRAME_COUNT,
+        .poolSizeCount = ARRAY_COUNT(poolSizes),
+        .pPoolSizes = poolSizes,
+    };
+
+    if (vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan descriptor pool.\n");
+
+        return;
+    }
+
+    VkDescriptorSetLayoutBinding descriptorBindings[] = {
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = MAX_TEXTURES,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        },  
+    };
+
+    VkDescriptorBindingFlags descriptorBindingFlags[] = {
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,  
+    };
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetBindingFlagsInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+        .bindingCount = ARRAY_COUNT(descriptorBindings),
+        .pBindingFlags = descriptorBindingFlags,
+    };
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = &descriptorSetBindingFlagsInfo,
+        .bindingCount = ARRAY_COUNT(descriptorBindings),
+        .pBindings = descriptorBindings,
+    };
+
+    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &descriptorSetLayoutCreateInfo, 0, &vulkan->descriptorLayout) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan descriptor set layout.\n");
+
+        return;
+    }
+
+    VkDescriptorSetLayout perSetLayouts[] = {
+        vulkan->descriptorLayout,  
+        vulkan->descriptorLayout,  
+        vulkan->descriptorLayout,  
+    };
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorSetCount = FRAME_COUNT,
+        .pSetLayouts = perSetLayouts,
+        .descriptorPool = vulkan->descriptorPool,
+    };
+
+    if (vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, vulkan->descriptorSets) != VK_SUCCESS) {
+        printf("ERROR: failed to allocate vulkan descriptor sets.\n");
+
+        return;
+    }
+}
+
 static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkShaderModuleCreateInfo vertexShaderCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -562,8 +661,17 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
         .pColorAttachmentFormats = &vulkan->swapchain.format,
     };
 
+    VkPushConstantRange pushConstantRange = {
+        .size = sizeof(VulkanPushConstant),
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,  
+    };
+
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pPushConstantRanges = &pushConstantRange,
+        .pushConstantRangeCount = 1,
+        .setLayoutCount = 1,
+        .pSetLayouts = &vulkan->descriptorLayout,
     };
 
     if (vulkan->vkCreatePipelineLayout(vulkan->logicalDevice, &pipelineLayoutCreateInfo, 0, &vulkan->pipelineLayout) != VK_SUCCESS) {
@@ -600,15 +708,33 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     vulkan->vkDestroyShaderModule(vulkan->logicalDevice, fragmentModule, 0);
 }
 
+static void VulkanSamplerCreate(Vulkan *vulkan) {
+    VkSamplerCreateInfo samplerCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_NEAREST,
+        .minFilter = VK_FILTER_NEAREST,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,  
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,  
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .maxAnisotropy = 1.0f,
+    };
+
+    if (vulkan->vkCreateSampler(vulkan->logicalDevice, &samplerCreateInfo, 0, &vulkan->textureSampler) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan sampler.\n");
+
+        return;
+    }
+}
+
 static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
 #define INSTANCE_FUNCTION(name) \
-    vulkan->name = (PFN_##name)vkGetInstanceProcAddr(vulkan->instance, #name);
+    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
     VULKAN_INSTANCE_FUNCTIONS
 #undef INSTANCE_FUNCTION
 
 #if defined(DEBUG)
 #define DEBUG_FUNCTION(name) \
-    vulkan->name = (PFN_##name)vkGetInstanceProcAddr(vulkan->instance, #name);
+    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
     VULKAN_DEBUG_FUNCTIONS
 #undef DEBUG_FUNCTION
     VulkanDebugMessengerCreate(vulkan);
@@ -627,7 +753,12 @@ static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
 
     VulkanSwapchainCreate(vulkan, window->width, window->height);
     VulkanFrameResourcesCreate(vulkan);
+    VulkanDescriptorSetsCreate(vulkan);
     VulkanGraphicsPipelineCreate(vulkan);
+    VulkanSamplerCreate(vulkan);
+    
+    vulkan->frameIndex = 0;
+    vulkan->textureCount = 0;
 }
 
 // NOTE: divide this into windows and linux versions for the future
@@ -658,8 +789,285 @@ void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
         return;
     }
 
-    vulkan->frameIndex = 0;
     VulkanCommonInitialize(vulkan, window);
+}
+
+u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel, const void *pixels) {
+    if (vulkan->textureCount + 1 > MAX_TEXTURES) {
+        printf("ERROR: maximum number of textures reached: %u.\n", vulkan->textureCount);
+    }
+
+    VulkanImage result = {0};
+
+    VkImageCreateInfo imageCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .extent = { width, height, 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .format = VK_FORMAT_R8G8B8A8_SRGB,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .samples = VK_SAMPLE_COUNT_1_BIT,  
+    };
+
+    if (vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan image.\n");
+
+        return 0;
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vulkan->vkGetImageMemoryRequirements(vulkan->logicalDevice, result.handle, &memoryRequirements);
+
+    VkMemoryAllocateInfo allocationInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memoryRequirements.size,
+        .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+    };
+
+    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
+        printf("ERROR: failed to allocate vulkan image memory.\n");
+
+        return 0;
+    }
+
+    if (vulkan->vkBindImageMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
+        printf("ERROR: failed to bind vulkan image memory.\n");
+
+        return 0;
+    }
+
+    VkImageViewCreateInfo imageViewCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = result.handle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = VK_FORMAT_R8G8B8A8_SRGB,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .layerCount = 1,
+            .levelCount = 1,
+        },
+    };
+
+    if (vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &result.view) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan image view.\n");
+
+        return 0;
+    }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemoy;
+
+    // NOTE: we always pad up to 4 bpp
+    VkDeviceSize stagingBufferSize = width * height * 4;
+
+    VkBufferCreateInfo stagingBufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = stagingBufferSize,
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+
+    if (vulkan->vkCreateBuffer(vulkan->logicalDevice, &stagingBufferCreateInfo, 0, &stagingBuffer) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan staging buffer.\n");
+
+        return 0;
+    }
+
+    VkMemoryRequirements stagingMemoryRequirements;
+    vulkan->vkGetBufferMemoryRequirements(vulkan->logicalDevice, stagingBuffer, &stagingMemoryRequirements);
+
+    VkMemoryAllocateInfo stagingAllocationInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = stagingMemoryRequirements.size,
+        .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, stagingMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+    };
+
+    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &stagingAllocationInfo, 0, &stagingBufferMemoy) != VK_SUCCESS) {
+        printf("ERROR: failed to allocate vulkan staging buffer memory.\n");
+
+        return 0;
+    }
+
+    if (vulkan->vkBindBufferMemory(vulkan->logicalDevice, stagingBuffer, stagingBufferMemoy, 0) != VK_SUCCESS) {
+        printf("ERROR: failed to bind vulkan staging buffer memroy.\n");
+
+        return 0;
+    }
+
+    u8 *mappedData;
+
+    if (vulkan->vkMapMemory(vulkan->logicalDevice, stagingBufferMemoy, 0, stagingBufferSize, 0, (void **)&mappedData) != VK_SUCCESS) {
+        printf("ERROR: failed to map vulkan staging buffer memory.\n");
+
+        return 0;
+    }
+
+    printf("width=%u height=%u bpp=%u pixels=%p\n", 
+    width, height, bytesPerPixel, pixels);
+        const u8 *p = (const u8 *)pixels;
+printf("first pixel: %u %u %u %u\n", p[0], p[1], p[2], p[3]);
+
+printf("mapped first pixel: %u %u %u %u\n", mappedData[0], mappedData[1], mappedData[2], mappedData[3]);
+
+    const u8 *sourcePixels = (const u8 *)pixels;
+    for (u32 y = 0; y < height; ++y) {
+        u8 *destinationRow = mappedData + (y * width * 4);
+        const u8 *sourceRow = sourcePixels + (y * width * bytesPerPixel);
+
+        if (bytesPerPixel == 4) {
+            MemoryCopyForwards(destinationRow, sourceRow, width * 4);
+        } else if (bytesPerPixel == 3) {
+            for (u32 x = 0; x < width; ++x) {
+                destinationRow[x * 4 + 0] = sourceRow[x * 3 + 0];
+                destinationRow[x * 4 + 1] = sourceRow[x * 3 + 1];
+                destinationRow[x * 4 + 2] = sourceRow[x * 3 + 2];
+                destinationRow[x * 4 + 3] = 255;
+            }
+        }
+    }
+    vulkan->vkUnmapMemory(vulkan->logicalDevice, stagingBufferMemoy);
+
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+        .queueFamilyIndex = vulkan->queueFamilies.graphicsIndex,  
+    };
+
+    if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan staging command pool.\n");
+
+        return 0;
+    }
+
+    VkCommandBufferAllocateInfo commandBufferAllocationInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = commandPool,
+        .commandBufferCount = 1,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,  
+    };
+
+    if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer) != VK_SUCCESS) {
+        printf("ERROR: failed to allocate vulkan staging command buffer.\n");
+
+        return 0;
+    }
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,  
+    };
+
+    if (vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
+        printf("ERROR: failed to beging recording into vulkan staging command buffer.\n");
+
+        return 0;
+    }
+
+    VkImageMemoryBarrier imageMemoryBarrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = result.handle,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .layerCount = 1,
+            .levelCount = 1,
+        },
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+    };
+
+    vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
+
+    VkBufferImageCopy copyRegion = {
+        .imageExtent = (VkExtent3D){ width, height, 1 },
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .layerCount = 1,
+        },
+    };
+
+    vulkan->vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, result.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    imageMemoryBarrier = (VkImageMemoryBarrier){
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = result.handle,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .layerCount = 1,
+            .levelCount = 1,
+        },
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+    };
+
+    vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
+
+    if (vulkan->vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        printf("ERROR: failed to end recording into vulkan staging command buffer.\n");
+
+        return 0;
+    }
+
+    VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &commandBuffer,  
+    };
+
+    if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        printf("ERROR: failed to submit vulkan staging buffer command.\n");
+
+        return 0;
+    }
+
+    if (vulkan->vkQueueWaitIdle(vulkan->graphicsQueue) != VK_SUCCESS) {
+        printf("ERROR: failed to wait for vulkan graphics queue.\n");
+
+        return 0;
+    }
+
+    vulkan->vkDestroyCommandPool(vulkan->logicalDevice, commandPool, 0);
+    vulkan->vkFreeMemory(vulkan->logicalDevice, stagingBufferMemoy, 0);
+    vulkan->vkDestroyBuffer(vulkan->logicalDevice, stagingBuffer, 0);
+
+    u32 textureIndex = vulkan->textureCount;
+    vulkan->textures[textureIndex] = result;
+    vulkan->textureCount++;
+
+    VkDescriptorImageInfo imageInfo = {
+        .sampler = vulkan->textureSampler,
+        .imageView = result.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    VkWriteDescriptorSet descriptorWrite = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .pImageInfo = &imageInfo,
+        .dstArrayElement = textureIndex,
+    };
+
+    for (u32 i = 0; i < FRAME_COUNT; i++) {
+        descriptorWrite.dstSet = vulkan->descriptorSets[i];
+        vulkan->vkUpdateDescriptorSets(vulkan->logicalDevice, 1, &descriptorWrite, 0, 0);
+    }
+
+    return vulkan->textureCount;
 }
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window) {
@@ -710,7 +1118,7 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
     };
 
-    vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
+    vulkan->vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
     VkClearValue clearColor = {
         .color = {{0.0f, 1.0f, 0.0f, 1.0f}},
@@ -736,7 +1144,7 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         },
     };
 
-    vkCmdBeginRendering(frameData->commandBuffer, &renderingInfo);
+    vulkan->vkCmdBeginRendering(frameData->commandBuffer, &renderingInfo);
 
     VkViewport viewport = {
         .x = 0.0f,
@@ -752,13 +1160,21 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .extent = vulkan->swapchain.extent,
     };
 
-    vkCmdSetViewport(frameData->commandBuffer, 0, 1, &viewport);
-    vkCmdSetScissor(frameData->commandBuffer, 0, 1, &scissor);
+    vulkan->vkCmdSetViewport(frameData->commandBuffer, 0, 1, &viewport);
+    vulkan->vkCmdSetScissor(frameData->commandBuffer, 0, 1, &scissor);
 
-    vkCmdBindPipeline(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipeline);
-    vkCmdDraw(frameData->commandBuffer, 3, 1, 0, 0);
+    vulkan->vkCmdBindPipeline(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipeline);
+    vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 0, 1, &vulkan->descriptorSets[vulkan->frameIndex], 0, 0);
 
-    vkCmdEndRendering(frameData->commandBuffer);
+    VulkanPushConstant pushConstant = {
+        .textureIndex = 1,  
+    };
+
+    vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
+    
+    vulkan->vkCmdDraw(frameData->commandBuffer, 3, 1, 0, 0);
+
+    vulkan->vkCmdEndRendering(frameData->commandBuffer);
 
     imageMemoryBarrier = (VkImageMemoryBarrier){
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -775,9 +1191,9 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
     };
 
-    vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
+    vulkan->vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
-    if (vkEndCommandBuffer(frameData->commandBuffer) != VK_SUCCESS) {
+    if (vulkan->vkEndCommandBuffer(frameData->commandBuffer) != VK_SUCCESS) {
         printf("ERROR: failed to end recording vulkan command buffer.\n");
 
         return;
@@ -821,7 +1237,7 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .pWaitSemaphores = signalSemaphores,
     };
 
-    if (vkQueuePresentKHR(vulkan->presentQueue, &presentInfo) != VK_SUCCESS) {
+    if (vulkan->vkQueuePresentKHR(vulkan->presentQueue, &presentInfo) != VK_SUCCESS) {
         printf("ERROR: failed to present present queue.\n");
 
         return;
