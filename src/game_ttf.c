@@ -131,13 +131,13 @@ typedef struct {
 static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength, bool isHeadTable) {
     u32 checksum = 0;
     u32 numberOfLongs = (tableLength + 3) / 4;
-    usize currentReadOffset = 0;
+    usize offset = 0;
 
     for (u32 index = 0; index < numberOfLongs; index++) {
-        u8 byte0 = (currentReadOffset < tableLength) ? tableMemory[currentReadOffset++] : 0;
-        u8 byte1 = (currentReadOffset < tableLength) ? tableMemory[currentReadOffset++] : 0;
-        u8 byte2 = (currentReadOffset < tableLength) ? tableMemory[currentReadOffset++] : 0;
-        u8 byte3 = (currentReadOffset < tableLength) ? tableMemory[currentReadOffset++] : 0;
+        u8 byte0 = (offset < tableLength) ? tableMemory[offset++] : 0;
+        u8 byte1 = (offset < tableLength) ? tableMemory[offset++] : 0;
+        u8 byte2 = (offset < tableLength) ? tableMemory[offset++] : 0;
+        u8 byte3 = (offset < tableLength) ? tableMemory[offset++] : 0;
 
         u32 value = ((u32)byte0 << 24) |
                     ((u32)byte1 << 16) |
@@ -167,11 +167,10 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
         return result;
     }
 
-    const u8 *fontBufferPointer = (const u8 *)memory;
-    usize currentReadOffset = 0;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, memory, length);
 
-    u32 scalerTypeValue = ReadUInt32BigEndian(&fontBufferPointer[currentReadOffset]);
-    currentReadOffset += 4;
+    u32 scalerTypeValue = BinaryStreamReadUInt32BigEndian(&stream);
 
     if (scalerTypeValue == 0x00010000) {
         result.scalerType = TrueTypeScalerTypeWindows;
@@ -185,17 +184,10 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
         return result;
     }
 
-    result.numberOfTables = ReadUInt16BigEndian(&fontBufferPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.searchRange = ReadUInt16BigEndian(&fontBufferPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.entrySelector = ReadUInt16BigEndian(&fontBufferPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.rangeShift = ReadUInt16BigEndian(&fontBufferPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.numberOfTables = BinaryStreamReadUInt16BigEndian(&stream);
+    result.searchRange = BinaryStreamReadUInt16BigEndian(&stream);
+    result.entrySelector = BinaryStreamReadUInt16BigEndian(&stream);
+    result.rangeShift = BinaryStreamReadUInt16BigEndian(&stream);
 
     const usize trueTypeTableDirectoryEntryLength = 16;
     usize expectedDirectorySize = trueTypeOffsetSubtableLength + ((usize)result.numberOfTables * trueTypeTableDirectoryEntryLength);
@@ -211,8 +203,8 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
         }
 
         for (u16 tableIndex = 0; tableIndex < result.numberOfTables; tableIndex++) {
-            const u8 *entryPointer = &fontBufferPointer[currentReadOffset];
-            currentReadOffset += trueTypeTableDirectoryEntryLength;
+            const u8 *entryPointer = &stream.memory[stream.offset];
+            stream.offset += trueTypeTableDirectoryEntryLength;
 
             u32 tag = ReadUInt32BigEndian(&entryPointer[0]);
             u32 expectedChecksum = ReadUInt32BigEndian(&entryPointer[4]);
@@ -223,10 +215,10 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
                 ReturnZeroed(result);
             }
 
-            const u8 *tableDataPointer = &fontBufferPointer[tableOffset];
+            const u8 *tableDataPointer = &stream.memory[tableOffset];
             bool isHeadTable = (tag == TrueTypeTableTag_HEAD);
 
-            u32 calculatedChecksum = TrueTypeCalculateTableChecksum(tableDataPointer, tableLength, isHeadTable);
+            u32 calculatedChecksum = TrueTypeCalculateTableChecksum(stream.memory, tableLength, isHeadTable);
 
             if (calculatedChecksum != expectedChecksum) {
                 ReturnZeroed(result);
@@ -270,68 +262,37 @@ TrueTypeHeadTable TrueTypeHeadTableParse(const TrueTypeTableDirectoryEntry *head
         return result;
     }
 
-    const u8 *tableDataPointer = headTableEntry->memory;
-    usize currentReadOffset = 0;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, headTableEntry->memory, headTableEntry->length);
 
-    result.version = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 4;
-
-    result.fontRevision = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 4;
-
-    result.checkSumAdjustment = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 4;
-
-    result.magicNumber = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 4;
+    result.version = BinaryStreamReadUInt32BigEndian(&stream);
+    result.fontRevision = BinaryStreamReadUInt32BigEndian(&stream);
+    result.checkSumAdjustment = BinaryStreamReadUInt32BigEndian(&stream);
+    result.magicNumber = BinaryStreamReadUInt32BigEndian(&stream);
 
     const u32 trueTypeHeadTableMagicNumber = 0x5F0F3CF5;
     if (result.magicNumber != trueTypeHeadTableMagicNumber) {
         ReturnZeroed(result);
     }
 
-    result.flags = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.unitsPerEm = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.flags = BinaryStreamReadUInt16BigEndian(&stream);
+    result.unitsPerEm = BinaryStreamReadUInt16BigEndian(&stream);
 
     if (result.unitsPerEm < 64 || result.unitsPerEm > 16384) {
         ReturnZeroed(result);
     }
 
-    result.created = ReadInt64BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 8;
-
-    result.modified = ReadInt64BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 8;
-
-    result.xMin = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.yMin = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.xMax = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.yMax = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.macStyle = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.lowestRecPPEM = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.fontDirectionHint = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.indexToLocFormat = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.glyphDataFormat = ReadInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.created = BinaryStreamReadInt64BigEndian(&stream);
+    result.modified = BinaryStreamReadInt64BigEndian(&stream);
+    result.xMin = BinaryStreamReadInt16BigEndian(&stream);
+    result.yMin = BinaryStreamReadInt16BigEndian(&stream);
+    result.xMax = BinaryStreamReadInt16BigEndian(&stream);
+    result.yMax = BinaryStreamReadInt16BigEndian(&stream);
+    result.macStyle = BinaryStreamReadUInt16BigEndian(&stream);
+    result.lowestRecPPEM = BinaryStreamReadUInt16BigEndian(&stream);
+    result.fontDirectionHint = BinaryStreamReadInt16BigEndian(&stream);
+    result.indexToLocFormat = BinaryStreamReadInt16BigEndian(&stream);
+    result.glyphDataFormat = BinaryStreamReadInt16BigEndian(&stream);
 
     return result;
 }
@@ -351,14 +312,11 @@ TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTable
         return result;
     }
 
-    const u8 *tableDataPointer = MaximumProfileTableEntry->memory;
-    usize currentReadOffset = 0;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, MaximumProfileTableEntry->memory, MaximumProfileTableEntry->length);
 
-    result.version = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 4;
-
-    result.numGlyphs = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.version = BinaryStreamReadUInt32BigEndian(&stream);
+    result.numGlyphs = BinaryStreamReadUInt16BigEndian(&stream);
 
     const u32 trueTypeMaximumProfileVersion05 = 0x00005000;
     const u32 trueTypeMaximumProfileVersion10 = 0x00010000;
@@ -370,44 +328,19 @@ TrueTypeMaximumProfileTable TrueTypeMaximumProfileTableParse(const TrueTypeTable
             ReturnZeroed(result);
         }
 
-        result.MaxPoints = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxContours = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxComponentPoints = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxComponentContours = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxZones = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxTwilightPoints = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxStorage = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxFunctionDefs = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxInstructionDefs = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxStackElements = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxSizeOfInstructions = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxComponentElements = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        result.MaxComponentDepth = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
+        result.MaxPoints = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxContours = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentPoints = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentContours = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxZones = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxTwilightPoints = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxStorage = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxFunctionDefs = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxInstructionDefs = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxStackElements = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxSizeOfInstructions = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentElements = BinaryStreamReadUInt16BigEndian(&stream);
+        result.MaxComponentDepth = BinaryStreamReadUInt16BigEndian(&stream);
     } else {
         ReturnZeroed(result);
     }
@@ -428,18 +361,15 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
         return result;
     }
 
-    const u8 *tableDataPointer = cmapTableEntry->memory;
-    usize currentReadOffset = 0;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, cmapTableEntry->memory, cmapTableEntry->length);
 
-    u16 version = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
+    u16 version = BinaryStreamReadUInt16BigEndian(&stream);
     if (version != 0) {
         return result;
     }
 
-    u16 numberSubtables = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    u16 numberSubtables = BinaryStreamReadUInt16BigEndian(&stream);
 
     const usize TrueTypeCmapEncodingRecordLength = 8;
     if (cmapTableEntry->length < TrueTypeCmapHeaderLength + (numberSubtables * TrueTypeCmapEncodingRecordLength)) {
@@ -449,14 +379,9 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
     u32 selectedSubtableOffset = 0;
 
     for (u16 subtableIndex = 0; subtableIndex < numberSubtables; subtableIndex++) {
-        u16 platformID = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        u16 platformSpecificID = ReadUInt16BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
-
-        u32 subtableOffset = ReadUInt32BigEndian(&tableDataPointer[currentReadOffset]);
-        currentReadOffset += 4;
+        u16 platformID = BinaryStreamReadUInt16BigEndian(&stream);
+        u16 platformSpecificID = BinaryStreamReadUInt16BigEndian(&stream);
+        u32 subtableOffset = BinaryStreamReadUInt32BigEndian(&stream);
 
         if (subtableOffset > cmapTableEntry->length || subtableOffset + 2 > cmapTableEntry->length) {
             continue;
@@ -466,7 +391,7 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
         bool isUnicodeBMP = (platformID == 0 && (platformSpecificID == 3 || platformSpecificID == 4));
 
         if (isWindowsBMP || isUnicodeBMP) {
-            u16 subtableFormat = ReadUInt16BigEndian(&tableDataPointer[subtableOffset]);
+            u16 subtableFormat = ReadUInt16BigEndian(&stream.memory[subtableOffset]);
             if (subtableFormat == 4) {
                 selectedSubtableOffset = subtableOffset;
                 break;
@@ -478,7 +403,7 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
         return result;
     }
 
-    const u8 *subtablePointer = &tableDataPointer[selectedSubtableOffset];
+    const u8 *subtablePointer = &stream.memory[selectedSubtableOffset];
     usize subtableRemainingLength = cmapTableEntry->length - selectedSubtableOffset;
 
     const usize TrueTypeCmapFormat4HeaderLength = 14;
@@ -660,28 +585,20 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
         return result;
     }
 
-    const u8 *glyphDataPointer = &glyfTableEntry->memory[glyphLocation.offset];
-    usize currentReadOffset = 0;
+    BinaryStream stream;
+    BinaryStreamInitialize(&stream, &glyfTableEntry->memory[glyphLocation.offset], glyphLocation.length);
 
     const usize TrueTypeGlyphHeaderLength = 10;
     if (glyphLocation.length < TrueTypeGlyphHeaderLength) {
         return result;
     }
 
-    result.numberOfContours = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.numberOfContours = BinaryStreamReadInt16BigEndian(&stream);
 
-    result.xMin = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.yMin = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.xMax = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
-
-    result.yMax = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.xMin = BinaryStreamReadInt16BigEndian(&stream);
+    result.yMin = BinaryStreamReadInt16BigEndian(&stream);
+    result.xMax = BinaryStreamReadInt16BigEndian(&stream);
+    result.yMax = BinaryStreamReadInt16BigEndian(&stream);
 
     if (result.numberOfContours < 0) {
         result.isValid = true;
@@ -695,11 +612,11 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     }
 
     usize endPointsArrayByteLength = (usize)result.numberOfContours * 2;
-    if (currentReadOffset + endPointsArrayByteLength > glyphLocation.length) {
+    if (stream.offset + endPointsArrayByteLength > glyphLocation.length) {
         return result;
     }
 
-    u16 lastPointIndex = ReadUInt16BigEndian(&glyphDataPointer[currentReadOffset + endPointsArrayByteLength - 2]);
+    u16 lastPointIndex = ReadUInt16BigEndian(&stream.memory[stream.offset + endPointsArrayByteLength - 2]);
     result.numberOfPoints = (u32)lastPointIndex + 1;
 
     usize contoursAllocationSize = sizeof(u16) * result.numberOfContours;
@@ -715,23 +632,21 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     result.points = (TrueTypeGlyphPoint *)(allocationBuffer + contoursAllocationSize);
 
     for (i16 contourIndex = 0; contourIndex < result.numberOfContours; contourIndex++) {
-        result.endPointsOfContours[contourIndex] = ReadUInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-        currentReadOffset += 2;
+        result.endPointsOfContours[contourIndex] = BinaryStreamReadUInt16BigEndian(&stream);
     }
 
-    if (currentReadOffset + 2 > glyphLocation.length) {
+    if (stream.offset + 2 > glyphLocation.length) {
         ReturnZeroed(result);
     }
 
-    result.instructionLength = ReadUInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-    currentReadOffset += 2;
+    result.instructionLength = BinaryStreamReadUInt16BigEndian(&stream);
 
-    if (currentReadOffset + result.instructionLength > glyphLocation.length) {
+    if (stream.offset + result.instructionLength > glyphLocation.length) {
         ReturnZeroed(result);
     }
 
-    result.instructions = &glyphDataPointer[currentReadOffset];
-    currentReadOffset += result.instructionLength;
+    result.instructions = &stream.memory[stream.offset];
+    stream.offset += result.instructionLength;
 
     u8 *unpackedFlags = MemoryArenaPushArray(arena, u8, result.numberOfPoints);
     if (!unpackedFlags) {
@@ -740,19 +655,19 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
 
     u32 pointsProcessed = 0;
     while (pointsProcessed < result.numberOfPoints) {
-        if (currentReadOffset + 1 > glyphLocation.length) {
+        if (stream.offset + 1 > glyphLocation.length) {
             ReturnZeroed(result);
         }
 
-        u8 currentFlag = glyphDataPointer[currentReadOffset++];
+        u8 currentFlag = stream.memory[stream.offset++];
         unpackedFlags[pointsProcessed++] = currentFlag;
 
-        if (IsBitSet(currentFlag, TrueTypeGlyphFlag_Repeat))) {
-                if (currentReadOffset + 1 > glyphLocation.length) {
+        if (IsBitSet(currentFlag, TrueTypeGlyphFlag_Repeat)) {
+                if (stream.offset + 1 > glyphLocation.length) {
                     ReturnZeroed(result);
                 }
 
-                u8 repeatCount = glyphDataPointer[currentReadOffset++];
+                u8 repeatCount = stream.memory[stream.offset++];
 
                 if (pointsProcessed + repeatCount > result.numberOfPoints) {
                     ReturnZeroed(result);
@@ -767,15 +682,15 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     i16 currentX = 0;
     for (u32 pointIndex = 0; pointIndex < result.numberOfPoints; pointIndex++) {
         u8 flag = unpackedFlags[pointIndex];
-        result.points[pointIndex].isOnCurve = IsBitSet(flag, TrueTypeGlyphFlag_OnCurve));
+        result.points[pointIndex].isOnCurve = IsBitSet(flag, TrueTypeGlyphFlag_OnCurve);
 
-        if (IsBitSet(flag, TrueTypeGlyphFlag_XShortVector))) {
-                if (currentReadOffset + 1 > glyphLocation.length) {
+        if (IsBitSet(flag, TrueTypeGlyphFlag_XShortVector)) {
+                if (stream.offset + 1 > glyphLocation.length) {
                     ReturnZeroed(result);
                 }
 
-                u8 deltaX = glyphDataPointer[currentReadOffset++];
-                if (IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort))) {
+                u8 deltaX = stream.memory[stream.offset++];
+                if (IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
                         currentX += deltaX;
                     }
                 else {
@@ -783,13 +698,12 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
                 }
             }
         else {
-            if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort))) {
-                    if (currentReadOffset + 2 > glyphLocation.length) {
+            if (!IsBitSet(flag, TrueTypeGlyphFlag_XIsSameOrPositiveXShort)) {
+                    if (stream.offset + 2 > glyphLocation.length) {
                         ReturnZeroed(result);
                     }
 
-                    i16 deltaX = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-                    currentReadOffset += 2;
+                    i16 deltaX = BinaryStreamReadInt16BigEndian(&stream);
                     currentX += deltaX;
                 }
         }
@@ -800,13 +714,13 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
     for (u32 pointIndex = 0; pointIndex < result.numberOfPoints; pointIndex++) {
         u8 flag = unpackedFlags[pointIndex];
 
-        if (IsBitSet(flag, TrueTypeGlyphFlag_YShortVector))) {
-                if (currentReadOffset + 1 > glyphLocation.length) {
+        if (IsBitSet(flag, TrueTypeGlyphFlag_YShortVector)) {
+                if (stream.offset + 1 > glyphLocation.length) {
                     ReturnZeroed(result);
                 }
 
-                u8 deltaY = glyphDataPointer[currentReadOffset++];
-                if (IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort))) {
+                u8 deltaY = stream.memory[stream.offset++];
+                if (IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
                         currentY += deltaY;
                     }
                 else {
@@ -814,13 +728,12 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, const 
                 }
             }
         else {
-            if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort))) {
-                    if (currentReadOffset + 2 > glyphLocation.length) {
+            if (!IsBitSet(flag, TrueTypeGlyphFlag_YIsSameOrPositiveYShort)) {
+                    if (stream.offset + 2 > glyphLocation.length) {
                         ReturnZeroed(result);
                     }
 
-                    i16 deltaY = ReadInt16BigEndian(&glyphDataPointer[currentReadOffset]);
-                    currentReadOffset += 2;
+                    i16 deltaY = BinaryStreamReadInt16BigEndian(&stream);
                     currentY += deltaY;
                 }
         }

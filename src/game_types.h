@@ -28,7 +28,7 @@ typedef float f32;
 
 // NOTE: Macros.
 
-#define IsBitSet(value, bitFlag) (((value) & (bitFlag)) != 0
+#define IsBitSet(value, bitFlag) (((value) & (bitFlag)) != 0)
 
 #define Abs(x) (((x) < 0) ? -(x) : (x))
 #define Min(x, y) ((x) > (y) ? (y) : (x))

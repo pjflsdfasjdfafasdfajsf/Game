@@ -41,7 +41,11 @@ static inline void MemoryZero(void *destination, usize count) {
 #define ZeroStruct(instance) MemoryZero(&(instance), sizeof(instance))
 #define ZeroArray(array) MemoryZero((array), sizeof(array))
 #define ZeroItems(pointer, count) MemoryZero((pointer), sizeof(*(pointer)) * (count))
-#define ReturnZeroed(instance) do { ZeroStruct(instance); return (instance); } while(0)
+#define ReturnZeroed(instance) \
+    do {                       \
+        ZeroStruct(instance);  \
+        return (instance);     \
+    } while (0)
 
 static inline void MemoryCopyForwards(void *destination, const void *source, usize count) {
     char *destinationPointer = (char *)destination;
@@ -196,6 +200,73 @@ static inline void MemoryArenaRestoreCheckpoint(MemoryArenaCheckpoint checkpoint
 
 #define MemoryArenaPushArray(arena, type, count) (type *)MemoryArenaAllocateBytesAndZero((arena), sizeof(type) * (count))
 #define MemoryArenaPushBytes(arena, size) MemoryArenaAllocateBytesAndZero((arena), (size))
+
+typedef struct {
+    const u8 *memory;
+    usize capacity;
+    usize offset;
+    bool hasOverflowed;
+} BinaryStream;
+
+static inline void BinaryStreamInitialize(BinaryStream *stream, const void *memory, usize capacity) {
+    ZeroStruct(*stream);
+    stream->memory = (const u8 *)memory;
+    stream->capacity = capacity;
+}
+
+static inline bool BinaryStreamHasSpace(BinaryStream *stream, usize readSize) {
+    if (stream->hasOverflowed || !stream->memory || stream->offset + readSize > stream->capacity) {
+        stream->hasOverflowed = true;
+
+        return false;
+    }
+
+    return true;
+}
+
+static inline u8 BinaryStreamReadUInt8(BinaryStream *stream) {
+    if (!BinaryStreamHasSpace(stream, 1)) {
+        return 0;
+    }
+    u8 result = stream->memory[stream->offset];
+    stream->offset += 1;
+
+    return result;
+}
+
+static inline u16 BinaryStreamReadUInt16BigEndian(BinaryStream *stream) {
+    if (!BinaryStreamHasSpace(stream, 2)) {
+        return 0;
+    }
+    u16 result = ReadUInt16BigEndian(&stream->memory[stream->offset]);
+    stream->offset += 2;
+
+    return result;
+}
+
+static inline i16 BinaryStreamReadInt16BigEndian(BinaryStream *stream) {
+    return (i16)BinaryStreamReadUInt16BigEndian(stream);
+}
+
+static inline u32 BinaryStreamReadUInt32BigEndian(BinaryStream *stream) {
+    if (!BinaryStreamHasSpace(stream, 4)) {
+        return 0;
+    }
+    u32 result = ReadUInt32BigEndian(&stream->memory[stream->offset]);
+    stream->offset += 4;
+
+    return result;
+}
+
+static inline i64 BinaryStreamReadInt64BigEndian(BinaryStream *stream) {
+    if (!BinaryStreamHasSpace(stream, 8)) {
+        return 0;
+    }
+    i64 result = ReadInt64BigEndian(&stream->memory[stream->offset]);
+    stream->offset += 8;
+
+    return result;
+}
 
 // NOTE: Services that the game provides to platform.
 

@@ -411,7 +411,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         return result;
     }
 
-    usize currentReadOffset = PNGFileSignatureLength;
+    usize stream.offset = PNGFileSignatureLength;
 
     bool hasParsedIHDR = false;
 
@@ -429,30 +429,30 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     bool hasSeenIDAT = false;
     bool isPreviousChunkIDAT = false;
 
-    while (currentReadOffset < length) {
-        usize remainingBytes = length - currentReadOffset;
+    while (stream.offset < length) {
+        usize remainingBytes = length - stream.offset;
         usize headerSize = PNGChunkLengthSize + PNGChunkTypeSize;
 
         if (remainingBytes < headerSize) {
             break;
         }
 
-        u32 chunkLength = ReadUInt32BigEndian(&imageBufferPointer[currentReadOffset]);
-        currentReadOffset += PNGChunkLengthSize;
+        u32 chunkLength = ReadUInt32BigEndian(&imageBufferPointer[stream.offset]);
+        stream.offset += PNGChunkLengthSize;
 
-        const u8 *chunkTypePointer = &imageBufferPointer[currentReadOffset];
-        currentReadOffset += PNGChunkTypeSize;
+        const u8 *chunkTypePointer = &imageBufferPointer[stream.offset];
+        stream.offset += PNGChunkTypeSize;
 
-        remainingBytes = length - currentReadOffset;
+        remainingBytes = length - stream.offset;
         if (remainingBytes < chunkLength + PNGChunkCRCSize) {
             break;
         }
 
-        const u8 *chunkDataPointer = &imageBufferPointer[currentReadOffset];
-        currentReadOffset += chunkLength;
+        const u8 *chunkDataPointer = &imageBufferPointer[stream.offset];
+        stream.offset += chunkLength;
 
-        u32 expectedCRC = ReadUInt32BigEndian(&imageBufferPointer[currentReadOffset]);
-        currentReadOffset += PNGChunkCRCSize;
+        u32 expectedCRC = ReadUInt32BigEndian(&imageBufferPointer[stream.offset]);
+        stream.offset += PNGChunkCRCSize;
 
         usize crcDataLength = PNGChunkTypeSize + chunkLength;
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
