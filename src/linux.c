@@ -77,8 +77,11 @@ static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, 
     
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
-    bool isCompositor = (strcmp(interface, wl_compositor_interface.name) == 0);
-    bool isXdgWmBase = (strcmp(interface, xdg_wm_base_interface.name) == 0);
+    usize compositorNameLength = StringGetLength(wl_compositor_interface.name);
+    usize xdgWmBaseNameLength = StringGetLength(xdg_wm_base_interface.name);
+
+    bool isCompositor = MemoryEquals(interface, wl_compositor_interface.name, compositorNameLength + 1);
+    bool isXdgWmBase = MemoryEquals(interface, xdg_wm_base_interface.name, xdgWmBaseNameLength + 1);
 
     if (isCompositor) {
         wayland->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
