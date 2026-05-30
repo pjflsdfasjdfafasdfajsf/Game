@@ -2,6 +2,9 @@
 *.exe
 *.obj
 
+# NOTE: Linux artifacts
+Game
+
 # NOTE: dxc artifacts.
 BasicGeometryPS.h
 BasicGeometryVS.h

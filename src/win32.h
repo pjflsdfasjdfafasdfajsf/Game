@@ -11,9 +11,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#define DEFAULT_WINDOW_WIDTH 1280
-#define DEFAULT_WINDOW_HEIGHT 720
-
 #define COM_OUT_POINTER(pointer) ((void **)(pointer))
 
 typedef struct {

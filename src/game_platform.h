@@ -15,6 +15,9 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef float f32;
 
+#define DEFAULT_WINDOW_WIDTH 1280
+#define DEFAULT_WINDOW_HEIGHT 720
+
 #define ABS(x) (((x) < 0) ? -(x) : (x))
 
 typedef struct {
@@ -36,7 +39,7 @@ typedef struct {
 } Vector4;
 
 static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
-    return (Vector4){{x, y, z, w}};
+    return (Vector4){{{x, y, z, w}}};
 }
 
 typedef struct {
@@ -68,7 +71,7 @@ typedef struct {
 } UnsignedVector2;
 
 static inline Vector2 V2(f32 x, f32 y) {
-    return (Vector2){{x, y}};
+    return (Vector2){{{x, y}}};
 }
 
 typedef struct {
