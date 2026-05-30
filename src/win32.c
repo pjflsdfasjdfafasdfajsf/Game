@@ -138,20 +138,15 @@ void AudioUpdate(Win32Audio *audio) {
         ErrorShowHRESULT(hresult, L"GetBuffer");
     }
 
-    f32 *samplePointer = (f32 *)audioData;
+    AudioBuffer audioBuffer;
+    ZeroStruct(audioBuffer);
 
-    for (u32 frameIndex = 0; frameIndex < availableFrameCount; frameIndex++) {
-        f32 sampleValue = (audio->phase < 0.5f) ? 0.05f : -0.05f;
+    audioBuffer.samplesPerSecond = audio->samplesPerSecond;
+    audioBuffer.channelCount = audio->channels;
+    audioBuffer.frameCount = availableFrameCount;
+    audioBuffer.samples = (f32 *)audioData;
 
-        audio->phase += audio->phaseIncrement;
-        if (audio->phase > 1.0f) {
-            audio->phase -= 1.0f;
-        }
-
-        for (u32 channelIndex = 0; channelIndex < audio->channels; channelIndex++) {
-            *samplePointer++ = sampleValue;
-        }
-    }
+    GetSoundSamples(&audioBuffer);
 
     hresult = IAudioRenderClient_ReleaseBuffer(audio->renderClient, availableFrameCount, 0);
     if (FAILED(hresult)) {

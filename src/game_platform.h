@@ -426,6 +426,16 @@ static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, V
 }
 // NOTE: Services that the game provides to platform.
 
+typedef struct {
+    u32 samplesPerSecond;
+    u32 channelCount;
+    u32 frameCount;
+    f32 *samples;
+} AudioBuffer;
+
 #define UPDATE_AND_RENDER(name) void name(RenderCommandBuffer *commandBuffer)
 typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
+
+#define GET_SOUND_SAMPLES(name) void name(AudioBuffer *audioBuffer)
+typedef GET_SOUND_SAMPLES(GetSoundSamplesFunc);
 
