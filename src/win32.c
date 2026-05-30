@@ -1,8 +1,6 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Image rendering
-//     * Integrate stb_image
 //     * Text rendering
 //
 
