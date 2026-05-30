@@ -1,7 +1,8 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Text rendering
+//     * Define a proper cross-platform renderer interface
+//     * Separate game and platform
 //
 
 #include "win32.h"
