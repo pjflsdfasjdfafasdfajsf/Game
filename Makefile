@@ -31,9 +31,9 @@ endif
 ifeq ($(PLATFORM),Linux)
     CC = clang
     CFLAGS = -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -I $(GENERATED)
-    LIBRARIES = -lwayland-client -lasound -pthread
+    LIBRARIES = -lwayland-client -lvulkan -lasound -pthread
     
-    SOURCES = $(SRC)/linux.c $(GENERATED)/xdg-shell-client-protocol.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
+    SOURCES = $(SRC)/linux.c $(SRC)/linux_vulkan.c $(GENERATED)/xdg-shell-client-protocol.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c
     
     TARGET = $(BUILD)/Game
     ASSET_TOOL = $(TOOLS)/AssetPreprocess
