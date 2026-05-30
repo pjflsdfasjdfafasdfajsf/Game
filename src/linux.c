@@ -8,6 +8,7 @@
 #include "linux.h"
 #include "linux_vulkan.h"
 #include "game_platform.h"
+#include "xdg-shell-client-protocol.h"
 
 #include <alsa/asoundlib.h>
 #include <pthread.h>
@@ -45,7 +46,7 @@ static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdg
 
 static void XdgToplevelCloseHandler(void *userData, struct xdg_toplevel *xdgToplevel) {
     UNUSED(xdgToplevel);
-    
+
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     if (wayland) {
@@ -74,7 +75,7 @@ static const struct xdg_surface_listener xdgSurfaceListener = {
 
 static void XdgWindowManagerBasePingHandler(void *userData, struct xdg_wm_base *xdgWmBase, uint32_t serial) {
     UNUSED(userData);
-    
+
     xdg_wm_base_pong(xdgWmBase, serial);
 }
 
@@ -84,7 +85,7 @@ static const struct xdg_wm_base_listener xdgWmBaseListener = {
 
 static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     UNUSED(version);
-    
+
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     usize compositorNameLength = StringGetLength(wl_compositor_interface.name);
@@ -141,6 +142,7 @@ LinuxWayland WindowCreate(const char *title) {
     xdg_toplevel_add_listener(result.xdgToplevel, &xdgToplevelListener, &result);
 
     xdg_toplevel_set_title(result.xdgToplevel, title);
+    xdg_toplevel_set_app_id(result.xdgToplevel, "wayland-game-linux");
 
     wl_surface_commit(result.surface);
     wl_display_roundtrip(result.display);
@@ -291,9 +293,9 @@ void AudioInitialize(LinuxAudio *audio) {
 }
 
 void RunDraw(LinuxWayland *wayland, Vulkan *vulkan) {
-    VulkanFrameBegin(vulkan, wayland);
-
-    VulkanFrameEnd(vulkan);
+    if (VulkanFrameBegin(vulkan, wayland)) {
+        VulkanFrameEnd(vulkan);
+    }
 }
 
 void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan) {

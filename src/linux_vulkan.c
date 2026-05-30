@@ -135,7 +135,7 @@ static bool VulkanPhysicalDeviceSuitable(Vulkan *vulkan, VkPhysicalDevice physic
     VkPhysicalDeviceFeatures features;
     vulkan->vkGetPhysicalDeviceFeatures(physicalDevice, &features);
     VulkanQueueFamiliesFind(vulkan, physicalDevice);
-    return (properties.deviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
+    return (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && VulkanQueueFamiliesComplete(vulkan));
 }
 
 static void VulkanPhysicalDevicePick(Vulkan *vulkan) {
