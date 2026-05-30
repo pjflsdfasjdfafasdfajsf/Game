@@ -87,13 +87,23 @@ $(BUILD)/app.res: $(SRC)/win32/app.rc
 
 else # Linux
 
-os_prerequisites: $(GENERATED)/xdg-shell-client-protocol.h $(GENERATED)/xdg-shell-client-protocol.c
+os_prerequisites: $(GENERATED)/xdg-shell-client-protocol.h $(GENERATED)/xdg-shell-client-protocol.c $(GENERATED)/BasicGeometry.vert.h $(GENERATED)/BasicGeometry.frag.h
 
 $(GENERATED)/xdg-shell-client-protocol.h:
 	@wayland-scanner client-header "$(XDG_SHELL_XML)" $@
 
 $(GENERATED)/xdg-shell-client-protocol.c: $(GENERATED)/xdg-shell-client-protocol.h
 	@wayland-scanner private-code "$(XDG_SHELL_XML)" $@
+
+$(GENERATED)/BasicGeometry.vert.h: $(SRC)/glsl/BasicGeometry.vert
+	@glslc $< -o $(GENERATED)/BasicGeometry.vert.spv
+	@$(ASSET_TOOL) $(GENERATED)/BasicGeometry.vert.spv $@
+	@rm $(GENERATED)/BasicGeometry.vert.spv
+	
+$(GENERATED)/BasicGeometry.frag.h: $(SRC)/glsl/BasicGeometry.frag
+	@glslc $< -o $(GENERATED)/BasicGeometry.frag.spv
+	@$(ASSET_TOOL) $(GENERATED)/BasicGeometry.frag.spv $@
+	@rm $(GENERATED)/BasicGeometry.frag.spv
 
 endif # ($(PLATFORM),Windows)
 
