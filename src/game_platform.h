@@ -414,6 +414,8 @@ typedef struct {
     // NOTE: These two standard streams are dumped to console by the platform.
     MemoryStream *standardErrorStream;
     MemoryStream *standardInfoStream;
+
+    // TODO: Pass in arenas here
     
     bool isInitialized;
 } GameMemory;
