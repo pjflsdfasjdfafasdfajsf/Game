@@ -1,7 +1,5 @@
 #pragma once
 
-#include "game_platform.h"
-
 #define COBJMACROS
 #define UNICODE
 
@@ -10,6 +8,8 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+#include "game_types.h"
 
 #define COM_OUT_POINTER(pointer) ((void **)(pointer))
 

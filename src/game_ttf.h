@@ -1,7 +1,8 @@
 #pragma once
 
-#include "game_platform.h"
 #include "game_png.h"
+#include "game_types.h"
+#include "game_platform.h"
 
 #define TRUETYPE_FIRST_CHARACTER_FOR_ASCII 32
 #define TRUETYPE_CHARACTER_COUNT_FOR_ASCII 95

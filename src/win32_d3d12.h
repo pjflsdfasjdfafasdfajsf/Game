@@ -1,9 +1,10 @@
 #pragma once
 
-#include "game_platform.h"
-
 #include <d3d12.h>
 #include <dxgi1_4.h>
+
+#include "game_platform.h"
+#include "game_types.h"
 
 #define FRAME_COUNT 3
 

@@ -1,7 +1,7 @@
 #include "game_ttf.h"
-#include "game_platform.h"
-// TODO: Make this crossplatform and do not depend on this header.
 #include "game_png.h"
+#include "game_types.h"
+#include "game_platform.h"
 #include "game_rectangle_pack.h"
 
 // NOTE: You can find the spec here:  https://developer.apple.com/fonts/TrueType-Reference-Manual

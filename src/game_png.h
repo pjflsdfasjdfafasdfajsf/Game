@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game_platform.h"
+#include "game_types.h"
 
 typedef struct {
     Vector2U size;

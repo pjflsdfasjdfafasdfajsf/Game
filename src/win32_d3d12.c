@@ -2,6 +2,7 @@
 #include "win32_d3d12.h"
 
 #include "game_platform.h"
+#include "game_types.h"
 
 // NOTE: Compiled shaders.
 #include "BasicGeometryVS.h"

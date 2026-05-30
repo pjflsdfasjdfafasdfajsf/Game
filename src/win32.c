@@ -5,17 +5,20 @@
 //     * Separate game and platform
 //
 
-#include "win32.h"
-#include "game_ttf.h"
-#include "game_png.h"
-#include "win32_d3d12.h"
 
-#include "game_platform.h"
 
 #include <memoryapi.h>
 #include <windows.h>
 #include <wingdi.h>
 #include <winnt.h>
+
+#include "win32.h"
+#include "win32_d3d12.h"
+
+#include "game_platform.h"
+#include "game_types.h"
+#include "game_ttf.h"
+// #include "game_png.h"
 
 int _fltused = 0;
 

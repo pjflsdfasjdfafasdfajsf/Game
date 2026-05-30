@@ -4,14 +4,14 @@
 //     * Image rendering
 //     * Font rendering
 //
-
-#include "linux.h"
-#include "game_platform.h"
-
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#include "linux.h"
+#include "game_platform.h"
+#include "game_types.h"
 
 static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
     UNUSED(xdgToplevel), UNUSED(width), UNUSED(height);

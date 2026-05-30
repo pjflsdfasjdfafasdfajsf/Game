@@ -1,5 +1,6 @@
 #include "game_png.h"
 #include "game_platform.h"
+#include "game_types.h"
 
 // NOTE: CRC32.
 

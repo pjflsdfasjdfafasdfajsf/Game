@@ -1,4 +1,5 @@
 #include "game_rectangle_pack.h"
+#include "game_types.h"
 #include "game_platform.h"
 
 // Skyline packing algortihm I borrowed from Julien Vernay thank you love you twin mwha

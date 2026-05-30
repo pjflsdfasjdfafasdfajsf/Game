@@ -1,105 +1,18 @@
 #pragma once
 
-// NOTE: This header does not require CRT/libc so we're fine.
-#include <stddef.h>
-#include <stdint.h>
-
-// TODO: game_types.h once it becomes a problem
-
-#define bool int
-#define true 1
-#define false 0
-
-typedef size_t usize;
-
-typedef uint8_t u8;
-typedef int8_t i8;
-
-typedef uint16_t u16;
-typedef int16_t i16;
-
-typedef uint32_t u32;
-typedef int32_t i32;
-
-typedef uint64_t u64;
-typedef int64_t i64;
-
-typedef float f32;
+#include "game_types.h"
 
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
-#define ABS(x) (((x) < 0) ? -(x) : (x))
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
-#define MAX(x, y) ((x) < (y) ? (y) : (x))
-#define UNUSED(x) (void)x
-
-#define KILOBYTES(value) ((value) * 1024ULL)
-#define MEGABYTES(value) (KILOBYTES(value) * 1024ULL)
-#define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
-#define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
-
-#define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
-
-typedef struct {
-    union {
-        struct {
-            f32 r;
-            f32 g;
-            f32 b;
-            f32 a;
-        };
-
-        struct {
-            f32 x;
-            f32 y;
-            f32 z;
-            f32 w;
-        };
-    };
-} Vector4;
-
-static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
-    return (Vector4){{{x, y, z, w}}};
-}
-
-typedef struct {
-    union {
-        struct {
-            f32 width;
-            f32 height;
-        };
-
-        struct {
-            f32 x;
-            f32 y;
-        };
-    };
-} Vector2;
-
-typedef struct {
-    union {
-        struct {
-            u32 width;
-            u32 height;
-        };
-
-        struct {
-            u32 x;
-            u32 y;
-        };
-    };
-} Vector2U;
-
-static inline Vector2 V2(f32 x, f32 y) {
-    return (Vector2){{{x, y}}};
-}
-
+// NOTE: This vertex type must be shared between all renderer implementations.
 typedef struct {
     f32 position[3];
     f32 color[4];
     f32 uv[2];
 } Vertex;
+
+// NOTE: Shared utilities.
 
 static inline void MemoryZero(void *destination, usize count) {
     char *bytePointer = (char *)destination;
@@ -141,8 +54,6 @@ static inline usize StringGetLength(const char *string) {
     return characterPointer - string;
 }
 
-// NOTE: Reading utilities.
-
 static inline u16 ReadUInt16BigEndian(const u8 *memory) {
     return ((u16)memory[0] << 8) |
            ((u16)memory[1] << 0);
@@ -173,8 +84,6 @@ static inline u64 ReadUInt64BigEndian(const u8 *memory) {
 static inline i64 ReadInt64BigEndian(const u8 *memory) {
     return (i64)ReadUInt64BigEndian(memory);
 }
-
-// NOTE: Memory arena.
 
 typedef struct {
     u8 *basePointer;
@@ -267,3 +176,11 @@ static inline void MemoryArenaRestoreCheckpoint(MemoryArenaCheckpoint checkpoint
 
 #define MemoryArenaPushArray(arena, type, count) (type *)MemoryArenaAllocateBytesAndZero((arena), sizeof(type) * (count))
 #define MemoryArenaPushBytes(arena, size) MemoryArenaAllocateBytesAndZero((arena), (size))
+
+// NOTE: Services that the game provides to platform.
+
+#define UPDATE_AND_RENDER(name) void name()
+typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
+
+// --------------------------------------------------
+
