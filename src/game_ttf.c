@@ -124,6 +124,11 @@ typedef struct {
     Vector2 p2;
 } TrueTypeEdge;
 
+typedef struct {
+    f32 x;
+    i32 direction;
+} TrueTypeScanlineIntersection;
+
 static u32 TrueTypeCalculateTableChecksum(const u8 *tableMemory, u32 tableLength, bool isHeadTable) {
     u32 checksum = 0;
     u32 numberOfLongs = (tableLength + 3) / 4;
@@ -933,75 +938,63 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
         return result;
     }
 
-    u32 pointIndex = 0;
     u32 generatedPointCount = 0;
+    u32 currentPointIndex = 0;
 
     for (i16 contourIndex = 0; contourIndex < glyph->numberOfContours; contourIndex++) {
-        u32 contourStartIndex = pointIndex;
-        u32 generatedStartIndex = generatedPointCount;
+        u32 contourStartIndex = currentPointIndex;
+        u32 contourEndIndex = glyph->endPointsOfContours[contourIndex];
+        u32 contourLength = contourEndIndex - contourStartIndex + 1;
 
-        bool isContourStart = true;
-        bool contourStartedOffCurve = false;
+        Vector2 startAnchor;
+        bool firstIsOnCurve = glyph->points[contourStartIndex].isOnCurve;
+        bool lastIsOnCurve = glyph->points[contourEndIndex].isOnCurve;
 
-        for (; pointIndex <= glyph->endPointsOfContours[contourIndex]; pointIndex++) {
-            bool isOnCurve = glyph->points[pointIndex].isOnCurve;
-            f32 x = (f32)glyph->points[pointIndex].x;
-            f32 y = (f32)glyph->points[pointIndex].y;
+        if (firstIsOnCurve) {
+            startAnchor = V2((f32)glyph->points[contourStartIndex].x, (f32)glyph->points[contourStartIndex].y);
+        } else if (lastIsOnCurve) {
+            startAnchor = V2((f32)glyph->points[contourEndIndex].x, (f32)glyph->points[contourEndIndex].y);
+        } else {
+            startAnchor = V2(
+                (f32)(glyph->points[contourStartIndex].x + glyph->points[contourEndIndex].x) / 2.0f,
+                (f32)(glyph->points[contourStartIndex].y + glyph->points[contourEndIndex].y) / 2.0f);
+        }
 
-            u32 contourLength = glyph->endPointsOfContours[contourIndex] - contourStartIndex + 1;
-            u32 nextIndex = ((pointIndex + 1 - contourStartIndex) % contourLength) + contourStartIndex;
+        generatedPoints[generatedPointCount++] = startAnchor;
 
-            if (isOnCurve) {
-                generatedPoints[generatedPointCount++] = V2(x, y);
+        for (u32 i = 0; i <= contourLength; i++) {
+            u32 currentIndex = contourStartIndex + (i % contourLength);
+            u32 nextIndex = contourStartIndex + ((i + 1) % contourLength);
+
+            bool currentIsOnCurve = glyph->points[currentIndex].isOnCurve;
+            bool nextIsOnCurve = glyph->points[nextIndex].isOnCurve;
+
+            Vector2 pointCurrent = V2((f32)glyph->points[currentIndex].x, (f32)glyph->points[currentIndex].y);
+            Vector2 pointNext = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
+
+            if (currentIsOnCurve) {
+                generatedPoints[generatedPointCount++] = pointCurrent;
             } else {
-                if (isContourStart) {
-                    contourStartedOffCurve = true;
-                    if (glyph->points[nextIndex].isOnCurve) {
-                        generatedPoints[generatedPointCount++] = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
-                        pointIndex++;
-                        continue;
-                    }
-
-                    x = x + ((f32)glyph->points[nextIndex].x - x) / 2.0f;
-                    y = y + ((f32)glyph->points[nextIndex].y - y) / 2.0f;
-
-                    generatedPoints[generatedPointCount++] = V2(x, y);
-                }
-
                 Vector2 p0 = generatedPoints[generatedPointCount - 1];
-                Vector2 p1 = V2(x, y);
-                Vector2 p2 = V2((f32)glyph->points[nextIndex].x, (f32)glyph->points[nextIndex].y);
+                Vector2 p1 = pointCurrent;
+                Vector2 p2;
 
-                if (!glyph->points[nextIndex].isOnCurve) {
-                    p2.x = p1.x + (p2.x - p1.x) / 2.0f;
-                    p2.y = p1.y + (p2.y - p1.y) / 2.0f;
+                if (nextIsOnCurve) {
+                    p2 = pointNext;
                 } else {
-                    pointIndex++;
+                    p2 = V2((pointCurrent.x + pointNext.x) / 2.0f, (pointCurrent.y + pointNext.y) / 2.0f);
                 }
 
                 u32 addedPoints = 0;
                 TrueTypeTessellateBezier(generatedPoints + generatedPointCount, &addedPoints, p0, p1, p2);
                 generatedPointCount += addedPoints;
             }
-
-            isContourStart = false;
         }
 
-        if (glyph->points[pointIndex - 1].isOnCurve) {
-            generatedPoints[generatedPointCount++] = generatedPoints[generatedStartIndex];
-        }
-
-        if (contourStartedOffCurve) {
-            Vector2 p0 = generatedPoints[generatedPointCount - 1];
-            Vector2 p1 = V2((f32)glyph->points[contourStartIndex].x, (f32)glyph->points[contourStartIndex].y);
-            Vector2 p2 = generatedPoints[generatedStartIndex];
-
-            u32 addedPoints = 0;
-            TrueTypeTessellateBezier(generatedPoints + generatedPointCount, &addedPoints, p0, p1, p2);
-            generatedPointCount += addedPoints;
-        }
+        generatedPoints[generatedPointCount++] = startAnchor;
 
         contourEndIndices[contourIndex] = generatedPointCount;
+        currentPointIndex = contourEndIndex + 1;
     }
 
     for (u32 i = 0; i < generatedPointCount; i++) {
@@ -1011,15 +1004,16 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
 
     TrueTypeEdge *edges = (TrueTypeEdge *)VirtualAlloc(0, sizeof(TrueTypeEdge) * generatedPointCount, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     u32 edgeCount = 0;
-    u32 currentPointIndex = 0;
+    u32 readPointIndex = 0;
 
     for (i16 contourIndex = 0; contourIndex < glyph->numberOfContours; contourIndex++) {
-        for (; currentPointIndex < contourEndIndices[contourIndex] - 1; currentPointIndex++) {
-            edges[edgeCount].p1 = generatedPoints[currentPointIndex];
-            edges[edgeCount].p2 = generatedPoints[currentPointIndex + 1];
+        for (; readPointIndex < contourEndIndices[contourIndex] - 1; readPointIndex++) {
+            edges[edgeCount].p1 = generatedPoints[readPointIndex];
+            edges[edgeCount].p2 = generatedPoints[readPointIndex + 1];
             edgeCount++;
         }
-        currentPointIndex++;
+
+        readPointIndex++;
     }
 
     u8 *coverageBuffer = (u8 *)VirtualAlloc(0, result.size.x * result.size.y, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -1030,7 +1024,7 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
     f32 stepPerScanline = 1.0f / (f32)scanlineSubdivisions;
 
     const u32 maxIntersections = 256;
-    f32 intersections[256];
+    TrueTypeScanlineIntersection intersections[256];
 
     for (u32 y = 0; y < result.size.y; y++) {
         for (u32 subY = 0; subY < scanlineSubdivisions; subY++) {
@@ -1054,6 +1048,8 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                     continue;
                 }
 
+                i32 direction = (deltaY > 0.0f) ? 1 : -1;
+
                 f32 intersectionX = 0.0f;
                 if (deltaX == 0.0f) {
                     intersectionX = edge->p1.x;
@@ -1066,15 +1062,17 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                 }
 
                 if (intersectionCount < maxIntersections) {
-                    intersections[intersectionCount++] = intersectionX;
+                    intersections[intersectionCount].x = intersectionX;
+                    intersections[intersectionCount].direction = direction;
+                    intersectionCount++;
                 }
             }
 
             for (u32 i = 1; i < intersectionCount; i++) {
-                f32 key = intersections[i];
+                TrueTypeScanlineIntersection key = intersections[i];
                 i32 j = (i32)i - 1;
 
-                while (j >= 0 && intersections[j] > key) {
+                while (j >= 0 && intersections[j].x > key.x) {
                     intersections[j + 1] = intersections[j];
                     j--;
                 }
@@ -1082,46 +1080,56 @@ Image TrueTypeGlyphRasterize(const TrueTypeSimpleGlyph *glyph, f32 scale) {
                 intersections[j + 1] = key;
             }
 
-            if (intersectionCount > 1) {
-                for (u32 m = 0; m + 1 < intersectionCount; m += 2) {
-                    f32 startIntersection = intersections[m];
-                    i32 startIndex = (i32)startIntersection;
-                    f32 startCovered = ((f32)(startIndex + 1)) - startIntersection;
+            i32 windingNumber = 0;
+            f32 startX = 0.0f;
 
-                    f32 endIntersection = intersections[m + 1];
-                    i32 endIndex = (i32)endIntersection;
-                    f32 endCovered = endIntersection - (f32)endIndex;
+            for (u32 m = 0; m < intersectionCount; m++) {
+                i32 nextWindingNumber = windingNumber + intersections[m].direction;
 
-                    if (startIndex < 0) {
-                        startIndex = 0;
-                        startCovered = 1.0f;
-                    }
-                    if (endIndex >= (i32)result.size.x) {
-                        endIndex = result.size.x - 1;
-                        endCovered = 1.0f;
-                    }
-                    if (startIndex >= (i32)result.size.x || endIndex < 0) {
-                        continue;
-                    }
+                if (windingNumber == 0 && nextWindingNumber != 0) {
+                    startX = intersections[m].x;
+                } else if (windingNumber != 0 && nextWindingNumber == 0) {
+                    f32 endX = intersections[m].x;
 
-                    usize bufferIndexY = (usize)y * result.size.x;
+                    if (endX > startX) {
+                        i32 startIndex = (i32)startX;
+                        f32 startCovered = ((f32)(startIndex + 1)) - startX;
 
-                    if (startIndex == endIndex) {
-                        f32 value = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
-                        coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(value, 255.0f);
-                    } else {
-                        f32 valueStart = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
-                        coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(valueStart, 255.0f);
+                        i32 endIndex = (i32)endX;
+                        f32 endCovered = endX - (f32)endIndex;
 
-                        f32 valueEnd = (f32)coverageBuffer[endIndex + bufferIndexY] + (alphaWeight * endCovered);
-                        coverageBuffer[endIndex + bufferIndexY] = (u8)MIN(valueEnd, 255.0f);
-                    }
+                        if (startIndex < 0) {
+                            startIndex = 0;
+                            startCovered = 1.0f;
+                        }
+                        if (endIndex >= (i32)result.size.x) {
+                            endIndex = result.size.x - 1;
+                            endCovered = 1.0f;
+                        }
 
-                    for (i32 j = startIndex + 1; j < endIndex; j++) {
-                        f32 val = (f32)coverageBuffer[j + bufferIndexY] + alphaWeight;
-                        coverageBuffer[j + bufferIndexY] = (u8)MIN(val, 255.0f);
+                        if (startIndex < (i32)result.size.x && endIndex >= 0) {
+                            usize bufferIndexY = (usize)y * result.size.x;
+
+                            if (startIndex == endIndex) {
+                                f32 value = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * (startCovered + endCovered - 1.0f));
+                                coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(value, 255.0f);
+                            } else {
+                                f32 valueStart = (f32)coverageBuffer[startIndex + bufferIndexY] + (alphaWeight * startCovered);
+                                coverageBuffer[startIndex + bufferIndexY] = (u8)MIN(valueStart, 255.0f);
+
+                                f32 valueEnd = (f32)coverageBuffer[endIndex + bufferIndexY] + (alphaWeight * endCovered);
+                                coverageBuffer[endIndex + bufferIndexY] = (u8)MIN(valueEnd, 255.0f);
+
+                                for (i32 j = startIndex + 1; j < endIndex; j++) {
+                                    f32 val = (f32)coverageBuffer[j + bufferIndexY] + alphaWeight;
+                                    coverageBuffer[j + bufferIndexY] = (u8)MIN(val, 255.0f);
+                                }
+                            }
+                        }
                     }
                 }
+
+                windingNumber = nextWindingNumber;
             }
         }
     }
