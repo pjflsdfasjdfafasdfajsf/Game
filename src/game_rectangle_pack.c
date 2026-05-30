@@ -17,7 +17,6 @@ Pack2D Pack2DCreate(MemoryArena *arena, u32 maximumWidth, u32 maximumHeight) {
     result.maximumHeight = maximumHeight;
 
     usize maximumSkylinePoints = (usize)maximumWidth * 2;
-    usize allocationSize = sizeof(Vector2U) * maximumSkylinePoints;
 
     result.points = MemoryArenaPushArray(arena, Vector2U, maximumSkylinePoints);
 

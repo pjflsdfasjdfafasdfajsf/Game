@@ -1,6 +1,7 @@
 #pragma once
 
 // NOTE: This header does not require CRT/libc so we're fine.
+#include <stddef.h>
 #include <stdint.h>
 
 // TODO: game_types.h once it becomes a problem

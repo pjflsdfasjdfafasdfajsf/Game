@@ -205,8 +205,6 @@ TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, const void *memory, 
     }
 
     if (result.numberOfTables > 0) {
-        usize tablesAllocationSize = sizeof(TrueTypeTableDirectoryEntry) * result.numberOfTables;
-
         result.tables = MemoryArenaPushArray(arena, TrueTypeTableDirectoryEntry, result.numberOfTables);
         if (!result.tables) {
             return result;
@@ -503,11 +501,7 @@ TrueTypeCmapFormat4 TrueTypeCmapTableParseFormat4(const TrueTypeTableDirectoryEn
     }
 
     u16 length = ReadUInt16BigEndian(&subtablePointer[2]);
-    u16 language = ReadUInt16BigEndian(&subtablePointer[4]);
     u16 segCountX2 = ReadUInt16BigEndian(&subtablePointer[6]);
-    u16 searchRange = ReadUInt16BigEndian(&subtablePointer[8]);
-    u16 entrySelector = ReadUInt16BigEndian(&subtablePointer[10]);
-    u16 rangeShift = ReadUInt16BigEndian(&subtablePointer[12]);
 
     u16 segCount = segCountX2 / 2;
 
