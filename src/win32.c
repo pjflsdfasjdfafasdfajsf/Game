@@ -1,8 +1,9 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * If we're in a different directory than the executable, set it to the executable directory.
-//
+//     * Texture loading API
+//     * Texture support in the renderer API
+//     * Add UV support to DrawRectangle
 
 #include <windows.h>
 
@@ -20,6 +21,31 @@ static HMODULE GameDLL = 0;
 static UpdateAndRenderFunction *GameUpdateAndRender = 0;
 static GetSoundSamplesFunc *GameGetSoundSamples = 0;
 
+// NOTE: Returns absolute path to a file located in the same folder as the running .exe
+// 
+// For example, if the game is running from "C:\Project\build\Game.exe", and you ask 
+// for "Game.dll", this function returns "C:\Project\build\Game.dll"
+static void AbsoluteLibraryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
+    MemoryZero(destinationBuffer, destinationCapacity);
+
+    char executablePath[MAX_PATH];
+    ZeroArray(executablePath);
+    // NOTE: No W here :( because our String API does not work with wide chars
+    GetModuleFileNameA(0, executablePath, sizeof(executablePath));
+
+    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '\\');
+    if (finalSlashIndex == -1) {
+        finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
+    }
+
+    if (finalSlashIndex != -1) {
+        executablePath[finalSlashIndex + 1] = '\0';
+    }
+
+    StringCopy(destinationBuffer, destinationCapacity, executablePath);
+    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
+}
+
 static void GameCodeLoad() {
     if (GameDLL) {
         FreeLibrary(GameDLL);
@@ -29,9 +55,15 @@ static void GameCodeLoad() {
         GameGetSoundSamples = 0;
     }
 
-    CopyFileW(L"Game.dll", L"GameTEMP.dll", FALSE);
-    GameDLL = LoadLibraryW(L"GameTEMP.dll");
+    char sourceLibraryPath[MAX_PATH];
+    char temporaryLibraryPath[MAX_PATH];
 
+    AbsoluteLibraryPath("Game.dll", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibraryPath("GameTEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+
+    CopyFileA(sourceLibraryPath, temporaryLibraryPath, FALSE);
+
+    GameDLL = LoadLibraryA(temporaryLibraryPath);
     if (GameDLL) {
         GameUpdateAndRender = (UpdateAndRenderFunction *)GetProcAddress(GameDLL, "UpdateAndRender");
         GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");

@@ -614,6 +614,49 @@ void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffe
                 }
             } break;
 
+            case RenderCommandType_DrawRectangle: {
+                if (header->size >= sizeof(RenderCommandDrawRectangle)) {
+                    RenderCommandDrawRectangle *command = (RenderCommandDrawRectangle *)header;
+
+                    const UINT verticesPerRectangle = 6;
+                    if (d3d12->vertexCount + verticesPerRectangle <= d3d12->vertexCapacity) {
+                        f32 leftEdge = (command->position.x / (f32)DEFAULT_WINDOW_WIDTH) * 2.0f - 1.0f;
+                        f32 rightEdge = ((command->position.x + command->size.x) / (f32)DEFAULT_WINDOW_WIDTH) * 2.0f - 1.0f;
+                        f32 topEdge = 1.0f - (command->position.y / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
+                        f32 bottomEdge = 1.0f - ((command->position.y + command->size.y) / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
+
+                        Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 0.0f}};
+                        Vertex topRight = {{rightEdge, topEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 0.0f}};
+                        Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 1.0f}};
+                        Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 1.0f}};
+
+                        Vertex *currentVertexDestination = (Vertex *)d3d12->vertexData + d3d12->vertexCount;
+
+                        currentVertexDestination[0] = topLeft;
+                        currentVertexDestination[1] = topRight;
+                        currentVertexDestination[2] = bottomLeft;
+                        currentVertexDestination[3] = bottomLeft;
+                        currentVertexDestination[4] = topRight;
+                        currentVertexDestination[5] = bottomRight;
+
+                        UINT memoryOffsetInBytes = d3d12->vertexCount * sizeof(Vertex);
+
+                        D3D12_VERTEX_BUFFER_VIEW rectangleBufferView;
+                        rectangleBufferView.BufferLocation = d3d12->vertexBufferView.BufferLocation + memoryOffsetInBytes;
+                        rectangleBufferView.StrideInBytes = sizeof(Vertex);
+                        rectangleBufferView.SizeInBytes = verticesPerRectangle * sizeof(Vertex);
+
+                        u32 textureIndex = 0;
+
+                        ID3D12GraphicsCommandList_IASetVertexBuffers(d3d12->commandList, 0, 1, &rectangleBufferView);
+                        ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(d3d12->commandList, 0, 1, &textureIndex, 0);
+                        ID3D12GraphicsCommandList_DrawInstanced(d3d12->commandList, verticesPerRectangle, 1, 0, 0);
+
+                        d3d12->vertexCount += verticesPerRectangle;
+                    }
+                }
+            } break;
+
             case RenderCommandType_None:
             default: {
             } break;
@@ -664,4 +707,7 @@ void D3D12Initialize(Win32Direct12 *d3d12, HWND window) {
     D3D12PipelineInitialize(d3d12);
     D3D12SynchronizationInitialize(d3d12);
     D3D12VertexBufferInitialize(d3d12, 4096);
+
+    u32 whitePixel = 0xFFFFFFFF;
+    D3D12TextureCreate(d3d12, 1, 1, 4, &whitePixel);
 }

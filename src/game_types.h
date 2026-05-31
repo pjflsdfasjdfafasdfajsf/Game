@@ -10,7 +10,9 @@
 
 // NOTE: Integer types.
 
-typedef size_t usize;
+typedef uintptr_t usize;
+typedef intptr_t isize;
+
 
 typedef uint8_t u8;
 typedef int8_t i8;
@@ -70,8 +72,10 @@ static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
 
 // NOTE: Colors
 
-#define BLACK V4(0.0f, 0.0f, 0.0f, 1.0f)
-#define RED V4(1.0f, 0.0f, 0.0f, 1.0f)
+static const Vector4 Red = {1.0f, 0.0f, 0.0f, 1.0f};
+static const Vector4 Green = {0.0f, 1.0f, 0.0f, 1.0f};
+static const Vector4 Blue = {0.0f, 0.0f, 1.0f, 1.0f};
+static const Vector4 Black = {0.0f, 0.0f, 0.0f, 1.0f};
 
 typedef struct {
     union {

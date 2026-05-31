@@ -79,6 +79,45 @@ static inline usize StringGetLength(const char *string) {
     return characterPointer - string;
 }
 
+static inline isize StringFindLastOccurrenceOfCharacter(const char *string, char targetCharacter) {
+    isize lastFoundIndex = -1;
+    usize currentIndex = 0;
+
+    while (string[currentIndex] != '\0') {
+        if (string[currentIndex] == targetCharacter) {
+            lastFoundIndex = (isize)currentIndex;
+        }
+        currentIndex++;
+    }
+
+    return lastFoundIndex;
+}
+
+static inline void StringCopy(char *destination, usize destinationCapacity, const char *source) {
+    if (!destination || !source || destinationCapacity == 0) {
+        return;
+    }
+
+    usize sourceLength = StringGetLength(source);
+    usize bytesToCopy = (sourceLength < (destinationCapacity - 1)) ? sourceLength : (destinationCapacity - 1);
+
+    MemoryCopyForwards(destination, source, bytesToCopy);
+    destination[bytesToCopy] = '\0';
+}
+
+static inline void StringAppend(char *destination, usize destinationCapacity, const char *source) {
+    if (!destination || !source || destinationCapacity == 0) {
+        return;
+    }
+
+    usize currentLength = StringGetLength(destination);
+    usize remainingCapacity = destinationCapacity - currentLength;
+
+    if (remainingCapacity > 0) {
+        StringCopy(destination + currentLength, remainingCapacity, source);
+    }
+}
+
 static inline u16 ReadUInt16BigEndian(const u8 *memory) {
     return ((u16)memory[0] << 8) |
            ((u16)memory[1] << 0);
@@ -321,6 +360,7 @@ static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *strin
 typedef enum {
     RenderCommandType_None = 0,
     RenderCommandType_ClearEntireScreen,
+    RenderCommandType_DrawRectangle,
 } RenderCommandType;
 
 typedef struct {
@@ -332,6 +372,13 @@ typedef struct {
     RenderCommandHeader header;
     Vector4 color;
 } RenderCommandClearEntireScreen;
+
+typedef struct {
+    RenderCommandHeader header;
+    Vector2 position;
+    Vector2 size;
+    Vector4 color;
+} RenderCommandDrawRectangle;
 
 typedef struct {
     u8 *basePointer;
@@ -401,12 +448,27 @@ static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, V
         return;
     }
 
-    RenderCommandClearEntireScreen *clearEntireScreen = RenderCommandBufferPushCommand(commandBuffer, ClearEntireScreen);
+    RenderCommandClearEntireScreen *command = RenderCommandBufferPushCommand(commandBuffer, ClearEntireScreen);
 
-    if (clearEntireScreen) {
-        clearEntireScreen->color = color;
+    if (command) {
+        command->color = color;
     }
 }
+
+static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vector2 position, Vector2 size, Vector4 color) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    RenderCommandDrawRectangle *command = RenderCommandBufferPushCommand(commandBuffer, DrawRectangle);
+
+    if (command) {
+        command->position = position;
+        command->size = size;
+        command->color = color;
+    }
+}
+
 // NOTE: Services that the game provides to platform.
 
 typedef struct {

@@ -6,7 +6,9 @@ UPDATE_AND_RENDER(UpdateAndRender) {
         
         memory->isInitialized = true;
     }
-    RenderClearEntireScreen(commandBuffer, RED);
+
+    RenderClearEntireScreen(commandBuffer, Black);
+    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(20, 20), Red);
 }
 
 // Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.

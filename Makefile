@@ -45,8 +45,8 @@ ifeq ($(PLATFORM),Windows)
         BUILD_TARGETS = $(TARGET)
     else
         CFLAGS += /Od /Z7 /D DEBUG
-        LDFLAGS += /DEBUG
-        DLL_LDFLAGS = /nologo /NODEFAULTLIB /NOENTRY /DEBUG /EXPORT:UpdateAndRender /EXPORT:GetSoundSamples /DLL /PDB:$(BUILD)/GameDLL.pdb
+        LDFLAGS += /DEBUG /INCREMENTAL:NO
+        DLL_LDFLAGS = /nologo /NODEFAULTLIB /NOENTRY /DEBUG /INCREMENTAL:NO /EXPORT:UpdateAndRender /EXPORT:GetSoundSamples /DLL /PDB:$(BUILD)/GameDLL.pdb
         TARGET_OBJS = $(PLATFORM_OBJS) $(MSVC_OBJ)
         BUILD_TARGETS = $(GAME_DLL) $(TARGET)
     endif
