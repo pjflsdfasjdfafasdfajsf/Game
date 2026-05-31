@@ -18,8 +18,8 @@ void main() {
         outColor = vec4(1.0, 0.0, 0.0, 1.0);
     }
     else {
-        vec4 textureColor = texture(inTextures[nonuniformEXT(textureIndex)], inUV);
-        outColor = vec4(textureColor.xyz, 1.0);
+        vec4 textureColor = texture(inTextures[nonuniformEXT(textureIndex - 1)], inUV);
+        outColor = textureColor;
     }
 }
 

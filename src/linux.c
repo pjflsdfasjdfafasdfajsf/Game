@@ -366,6 +366,7 @@ int main() {
 
     Image image = ImageLoadFromPNG(&permanentArena, &temporaryArena, watermelonImage, sizeof(watermelonImage));
     u32 watermelonTexture = VulkanTextureCreate(&vulkan, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+    UNUSED(watermelonTexture);
 
     RunUpdate(&wayland, &audio, &vulkan);
 

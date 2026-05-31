@@ -906,13 +906,6 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
         return 0;
     }
 
-    printf("width=%u height=%u bpp=%u pixels=%p\n", 
-    width, height, bytesPerPixel, pixels);
-        const u8 *p = (const u8 *)pixels;
-printf("first pixel: %u %u %u %u\n", p[0], p[1], p[2], p[3]);
-
-printf("mapped first pixel: %u %u %u %u\n", mappedData[0], mappedData[1], mappedData[2], mappedData[3]);
-
     const u8 *sourcePixels = (const u8 *)pixels;
     for (u32 y = 0; y < height; ++y) {
         u8 *destinationRow = mappedData + (y * width * 4);
