@@ -72,10 +72,10 @@ static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
 
 // NOTE: Colors
 
-static const Vector4 Red = {1.0f, 0.0f, 0.0f, 1.0f};
-static const Vector4 Green = {0.0f, 1.0f, 0.0f, 1.0f};
-static const Vector4 Blue = {0.0f, 0.0f, 1.0f, 1.0f};
-static const Vector4 Black = {0.0f, 0.0f, 0.0f, 1.0f};
+static const Vector4 Red = {{{1.0f, 0.0f, 0.0f, 1.0f}}};
+static const Vector4 Green = {{{0.0f, 1.0f, 0.0f, 1.0f}}};
+static const Vector4 Blue = {{{0.0f, 0.0f, 1.0f, 1.0f}}};
+static const Vector4 Black = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
 
 typedef struct {
     union {

@@ -21,6 +21,8 @@ UPDATE_AND_RENDER(UpdateAndRender) {
 
 // Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.
 GET_SOUND_SAMPLES(GetSoundSamples) {
+    Unused(audioBuffer);
+
     // // TODO: Move this into GameState later!
     // static f32 phase = 0.0f;
 
