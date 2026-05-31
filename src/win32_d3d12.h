@@ -41,7 +41,6 @@ typedef struct {
 } Win32Direct12;
 
 void D3D12Initialize(Win32Direct12 *d3d12, HWND window);
-u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
-void D3D12FrameBegin(Win32Direct12 *d3d12);
+void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer);
 void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer);

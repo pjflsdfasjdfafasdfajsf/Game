@@ -5,6 +5,8 @@
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
+#define Untextured 0
+
 // NOTE: This vertex type must be shared between all renderer implementations.
 typedef struct {
     f32 position[3];
@@ -361,6 +363,7 @@ typedef enum {
     RenderCommandType_None = 0,
     RenderCommandType_ClearEntireScreen,
     RenderCommandType_DrawRectangle,
+    RenderCommandType_AllocateTexture,
 } RenderCommandType;
 
 typedef struct {
@@ -378,7 +381,16 @@ typedef struct {
     Vector2 position;
     Vector2 size;
     Vector4 color;
+    u32 texture;
 } RenderCommandDrawRectangle;
+
+typedef struct {
+    RenderCommandHeader header;
+    u32 index;
+    u32 bytesPerPixel;
+    Vector2U size;
+    const void *pixels;
+} RenderCommandAllocateTexture;
 
 typedef struct {
     u8 *basePointer;
@@ -455,7 +467,7 @@ static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, V
     }
 }
 
-static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vector2 position, Vector2 size, Vector4 color) {
+static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vector2 position, Vector2 size, Vector4 color, u32 texture) {
     if (!commandBuffer) {
         return;
     }
@@ -466,6 +478,22 @@ static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vecto
         command->position = position;
         command->size = size;
         command->color = color;
+        command->texture = texture;
+    }
+}
+
+static inline void RenderAllocateTexture(RenderCommandBuffer *commandBuffer, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    RenderCommandAllocateTexture *command = RenderCommandBufferPushCommand(commandBuffer, AllocateTexture);
+
+    if (command) {
+        command->index = index;
+        command->size = size;
+        command->bytesPerPixel = bytesPerPixel;
+        command->pixels = pixels;
     }
 }
 
@@ -476,7 +504,8 @@ typedef struct {
     MemoryStream *standardErrorStream;
     MemoryStream *standardInfoStream;
 
-    // TODO: Pass in arenas here
+    MemoryArena permanentArena;
+    MemoryArena temporaryArena;
     
     bool isInitialized;
 } GameMemory;

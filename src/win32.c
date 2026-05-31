@@ -1,8 +1,6 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Texture loading API
-//     * Texture support in the renderer API
 //     * Add UV support to DrawRectangle
 
 #include <windows.h>
@@ -12,8 +10,6 @@
 
 #include "game_platform.h"
 #include "game_types.h"
-// #include "game_ttf.h"
-// #include "game_png.h"
 #include "game.h"
 
 #if defined(DEBUG)
@@ -409,7 +405,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, 
                     GameUpdateAndRender(gameMemory, commandBuffer);
                 }
 
-                D3D12FrameBegin(d3d12);
+                D3D12FrameBegin(d3d12, commandBuffer);
                 D3D12FrameEnd(d3d12, commandBuffer);
             } else {
                 Sleep(10);
@@ -454,11 +450,6 @@ void mainCRTStartup() {
     MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
     MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
 
-    GameMemory gameMemory = {0};
-    gameMemory.standardErrorStream = errorStream;
-    gameMemory.standardInfoStream = infoStream;
-    gameMemory.isInitialized = false;
-
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12, window);
 
@@ -469,8 +460,14 @@ void mainCRTStartup() {
 
     usize commandBufferSize = Megabytes(2);
     void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
-
     RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
+
+    GameMemory gameMemory = {0};
+    gameMemory.standardErrorStream = errorStream;
+    gameMemory.standardInfoStream = infoStream;
+    gameMemory.permanentArena = permanentArena;
+    gameMemory.temporaryArena = temporaryArena;
+    gameMemory.isInitialized = false;
 
 #if defined(DEBUG)
     GameCodeLoad();

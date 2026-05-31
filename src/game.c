@@ -1,14 +1,22 @@
 #include "game_platform.h"
+#include "game_png.h"
 
 UPDATE_AND_RENDER(UpdateAndRender) {
     if (!memory->isInitialized) {
         MemoryStreamWriteString(memory->standardInfoStream, "Game says hi!");
-        
+
+        static const char watermelon[] = {
+#include "watermelon.png.h"
+        };
+
+        Image image = ImageLoadFromPNG(&memory->permanentArena, &memory->temporaryArena, memory->standardErrorStream, watermelon, sizeof(watermelon));
+        RenderAllocateTexture(commandBuffer, 1, image.size, image.bytesPerPixel, image.pixels);
+
         memory->isInitialized = true;
     }
 
     RenderClearEntireScreen(commandBuffer, Black);
-    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(20, 20), Red);
+    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(200, 200), Red, 1);
 }
 
 // Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.
