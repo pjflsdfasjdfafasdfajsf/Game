@@ -147,7 +147,15 @@ pub fn build(b: *std.Build) void {
         addGameAssets(b, main_module, asset_preprocessor_executable);
     }
 
-    // TODO: run step
+    //
+
+    const run_main_executable = b.addRunArtifact(main_executable);
+    if (b.args) |args| {
+        run_main_executable.addArgs(args);
+    }
+
+    const run_step = b.step("run", "Run the game");
+    run_step.dependOn(&run_main_executable.step);
 }
 
 fn addGameAssets(b: *std.Build, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {
