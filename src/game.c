@@ -1,6 +1,5 @@
 #include "game_platform.h"
 #include "game_png.h"
-#include <stdio.h>
 
 #if defined(WIN32)
 #define EXPORTED __declspec(dllexport)

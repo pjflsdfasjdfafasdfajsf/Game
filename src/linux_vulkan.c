@@ -24,11 +24,11 @@ typedef struct {
 } VulkanPushConstant;
 
 static u8 vertexShaderData[] = {
-#include "BasicGeometry.vert.h"
+#include "BasicGeometry.vert.spv.h"
 };
 
 static u8 fragmentShaderData[] = {
-#include "BasicGeometry.frag.h"
+#include "BasicGeometry.frag.spv.h"
 };
 
 static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryPropertyFlags properties) {
@@ -145,7 +145,9 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
 #if defined(DEBUG)
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userData) {
-    Unused(severity); Unused(type); Unused(userData);
+    Unused(severity);
+    Unused(type);
+    Unused(userData);
     printf("%s\n", data->pMessage);
 
     return VK_FALSE;
@@ -231,7 +233,6 @@ static void VulkanPhysicalDevicePick(Vulkan *vulkan) {
 
     if (!vulkan->physicalDevice) {
         printf("WARNING: I did not find a dedicated GPU!\n");
-
         vulkan->physicalDevice = devices[0];
     }
 
@@ -539,9 +540,9 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = MAX_TEXTURES * FRAME_COUNT,
-        },  
+        },
     };
-    
+
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = FRAME_COUNT,
@@ -561,11 +562,11 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = MAX_TEXTURES,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        },  
+        },
     };
 
     VkDescriptorBindingFlags descriptorBindingFlags[] = {
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,  
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,
     };
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetBindingFlagsInfo = {
@@ -588,9 +589,9 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     }
 
     VkDescriptorSetLayout perSetLayouts[] = {
-        vulkan->descriptorLayout,  
-        vulkan->descriptorLayout,  
-        vulkan->descriptorLayout,  
+        vulkan->descriptorLayout,
+        vulkan->descriptorLayout,
+        vulkan->descriptorLayout,
     };
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
@@ -651,7 +652,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkVertexInputBindingDescription bindingDescription = {
         .binding = 0,
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-        .stride = sizeof(Vertex), 
+        .stride = sizeof(Vertex),
     };
 
     VkVertexInputAttributeDescription attributeDescription[] = {
@@ -749,7 +750,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
 
     VkPushConstantRange pushConstantRange = {
         .size = sizeof(VulkanPushConstant),
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,  
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
     };
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
@@ -799,8 +800,8 @@ static void VulkanSamplerCreate(Vulkan *vulkan) {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .magFilter = VK_FILTER_NEAREST,
         .minFilter = VK_FILTER_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,  
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,  
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .maxAnisotropy = 1.0f,
     };
@@ -846,13 +847,15 @@ static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
     vulkan->vertexCount = 0;
     vulkan->vertexCapacity = 4096;
     vulkan->vertexBuffer = VulkanBufferHostVisibleCreate(vulkan, vulkan->vertexCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, (void **)&vulkan->vertexData);
-    
+
     vulkan->frameIndex = 0;
     vulkan->textureCount = 0;
 }
 
 // NOTE: divide this into windows and linux versions for the future
 void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
+    MemoryZero(vulkan, sizeof(Vulkan));
+
     void *libVulkan = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
     if (!libVulkan) {
         printf("ERROR: Could not load libvulkan.so.1: %s\n", dlerror());
@@ -892,7 +895,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     VkImageCreateInfo imageCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = VK_IMAGE_TYPE_2D,
-        .extent = { size.width, size.height, 1 },
+        .extent = {size.width, size.height, 1},
         .mipLevels = 1,
         .arrayLayers = 1,
         .format = VK_FORMAT_R8G8B8A8_SRGB,
@@ -900,7 +903,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .samples = VK_SAMPLE_COUNT_1_BIT,  
+        .samples = VK_SAMPLE_COUNT_1_BIT,
     };
 
     if (vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle) != VK_SUCCESS) {
@@ -950,7 +953,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     u8 *mappedData;
     VulkanBuffer stagingBuffer = VulkanBufferHostVisibleCreate(vulkan, size.width * size.height * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, (void **)&mappedData);
-   
+
     const u8 *sourcePixels = (const u8 *)pixels;
     for (u32 y = 0; y < size.height; ++y) {
         u8 *destinationRow = mappedData + (y * size.width * 4);
@@ -974,7 +977,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     VkCommandPoolCreateInfo commandPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-        .queueFamilyIndex = vulkan->queueFamilies.graphicsIndex,  
+        .queueFamilyIndex = vulkan->queueFamilies.graphicsIndex,
     };
 
     if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool) != VK_SUCCESS) {
@@ -987,7 +990,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = commandPool,
         .commandBufferCount = 1,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,  
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
     };
 
     if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer) != VK_SUCCESS) {
@@ -998,7 +1001,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,  
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
 
     if (vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
@@ -1025,7 +1028,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
     VkBufferImageCopy copyRegion = {
-        .imageExtent = (VkExtent3D){ size.width, size.height, 1 },
+        .imageExtent = (VkExtent3D){size.width, size.height, 1},
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .layerCount = 1,
@@ -1035,7 +1038,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     vulkan->vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.handle, result.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
     imageMemoryBarrier = (VkImageMemoryBarrier){
-      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1061,7 +1064,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     VkSubmitInfo submitInfo = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
-        .pCommandBuffers = &commandBuffer,  
+        .pCommandBuffers = &commandBuffer,
     };
 
     if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
@@ -1111,7 +1114,7 @@ static void VulkanFramePassTransfer(Vulkan *vulkan, const RenderCommandBuffer *c
     while (memoryOffset < commandBuffer->currentOffset) {
         RenderCommandHeader *header = (RenderCommandHeader *)(commandBuffer->basePointer + memoryOffset);
 
-         if (header->size == 0 || memoryOffset + header->size > commandBuffer->currentOffset) {
+        if (header->size == 0 || memoryOffset + header->size > commandBuffer->currentOffset) {
             break;
         }
 
@@ -1120,7 +1123,7 @@ static void VulkanFramePassTransfer(Vulkan *vulkan, const RenderCommandBuffer *c
             VulkanTextureCreate(vulkan, command->index, command->size, command->bytesPerPixel, command->pixels);
         }
 
-        memoryOffset += header->size; 
+        memoryOffset += header->size;
     }
 }
 
@@ -1139,11 +1142,16 @@ static void VulkanFramePassRender(Vulkan *vulkan, const RenderCommandBuffer *com
             RenderCommandClearEntireScreen *command = (RenderCommandClearEntireScreen *)header;
 
             vulkan->clearColor = (VkClearValue){
-                .color = {{ command->color.r, command->color.g, command->color.b, command->color.a, }},
+                .color = {{
+                    command->color.r,
+                    command->color.g,
+                    command->color.b,
+                    command->color.a,
+                }},
             };
-                
+
         } break;
-        
+
         case RenderCommandType_DrawRectangle: {
             RenderCommandDrawRectangle *command = (RenderCommandDrawRectangle *)header;
 
@@ -1171,14 +1179,14 @@ static void VulkanFramePassRender(Vulkan *vulkan, const RenderCommandBuffer *com
                 vulkan->vkCmdBindVertexBuffers(frameData->commandBuffer, 0, 1, &vulkan->vertexBuffer.handle, &offset);
 
                 VulkanPushConstant pushConstant = {
-                    .textureIndex = command->texture,  
+                    .textureIndex = command->texture,
                 };
 
                 vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
-    
+
                 vulkan->vkCmdDraw(frameData->commandBuffer, 6, 1, 0, 0);
 
-                vulkan->vertexCount += verticesPerRectangle;            
+                vulkan->vertexCount += verticesPerRectangle;
             }
         } break;
         }
@@ -1217,7 +1225,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
     if (vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
         printf("ERROR: could not beging command buffer.\n");
     }
-    
+
     VkImageMemoryBarrier imageMemoryBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1276,7 +1284,6 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 
     vulkan->vkCmdBindPipeline(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipeline);
     vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 0, 1, &vulkan->descriptorSets[vulkan->frameIndex], 0, 0);
-
 
     return true;
 }

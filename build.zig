@@ -46,7 +46,7 @@ pub fn build(b: *std.Build) void {
     main_module.addCSourceFiles(.{
         .files = switch (target.result.os.tag) {
             .windows => &.{ "src/win32.c", "src/win32_d3d12.c" },
-            .linux => &.{"src/linux.c"},
+            .linux => &.{ "src/linux.c", "src/linux_vulkan.c" },
             else => unreachable,
         },
     });
@@ -70,6 +70,7 @@ pub fn build(b: *std.Build) void {
                 .{ "src/hlsl/BasicGeometry.hlsl", "VSMain", "vs_6_6", "BasicGeometryVS.h" },
                 .{ "src/hlsl/BasicGeometry.hlsl", "PSMain", "ps_6_6", "BasicGeometryPS.h" },
             }) |shader| {
+                // NOTE: would have used b.addSystemCommand if it did not require initial argv[0]
                 const run = std.Build.Step.Run.create(b, "dxc");
                 run.addFileArg(dxc);
                 run.addArgs(&.{ "-T", shader[2], "-E", shader[1], "-Fh" });
@@ -97,6 +98,8 @@ pub fn build(b: *std.Build) void {
         },
 
         .linux => {
+            // NOTE: unlike dxc, there are no prebuilt binaries for glslc so we will have to hope that user has it in their
+            // PATH
             const wayland_protocols = b.run(&.{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" });
             const xdg_shell_xml = b.pathJoin(&.{ std.mem.trim(u8, wayland_protocols, "\n"), "stable/xdg-shell/xdg-shell.xml" });
 
@@ -109,6 +112,15 @@ pub fn build(b: *std.Build) void {
                 const run = b.addSystemCommand(&.{ "wayland-scanner", "private-code", xdg_shell_xml });
                 break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.c");
             } });
+
+            inline for (.{
+                .{ "src/glsl/BasicGeometry.vert", "BasicGeometry.vert.spv" },
+                .{ "src/glsl/BasicGeometry.frag", "BasicGeometry.frag.spv" },
+            }) |shader| {
+                const run = b.addSystemCommand(&.{ "glslc", shader[0] });
+                const compiled_spirv_path = run.addPrefixedOutputFileArg("-o", shader[1]);
+                preprocessAsset(b, compiled_spirv_path, shader[1], main_module, asset_preprocessor_executable);
+            }
 
             main_module.linkSystemLibrary("wayland-client", .{});
             main_module.linkSystemLibrary("asound", .{});
@@ -191,9 +203,12 @@ fn addGameAssets(b: *std.Build, module: *std.Build.Module, asset_preprocessor: *
             continue;
         }
 
-        const asset_path = b.pathJoin(&.{ "assets", entry.path });
-        const run = b.addRunArtifact(asset_preprocessor);
-        run.addFileArg(b.path(asset_path));
-        module.addIncludePath(run.addOutputFileArg(b.fmt("{s}.h", .{std.fs.path.basename(entry.path)})).dirname());
+        preprocessAsset(b, b.path(b.pathJoin(&.{ "assets", entry.path })), entry.basename, module, asset_preprocessor);
     }
+}
+
+fn preprocessAsset(b: *std.Build, path: std.Build.LazyPath, basename: []const u8, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {
+    const run = b.addRunArtifact(asset_preprocessor);
+    run.addFileArg(path);
+    module.addIncludePath(run.addOutputFileArg(b.fmt("{s}.h", .{basename})).dirname());
 }
