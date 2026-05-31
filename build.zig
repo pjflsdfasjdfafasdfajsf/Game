@@ -158,6 +158,7 @@ pub fn build(b: *std.Build) void {
     //
 
     const run_main_executable = b.addRunArtifact(main_executable);
+    run_main_executable.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_main_executable.addArgs(args);
     }
