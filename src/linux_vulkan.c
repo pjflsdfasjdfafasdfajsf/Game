@@ -30,6 +30,73 @@ static u8 fragmentShaderData[] = {
 #include "BasicGeometry.frag.h"
 };
 
+static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vulkan->vkGetPhysicalDeviceMemoryProperties(vulkan->physicalDevice, &memoryProperties);
+
+    for (u32 i = 0; i < memoryProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
+static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize size, VkBufferUsageFlags flags, void **mapped) {
+    VulkanBuffer result = {
+        .size = size,
+    };
+
+    VkBufferCreateInfo bufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .usage = flags,
+        .size = size,
+    };
+
+    if (vulkan->vkCreateBuffer(vulkan->logicalDevice, &bufferCreateInfo, 0, &result.handle) != VK_SUCCESS) {
+        printf("ERROR: failed to create vulkan host visible buffer.\n");
+
+        return result;
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vulkan->vkGetBufferMemoryRequirements(vulkan->logicalDevice, result.handle, &memoryRequirements);
+
+    VkMemoryAllocateInfo allocationInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memoryRequirements.size,
+        .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+    };
+
+    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
+        printf("ERROR: failed to allocate vulkan memory.\n");
+
+        return result;
+    }
+
+    if (vulkan->vkBindBufferMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
+        printf("ERROR: failed to bind vulkan host visible buffer.\n");
+
+        return result;
+    }
+
+    if (vulkan->vkMapMemory(vulkan->logicalDevice, result.memory, 0, result.size, 0, mapped) != VK_SUCCESS) {
+        printf("ERROR: failed to map vulkan host visible memroy.\n");
+
+        return result;
+    }
+
+    return result;
+}
+
+static void VulkanBufferHostVisibleDestroy(Vulkan *vulkan, VulkanBuffer buffer) {
+    vulkan->vkUnmapMemory(vulkan->logicalDevice, buffer.memory);
+    vulkan->vkFreeMemory(vulkan->logicalDevice, buffer.memory, 0);
+    vulkan->vkDestroyBuffer(vulkan->logicalDevice, buffer.handle, 0);
+}
+
 static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateInstance, const char *platformExtension) {
     const char *extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
@@ -230,19 +297,6 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 
         return;
     }
-}
-
-static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memoryProperties;
-    vulkan->vkGetPhysicalDeviceMemoryProperties(vulkan->physicalDevice, &memoryProperties);
-
-    for (u32 i = 0; i < memoryProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-
-    return 0;
 }
 
 static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
@@ -593,8 +647,39 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
         },
     };
 
+    VkVertexInputBindingDescription bindingDescription = {
+        .binding = 0,
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        .stride = sizeof(Vertex), 
+    };
+
+    VkVertexInputAttributeDescription attributeDescription[] = {
+        {
+            .binding = 0,
+            .location = 0,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = 0, // x, y, z
+        },
+        {
+            .binding = 0,
+            .location = 1,
+            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .offset = sizeof(f32) * 3, // r, g, b, a
+        },
+        {
+            .binding = 0,
+            .location = 2,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = sizeof(f32) * 7, // u, v
+        },
+    };
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &bindingDescription,
+        .vertexAttributeDescriptionCount = ARRAY_COUNT(attributeDescription),
+        .pVertexAttributeDescriptions = attributeDescription,
     };
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
@@ -756,6 +841,10 @@ static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
     VulkanDescriptorSetsCreate(vulkan);
     VulkanGraphicsPipelineCreate(vulkan);
     VulkanSamplerCreate(vulkan);
+
+    vulkan->vertexCount = 0;
+    vulkan->vertexCapacity = 4096;
+    vulkan->vertexBuffer = VulkanBufferHostVisibleCreate(vulkan, vulkan->vertexCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, (void **)&vulkan->vertexData);
     
     vulkan->frameIndex = 0;
     vulkan->textureCount = 0;
@@ -858,54 +947,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
         return 0;
     }
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemoy;
-
-    // NOTE: we always pad up to 4 bpp
-    VkDeviceSize stagingBufferSize = width * height * 4;
-
-    VkBufferCreateInfo stagingBufferCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = stagingBufferSize,
-        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
-
-    if (vulkan->vkCreateBuffer(vulkan->logicalDevice, &stagingBufferCreateInfo, 0, &stagingBuffer) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan staging buffer.\n");
-
-        return 0;
-    }
-
-    VkMemoryRequirements stagingMemoryRequirements;
-    vulkan->vkGetBufferMemoryRequirements(vulkan->logicalDevice, stagingBuffer, &stagingMemoryRequirements);
-
-    VkMemoryAllocateInfo stagingAllocationInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = stagingMemoryRequirements.size,
-        .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, stagingMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-    };
-
-    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &stagingAllocationInfo, 0, &stagingBufferMemoy) != VK_SUCCESS) {
-        printf("ERROR: failed to allocate vulkan staging buffer memory.\n");
-
-        return 0;
-    }
-
-    if (vulkan->vkBindBufferMemory(vulkan->logicalDevice, stagingBuffer, stagingBufferMemoy, 0) != VK_SUCCESS) {
-        printf("ERROR: failed to bind vulkan staging buffer memroy.\n");
-
-        return 0;
-    }
-
     u8 *mappedData;
-
-    if (vulkan->vkMapMemory(vulkan->logicalDevice, stagingBufferMemoy, 0, stagingBufferSize, 0, (void **)&mappedData) != VK_SUCCESS) {
-        printf("ERROR: failed to map vulkan staging buffer memory.\n");
-
-        return 0;
-    }
-
+    VulkanBuffer stagingBuffer = VulkanBufferHostVisibleCreate(vulkan, width * height * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, (void **)&mappedData);
+   
     const u8 *sourcePixels = (const u8 *)pixels;
     for (u32 y = 0; y < height; ++y) {
         u8 *destinationRow = mappedData + (y * width * 4);
@@ -922,7 +966,6 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
             }
         }
     }
-    vulkan->vkUnmapMemory(vulkan->logicalDevice, stagingBufferMemoy);
 
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
@@ -988,7 +1031,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
         },
     };
 
-    vulkan->vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, result.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+    vulkan->vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.handle, result.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
     imageMemoryBarrier = (VkImageMemoryBarrier){
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1033,8 +1076,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
     }
 
     vulkan->vkDestroyCommandPool(vulkan->logicalDevice, commandPool, 0);
-    vulkan->vkFreeMemory(vulkan->logicalDevice, stagingBufferMemoy, 0);
-    vulkan->vkDestroyBuffer(vulkan->logicalDevice, stagingBuffer, 0);
+    VulkanBufferHostVisibleDestroy(vulkan, stagingBuffer);
 
     u32 textureIndex = vulkan->textureCount;
     vulkan->textures[textureIndex] = result;
@@ -1089,13 +1131,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window) {
     if (vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
         printf("ERROR: could not beging command buffer.\n");
     }
-
-    return true;
-}
-
-void VulkanFrameEnd(Vulkan *vulkan) {
-    VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
-
+    
     VkImageMemoryBarrier imageMemoryBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1159,17 +1195,57 @@ void VulkanFrameEnd(Vulkan *vulkan) {
     vulkan->vkCmdBindPipeline(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipeline);
     vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 0, 1, &vulkan->descriptorSets[vulkan->frameIndex], 0, 0);
 
+
+    return true;
+}
+
+void VulkanRectangleDraw(Vulkan *vulkan, u32 textureId, Vector2 origin, Vector2 size, Vector4 color) {
+    VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
+    
+    const u32 verticesPerRectangle = 6;
+    if (vulkan->vertexCount + verticesPerRectangle > vulkan->vertexCapacity) {
+        return;
+    }
+
+    f32 leftEdge = origin.x;
+    f32 rightEdge = origin.x + size.width;
+    f32 topEdge = origin.y;
+    f32 bottomEdge = origin.y - size.height;
+
+    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 1.0f}};
+    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 1.0f}};
+    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 0.0f}};
+    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 0.0f}};
+
+    Vertex *currentVertexDestination = (Vertex *)vulkan->vertexData + vulkan->vertexCount;
+
+    currentVertexDestination[0] = topLeft;
+    currentVertexDestination[1] = topRight;
+    currentVertexDestination[2] = bottomLeft;
+    currentVertexDestination[3] = bottomLeft;
+    currentVertexDestination[4] = topRight;
+    currentVertexDestination[5] = bottomRight;
+
+    VkDeviceSize offset = vulkan->vertexCount * sizeof(Vertex);
+    vulkan->vkCmdBindVertexBuffers(frameData->commandBuffer, 0, 1, &vulkan->vertexBuffer.handle, &offset);
+
     VulkanPushConstant pushConstant = {
-        .textureIndex = 1,  
+        .textureIndex = textureId,  
     };
 
     vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
     
-    vulkan->vkCmdDraw(frameData->commandBuffer, 3, 1, 0, 0);
+    vulkan->vkCmdDraw(frameData->commandBuffer, 6, 1, 0, 0);
+
+    vulkan->vertexCount += verticesPerRectangle;
+}
+
+void VulkanFrameEnd(Vulkan *vulkan) {
+    VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
 
     vulkan->vkCmdEndRendering(frameData->commandBuffer);
 
-    imageMemoryBarrier = (VkImageMemoryBarrier){
+    VkImageMemoryBarrier imageMemoryBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
@@ -1236,5 +1312,6 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         return;
     }
 
+    vulkan->vertexCount = 0;
     vulkan->frameIndex = (vulkan->frameIndex + 1) % FRAME_COUNT;
 }

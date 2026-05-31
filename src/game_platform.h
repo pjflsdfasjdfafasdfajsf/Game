@@ -58,6 +58,8 @@ typedef struct {
             f32 z;
             f32 w;
         };
+
+        f32 e[4];
     };
 } Vector4;
 

@@ -30,7 +30,7 @@ endif
 # NOTE: Linux configuration.
 ifeq ($(PLATFORM),Linux)
     CC = clang
-    CFLAGS = -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -I $(GENERATED)
+    CFLAGS = -DDEBUG -fsanitize=address -g -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -I $(GENERATED)
     LIBRARIES = -lwayland-client -lasound -pthread
     
     SOURCES = $(SRC)/linux.c $(SRC)/linux_vulkan.c $(GENERATED)/xdg-shell-client-protocol.c $(SRC)/game_png.c $(SRC)/game_ttf.c $(SRC)/game_rectangle_pack.c

@@ -296,6 +296,9 @@ void AudioInitialize(LinuxAudio *audio) {
 
 void RunDraw(LinuxWayland *wayland, Vulkan *vulkan) {
     if (VulkanFrameBegin(vulkan, wayland)) {
+        VulkanRectangleDraw(vulkan, 1, (Vector2){.x = 0, .y = 0}, (Vector2){ .width = 0.5f, .height = 0.5f },
+                            (Vector4){ .r = 0.0f, .g = 0.0f, .b = 1.0f, .a = 1.0f});
+        
         VulkanFrameEnd(vulkan);
     }
 }

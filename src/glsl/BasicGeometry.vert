@@ -1,22 +1,16 @@
 
 #version 460
 
-layout (location = 0) out vec2 outUV;
+layout (location = 0) in vec3 inPosition;
+layout (location = 1) in vec4 inColor;
+layout (location = 2) in vec2 inUV;
 
-vec3 vertices[] = vec3[](
-    vec3(0.0f, -0.5f, 0.0f),
-    vec3(-0.5f, 0.5f, 0.0f),
-    vec3(0.5f, 0.5f, 0.0f)
-);
-
-vec2 uv[] = vec2[](
-    vec2(0.5f, 1.0f),
-    vec2(0.0f, 0.0f),
-    vec2(1.0f, 0.0f)       
-);
+layout (location = 0) out vec4 outColor;
+layout (location = 1) out vec2 outUV;
 
 void main() {
-    gl_Position = vec4(vertices[gl_VertexIndex], 1.0);
+    gl_Position = vec4(inPosition, 1.0);
 
-    outUV = uv[gl_VertexIndex];
+    outColor = inColor;
+    outUV = inUV;
 }

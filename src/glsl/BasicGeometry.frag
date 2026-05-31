@@ -3,7 +3,8 @@
 
 #extension GL_EXT_nonuniform_qualifier : enable
 
-layout (location = 0) in vec2 inUV;
+layout (location = 0) in vec4 inColor;
+layout (location = 1) in vec2 inUV;
 
 layout (location = 0) out vec4 outColor;
 
@@ -15,7 +16,7 @@ layout (push_constant) uniform PushConstant {
 
 void main() {
     if (textureIndex == 0) {
-        outColor = vec4(1.0, 0.0, 0.0, 1.0);
+        outColor = inColor;
     }
     else {
         vec4 textureColor = texture(inTextures[nonuniformEXT(textureIndex - 1)], inUV);
