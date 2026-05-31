@@ -170,6 +170,12 @@ pub fn build(b: *std.Build) void {
         addPlatformMacro(target, main_module);
     }
 
+    // NOTE: This is another workaround. This time around the fact that `bear` does not work with build.zig
+
+    const compile_flags_step = CompileFlagsStep.init(b, main_module);
+    compile_flags_step.step.dependOn(&main_executable.step);
+    b.getInstallStep().dependOn(&compile_flags_step.step);
+
     //
 
     const run_main_executable = b.addRunArtifact(main_executable);
@@ -212,3 +218,48 @@ fn processAsset(b: *std.Build, path: std.Build.LazyPath, basename: []const u8, m
     asset_preprocessor_run_step.addFileArg(path);
     module.addIncludePath(asset_preprocessor_run_step.addOutputFileArg(b.fmt("{s}.h", .{basename})).dirname());
 }
+
+const CompileFlagsStep = struct {
+    step: std.Build.Step,
+    module: *std.Build.Module,
+
+    fn init(b: *std.Build, module: *std.Build.Module) *CompileFlagsStep {
+        const compile_flags = b.allocator.create(CompileFlagsStep) catch @panic("OOM");
+        compile_flags.* = .{
+            .step = .init(.{
+                .id = .custom,
+                .name = "compile_flags.txt",
+                .owner = b,
+                .makeFn = make,
+            }),
+            .module = module,
+        };
+        return compile_flags;
+    }
+
+    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+        const compile_flags: *CompileFlagsStep = @fieldParentPtr("step", step);
+
+        const b: *std.Build = step.owner;
+        const io: std.Io = b.graph.io;
+
+        var file_write_buffer: [4096]u8 = undefined;
+
+        const file: std.Io.File = try std.Io.Dir.cwd().createFile(io, "compile_flags.txt", .{});
+        defer file.close(io);
+
+        var file_writer = file.writer(io, &file_write_buffer);
+        defer file_writer.flush() catch {};
+
+        for (compile_flags.module.include_dirs.items) |include_directory| {
+            const lazy_path = switch (include_directory) {
+                .path, .path_system, .path_after => |lazy_path| lazy_path,
+                else => continue,
+            };
+
+            const cache_path = try lazy_path.getPath4(b, step);
+            const full_path = b.pathResolve(&.{ cache_path.root_dir.path orelse ".", cache_path.sub_path });
+            try file_writer.interface.print("-I{s}\n", .{full_path});
+        }
+    }
+};
