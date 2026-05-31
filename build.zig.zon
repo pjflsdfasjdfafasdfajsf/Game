@@ -1,6 +1,7 @@
 .{
     .name = .Game,
-    .version = "0.16.0",
+    .version = "1.0.0",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         // NOTE: This is for case when you want to cross-compile to Windows.
