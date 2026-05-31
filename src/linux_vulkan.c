@@ -1,6 +1,7 @@
 
 #include "linux_vulkan.h"
 #include "game_platform.h"
+#include "game_types.h"
 #include "linux.h"
 
 #include <stdio.h>
@@ -126,10 +127,10 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
     VkInstanceCreateInfo instanceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &applicationInfo,
-        .enabledExtensionCount = ARRAY_COUNT(extensions),
+        .enabledExtensionCount = Array_Count(extensions),
         .ppEnabledExtensionNames = extensions,
 #if defined(DEBUG)
-        .enabledLayerCount = ARRAY_COUNT(layers),
+        .enabledLayerCount = Array_Count(layers),
         .ppEnabledLayerNames = layers,
 #endif
     };
@@ -178,7 +179,7 @@ static void VulkanQueueFamiliesFind(Vulkan *vulkan, VkPhysicalDevice physicalDev
     u32 count = 0;
     vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, 0);
 
-    count = MIN(count, 16);
+    count = Min(count, 16);
 
     VkQueueFamilyProperties families[16];
     vulkan->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, families);
@@ -215,7 +216,7 @@ static void VulkanPhysicalDevicePick(Vulkan *vulkan) {
     u32 count = 0;
     vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0);
 
-    count = MIN(count, 8);
+    count = Min(count, 8);
 
     VkPhysicalDevice devices[8];
     vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices);
@@ -288,7 +289,7 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .pNext = &indexingFeatures,
         .pQueueCreateInfos = queueCreateInfos,
         .queueCreateInfoCount = uniqueCount,
-        .enabledExtensionCount = ARRAY_COUNT(extensions),
+        .enabledExtensionCount = Array_Count(extensions),
         .ppEnabledExtensionNames = extensions,
     };
 
@@ -311,7 +312,7 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
     }
 
     // NOTE: There will be a segmentation fault if we don't clamp this because drivers can sometimes return just a lot of them.
-    result.formatCount = MIN(result.formatCount, 32);
+    result.formatCount = Min(result.formatCount, 32);
     vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
 
     vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
@@ -320,7 +321,7 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 
         return result;
     }
-    result.presentModeCount = MIN(result.presentModeCount, 8);
+    result.presentModeCount = Min(result.presentModeCount, 8);
     vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
 
     return result;
@@ -544,7 +545,7 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = FRAME_COUNT,
-        .poolSizeCount = ARRAY_COUNT(poolSizes),
+        .poolSizeCount = Array_Count(poolSizes),
         .pPoolSizes = poolSizes,
     };
 
@@ -569,14 +570,14 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetBindingFlagsInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-        .bindingCount = ARRAY_COUNT(descriptorBindings),
+        .bindingCount = Array_Count(descriptorBindings),
         .pBindingFlags = descriptorBindingFlags,
     };
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = &descriptorSetBindingFlagsInfo,
-        .bindingCount = ARRAY_COUNT(descriptorBindings),
+        .bindingCount = Array_Count(descriptorBindings),
         .pBindings = descriptorBindings,
     };
 
@@ -678,7 +679,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
         .pVertexBindingDescriptions = &bindingDescription,
-        .vertexAttributeDescriptionCount = ARRAY_COUNT(attributeDescription),
+        .vertexAttributeDescriptionCount = Array_Count(attributeDescription),
         .pVertexAttributeDescriptions = attributeDescription,
     };
 
@@ -736,7 +737,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
 
     VkPipelineDynamicStateCreateInfo dynamicState = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = ARRAY_COUNT(dynamicStates),
+        .dynamicStateCount = Array_Count(dynamicStates),
         .pDynamicStates = dynamicStates,
     };
 
@@ -769,7 +770,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &renderingCreateInfo,
-        .stageCount = ARRAY_COUNT(shaderStages),
+        .stageCount = Array_Count(shaderStages),
         .pStages = shaderStages,
         .pVertexInputState = &vertexInputInfo,
         .pInputAssemblyState = &inputAssembly,
@@ -1284,10 +1285,10 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
         .pCommandBuffers = &frameData->commandBuffer,
-        .waitSemaphoreCount = ARRAY_COUNT(waitSemaphores),
+        .waitSemaphoreCount = Array_Count(waitSemaphores),
         .pWaitSemaphores = waitSemaphores,
         .pWaitDstStageMask = waitStages,
-        .signalSemaphoreCount = ARRAY_COUNT(signalSemaphores),
+        .signalSemaphoreCount = Array_Count(signalSemaphores),
         .pSignalSemaphores = signalSemaphores,
     };
 
@@ -1302,7 +1303,7 @@ void VulkanFrameEnd(Vulkan *vulkan) {
         .swapchainCount = 1,
         .pSwapchains = &vulkan->swapchain.handle,
         .pImageIndices = &vulkan->imageIndex,
-        .waitSemaphoreCount = ARRAY_COUNT(signalSemaphores),
+        .waitSemaphoreCount = Array_Count(signalSemaphores),
         .pWaitSemaphores = signalSemaphores,
     };
 

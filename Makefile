@@ -68,7 +68,7 @@ ifeq ($(PLATFORM),Linux)
     WAYLAND_PROTOCOLS = $(shell pkg-config --variable=pkgdatadir wayland-protocols)
     XDG_SHELL_XML = $(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml
 
-    PLATFORM_SOURCES = $(SRC)/linux.c $(GENERATED)/xdg-shell-client-protocol.c
+    PLATFORM_SOURCES = $(SRC)/linux.c $(SRC)/linux_vulkan.c $(GENERATED)/xdg-shell-client-protocol.c
     MSVC_SRC =
     RES_FILE =
     OS_PREREQ = $(GENERATED)/xdg-shell-client-protocol.h $(GENERATED)/xdg-shell-client-protocol.c
@@ -142,6 +142,16 @@ $(GENERATED)/BasicGeometryVS.h: $(SRC)/hlsl/BasicGeometry.hlsl | directories
 $(GENERATED)/BasicGeometryPS.h: $(SRC)/hlsl/BasicGeometry.hlsl | directories
 	@dxc.exe -T ps_6_6 -E PSMain -Fh $@ $<
 
+$(GENERATED)/BasicGeometry.vert.h: $(SRC)/glsl/BasicGeometry.vert | directories
+	@glslc $< -o $(GENERATED)/BasicGeometry.vert.spv
+	@$(RUN_ASSET_PREPROCESS) $(GENERATED)/BasicGeometry.vert.spv $@
+	@rm $(GENERATED)/BasicGeometry.vert.spv
+
+$(GENERATED)/BasicGeometry.frag.h: $(SRC)/glsl/BasicGeometry.frag | directories
+	@glslc $< -o $(GENERATED)/BasicGeometry.frag.spv
+	@$(RUN_ASSET_PREPROCESS) $(GENERATED)/BasicGeometry.frag.spv $@
+	@rm $(GENERATED)/BasicGeometry.frag.spv
+
 $(BUILD)/app.res: $(SRC)/win32/app.rc | directories
 	@rc.exe /nologo /fo $@ $<
 
@@ -150,29 +160,3 @@ $(GENERATED)/xdg-shell-client-protocol.h: | directories
 
 $(GENERATED)/xdg-shell-client-protocol.c: $(GENERATED)/xdg-shell-client-protocol.h | directories
 	@wayland-scanner private-code "$(XDG_SHELL_XML)" $@
-
-$(GENERATED)/BasicGeometry.vert.h: $(SRC)/glsl/BasicGeometry.vert
-	@glslc $< -o $(GENERATED)/BasicGeometry.vert.spv
-	@$(ASSET_TOOL) $(GENERATED)/BasicGeometry.vert.spv $@
-	@rm $(GENERATED)/BasicGeometry.vert.spv
-	
-$(GENERATED)/BasicGeometry.frag.h: $(SRC)/glsl/BasicGeometry.frag
-	@glslc $< -o $(GENERATED)/BasicGeometry.frag.spv
-	@$(ASSET_TOOL) $(GENERATED)/BasicGeometry.frag.spv $@
-	@rm $(GENERATED)/BasicGeometry.frag.spv
-
-endif # ($(PLATFORM),Windows)
-
-# NOTE: Executable.
-
-game: $(TARGET)
-
-ifeq ($(PLATFORM),Windows)
-$(TARGET): $(SOURCES) os_prerequisites assets
-	@cl.exe $(CFLAGS) /Fo$(BUILD)/ /Fe:$@ $(SOURCES) $(BUILD)/app.res $(LIBRARIES) $(LDFLAGS)
-
-else # Linux
-
-$(TARGET): $(SOURCES) os_prerequisites assets
-	@$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LIBRARIES)
-endif # ($(PLATFORM),Windows)

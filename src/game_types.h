@@ -36,6 +36,7 @@ typedef float f32;
 #define Min(x, y) ((x) > (y) ? (y) : (x))
 #define Max(x, y) ((x) < (y) ? (y) : (x))
 #define Unused(x) (void)x
+#define Array_Count(arr) (sizeof((arr)) / sizeof((arr)[0]))
 
 #define Kilobytes(value) ((value) * 1024ULL)
 #define Megabytes(value) (Kilobytes(value) * 1024ULL)

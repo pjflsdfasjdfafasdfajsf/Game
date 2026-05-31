@@ -13,8 +13,10 @@
 #include <wayland-client-core.h>
 
 #include "linux.h"
+#include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
+#include "game_png.h"
 
 static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
     Unused(xdgToplevel), Unused(width), Unused(height);
@@ -113,42 +115,42 @@ static const struct wl_registry_listener registryListener = {
 LinuxWayland WindowCreate(const char *title) {
     LinuxWayland wayland = {0};
 
-    result.width = DEFAULT_WINDOW_WIDTH;
-    result.height = DEFAULT_WINDOW_HEIGHT;
+    wayland.width = DEFAULT_WINDOW_WIDTH;
+    wayland.height = DEFAULT_WINDOW_HEIGHT;
 
-    result.display = wl_display_connect(0);
-    if (!result.display) {
+    wayland.display = wl_display_connect(0);
+    if (!wayland.display) {
         fprintf(stderr, "Could not connect to Wayland display.\n");
-        return result;
+        return wayland;
     }
 
-    result.registry = wl_display_get_registry(result.display);
-    wl_registry_add_listener(result.registry, &registryListener, &result);
+    wayland.registry = wl_display_get_registry(wayland.display);
+    wl_registry_add_listener(wayland.registry, &registryListener, &wayland);
 
-    wl_display_roundtrip(result.display);
+    wl_display_roundtrip(wayland.display);
 
-    if (!result.compositor || !result.xdgWmBase) {
+    if (!wayland.compositor || !wayland.xdgWmBase) {
         fprintf(stderr, "Failed to bind Wayland compositor or xdg_wm_base.\n");
-        return result;
+        return wayland;
     }
 
-    result.surface = wl_compositor_create_surface(result.compositor);
-    result.xdgSurface = xdg_wm_base_get_xdg_surface(result.xdgWmBase, result.surface);
-    xdg_surface_add_listener(result.xdgSurface, &xdgSurfaceListener, &result);
+    wayland.surface = wl_compositor_create_surface(wayland.compositor);
+    wayland.xdgSurface = xdg_wm_base_get_xdg_surface(wayland.xdgWmBase, wayland.surface);
+    xdg_surface_add_listener(wayland.xdgSurface, &xdgSurfaceListener, &wayland);
 
-    result.xdgToplevel = xdg_surface_get_toplevel(result.xdgSurface);
-    xdg_toplevel_add_listener(result.xdgToplevel, &xdgToplevelListener, &result);
+    wayland.xdgToplevel = xdg_surface_get_toplevel(wayland.xdgSurface);
+    xdg_toplevel_add_listener(wayland.xdgToplevel, &xdgToplevelListener, &wayland);
 
-    xdg_toplevel_set_title(result.xdgToplevel, title);
-    xdg_toplevel_set_app_id(result.xdgToplevel, "wayland-game-linux");
+    xdg_toplevel_set_title(wayland.xdgToplevel, title);
+    xdg_toplevel_set_app_id(wayland.xdgToplevel, "wayland-game-linux");
 
-    wl_surface_commit(result.surface);
-    wl_display_roundtrip(result.display);
+    wl_surface_commit(wayland.surface);
+    wl_display_roundtrip(wayland.display);
 
-    result.isRunning = true;
-    result.isFocused = true;
+    wayland.isRunning = true;
+    wayland.isFocused = true;
 
-    return result;
+    return wayland;
 }
 
 // NOTE: Audio
@@ -349,8 +351,8 @@ int main() {
     Vulkan vulkan;
     VulkanInitialize(&vulkan, &wayland);
 
-    usize permanentArenaSize = MEGABYTES(64);
-    usize temporaryArenaSize = MEGABYTES(256);
+    usize permanentArenaSize = Megabytes(64);
+    usize temporaryArenaSize = Megabytes(256);
 
     void *permanentMemoryBlock = malloc(permanentArenaSize);
     void *temporaryMemoryBlock = malloc(temporaryArenaSize);
@@ -361,13 +363,22 @@ int main() {
     MemoryArena temporaryArena;
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
+    usize errorStreamSize = Kilobytes(64);
+    usize infoStreamSize = Kilobytes(256);
+
+    MemoryStream *errorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+    MemoryStream *infoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+
+    MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
+    MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
+
     static const u8 watermelonImage[] = {
 #include "watermelon.png.h"  
     };
 
-    Image image = ImageLoadFromPNG(&permanentArena, &temporaryArena, watermelonImage, sizeof(watermelonImage));
+    Image image = ImageLoadFromPNG(&permanentArena, &temporaryArena, errorStream, watermelonImage, sizeof(watermelonImage));
     u32 watermelonTexture = VulkanTextureCreate(&vulkan, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
-    UNUSED(watermelonTexture);
+    Unused(watermelonTexture);
 
     RunUpdate(&wayland, &audio, &vulkan);
 
