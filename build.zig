@@ -49,14 +49,18 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const main_executable = b.addExecutable(.{ .name = "Game", .root_module = main_module });
+    const main_executable = b.addExecutable(.{
+        .name = "Game",
+        .root_module = main_module,
+    });
+
     b.installArtifact(main_executable);
 
     switch (target.result.os.tag) {
         .windows => {
             // NOTE: This is for cross-compilation
             const dxc = switch (b.graph.host.result.os.tag) {
-                .windows => (b.lazyDependency("dxc-win32", .{}) orelse return).path("bin/dxc.exe"),
+                .windows => (b.lazyDependency("dxc-win32", .{}) orelse return).path("bin/x64/dxc.exe"),
                 .linux => (b.lazyDependency("dxc-linux", .{}) orelse return).path("bin/dxc"),
                 else => unreachable,
             };
@@ -71,6 +75,10 @@ pub fn build(b: *std.Build) void {
                 main_module.addIncludePath(run.addOutputFileArg(shader[3]).dirname());
                 run.addFileArg(b.path(shader[0]));
             }
+
+            main_module.addWin32ResourceFile(.{
+                .file = b.path("src/win32/app.rc"),
+            });
 
             main_module.linkSystemLibrary("kernel32", .{ .use_pkg_config = .no });
             main_module.linkSystemLibrary("user32", .{ .use_pkg_config = .no });
