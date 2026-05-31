@@ -1,3 +1,5 @@
+// TODO:
+// * WAV files parsing.
 #include "game_platform.h"
 #include "game_png.h"
 

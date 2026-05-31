@@ -1,4 +1,5 @@
-
+// TODO:
+// * Flip Y.
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <assert.h>
-#include <vulkan/vulkan_core.h>
 
 typedef struct {
     VkSurfaceCapabilitiesKHR capabilities;

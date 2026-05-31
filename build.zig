@@ -1,6 +1,6 @@
 // TODO:
-// * Have all assets merged into one game_assets.h so that game.c can just #include "game_assets.h", since these arrays embedding assets in the middle of code look
-// rather ugly.
+// * Have all assets merged into one game_assets.h so that game.c can just #include "game_assets.h", since these arrays embedding
+// assets in the middle of code look rather ugly.
 const std = @import("std");
 
 const game_source_files: []const []const u8 = &.{
