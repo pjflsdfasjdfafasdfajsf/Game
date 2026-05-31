@@ -102,8 +102,7 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
 
     d3d12->renderTargetViewDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap);
 
     for (index = 0; index < (UINT)FRAME_COUNT; index++) {
         hresult = IDXGISwapChain3_GetBuffer(d3d12->swapChain, index, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->renderTargets[index]));
@@ -435,8 +434,7 @@ u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 index, Vector2U size, u32 bytes
     shaderResourceViewDescription.Texture2D.MipLevels = 1;
 
     UINT descriptorIncrementSize = ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    D3D12_CPU_DESCRIPTOR_HANDLE heapHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->descriptorHeap, &heapHandle);
+    D3D12_CPU_DESCRIPTOR_HANDLE heapHandle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->descriptorHeap);
     heapHandle.ptr += (index * descriptorIncrementSize);
 
     ID3D12Device_CreateShaderResourceView(d3d12->device, d3d12->textures[index], &shaderResourceViewDescription, heapHandle);
@@ -467,8 +465,7 @@ static void D3D12FramePassTransfer(Win32Direct12 *d3d12, const RenderCommandBuff
 }
 
 static void D3D12FramePassRender(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer) {
-    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap);
     renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
 
     usize memoryOffset = 0;
@@ -571,8 +568,7 @@ void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer) {
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     ID3D12GraphicsCommandList_ResourceBarrier(d3d12->commandList, 1, &barrier);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap, &renderTargetViewHandle);
+    D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(d3d12->renderTargetViewHeap);
     renderTargetViewHandle.ptr += d3d12->frameIndex * d3d12->renderTargetViewDescriptorSize;
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);

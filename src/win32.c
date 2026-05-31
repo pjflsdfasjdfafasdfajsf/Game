@@ -10,65 +10,6 @@
 
 #include "game_platform.h"
 #include "game_types.h"
-#include "game.h"
-
-#if defined(DEBUG)
-static HMODULE GameDLL = 0;
-static UpdateAndRenderFunction *GameUpdateAndRender = 0;
-static GetSoundSamplesFunction *GameGetSoundSamples = 0;
-
-// NOTE: Returns absolute path to a file located in the same folder as the running .exe
-// 
-// For example, if the game is running from "C:\Project\build\Game.exe", and you ask 
-// for "Game.dll", this function returns "C:\Project\build\Game.dll"
-static void AbsoluteLibraryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
-    MemoryZero(destinationBuffer, destinationCapacity);
-
-    char executablePath[MAX_PATH];
-    ZeroArray(executablePath);
-    // NOTE: No W here :( because our String API does not work with wide chars
-    GetModuleFileNameA(0, executablePath, sizeof(executablePath));
-
-    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '\\');
-    if (finalSlashIndex == -1) {
-        finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
-    }
-
-    if (finalSlashIndex != -1) {
-        executablePath[finalSlashIndex + 1] = '\0';
-    }
-
-    StringCopy(destinationBuffer, destinationCapacity, executablePath);
-    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
-}
-
-static void GameCodeLoad() {
-    if (GameDLL) {
-        FreeLibrary(GameDLL);
-
-        GameDLL = 0;
-        GameUpdateAndRender = 0;
-        GameGetSoundSamples = 0;
-    }
-
-    char sourceLibraryPath[MAX_PATH];
-    char temporaryLibraryPath[MAX_PATH];
-
-    AbsoluteLibraryPath("Game.dll", sourceLibraryPath, sizeof(sourceLibraryPath));
-    AbsoluteLibraryPath("GameTEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
-
-    CopyFileA(sourceLibraryPath, temporaryLibraryPath, FALSE);
-
-    GameDLL = LoadLibraryA(temporaryLibraryPath);
-    if (GameDLL) {
-        GameUpdateAndRender = (UpdateAndRenderFunction *)GetProcAddress(GameDLL, "UpdateAndRender");
-        GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");
-    }
-}
-#else
-#define GameUpdateAndRender UpdateAndRender
-#define GameGetSoundSamples GetSoundSamples
-#endif
 
 void ErrorShowLast(const wchar_t *functionName) {
     if (!functionName) {
@@ -110,6 +51,78 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
 
     ExitProcess(1);
 }
+
+#if defined(DEBUG)
+static HMODULE GameDLL = 0;
+static UpdateAndRenderFunction *GameUpdateAndRender = 0;
+static GetSoundSamplesFunc *GameGetSoundSamples = 0;
+
+// NOTE: Returns absolute path to a file located in the same folder as the running .exe
+//
+// For example, if the game is running from "C:\Project\build\Game.exe", and you ask
+// for "Game.dll", this function returns "C:\Project\build\Game.dll"
+static void AbsoluteLibraryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
+    MemoryZero(destinationBuffer, destinationCapacity);
+
+    char executablePath[MAX_PATH];
+    ZeroArray(executablePath);
+    // NOTE: No W here :( because our String API does not work with wide chars
+    GetModuleFileNameA(0, executablePath, sizeof(executablePath));
+
+    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '\\');
+    if (finalSlashIndex == -1) {
+        finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
+    }
+
+    if (finalSlashIndex != -1) {
+        executablePath[finalSlashIndex + 1] = '\0';
+    }
+
+    StringCopy(destinationBuffer, destinationCapacity, executablePath);
+    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
+}
+
+static bool GameCodeLoad() {
+    if (GameDLL) {
+        FreeLibrary(GameDLL);
+
+        GameDLL = 0;
+        GameUpdateAndRender = 0;
+        GameGetSoundSamples = 0;
+    }
+
+    char sourceLibraryPath[MAX_PATH];
+    char temporaryLibraryPath[MAX_PATH];
+
+    AbsoluteLibraryPath("Game.dll", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibraryPath("GameTEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+
+    CopyFileA(sourceLibraryPath, temporaryLibraryPath, FALSE);
+
+    GameDLL = LoadLibraryA(temporaryLibraryPath);
+    if (!GameDLL) {
+        ErrorShowLast(L"LoadLibraryA");
+
+        return false;
+    }
+
+    GameUpdateAndRender = (UpdateAndRenderFunction *)GetProcAddress(GameDLL, "UpdateAndRender");
+    if (!GameUpdateAndRender) {
+        ErrorShowLast(L"GetProcAddress UpdateAndRender");
+
+        return false;
+    }
+    GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");
+    if (!GameGetSoundSamples) {
+        ErrorShowLast(L"GetProcAddress GetSoundSamples");
+
+        return false;
+    }
+}
+#else
+#define GameUpdateAndRender UpdateAndRender
+#define GameGetSoundSamples GetSoundSamples
+#endif
 
 // NOTE: Audio API
 
@@ -414,7 +427,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, 
     }
 }
 
-void mainCRTStartup() {
+void wWinMainCRTStartup() {
     HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
@@ -470,7 +483,9 @@ void mainCRTStartup() {
     gameMemory.isInitialized = false;
 
 #if defined(DEBUG)
-    GameCodeLoad();
+    if (!GameCodeLoad()) {
+        ExitProcess(1);
+    }
 #endif
 
     WindowShow(window);

@@ -1,0 +1,22 @@
+.{
+    .name = .Game,
+    .version = "0.16.0",
+
+    .dependencies = .{
+        // NOTE: This is for case when you want to cross-compile to Windows.
+        .@"dxc-linux" = .{
+            .url = "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/linux_dxc_2026_02_20.x86_64.tar.gz",
+            .hash = "N-V-__8AAKzqFwKQEY4pTRA8UbZpzH2_vdXUel_oK8peQDjD",
+            .lazy = true,
+        },
+        // NOTE: And this is just for native Windows.
+        .@"dxc-win32" = .{
+            .url = "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+            .hash = "N-V-__8AADDbugPLxR0FEAqeAI8CNrcbb863kmQ1S5T-wrI2",
+            .lazy = true,
+        },
+    },
+    // NOTE: I will keep this empty because this is not a library or something you would want to fetch.
+    .paths = .{""},
+    .fingerprint = 0x83199eb2d5d7fb4c,
+}
