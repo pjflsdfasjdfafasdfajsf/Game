@@ -1,8 +1,12 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    // TODO: Fill in the whitelist.
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{
+        .whitelist = &.{
+            .{ .os_tag = .windows },
+            .{ .os_tag = .linux },
+        },
+    });
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
 
     const asset_preprocessor_module = b.createModule(.{
