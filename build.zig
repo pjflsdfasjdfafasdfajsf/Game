@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) void {
             .root_module = game_module,
             .linkage = .dynamic,
         });
-        b.installArtifact(game_library);
+        b.getInstallStep().dependOn(&b.addInstallArtifact(game_library, .{ .dest_dir = .{ .override = .bin } }).step);
     } else {
         main_module.addCSourceFiles(.{ .files = game_source_files });
         addGameAssets(b, main_module, asset_preprocessor_executable);

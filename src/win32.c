@@ -95,7 +95,7 @@ static bool GameCodeLoad() {
     char temporaryLibraryPath[MAX_PATH];
 
     AbsoluteLibraryPath("Game.dll", sourceLibraryPath, sizeof(sourceLibraryPath));
-    AbsoluteLibraryPath("GameTEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+    AbsoluteLibraryPath("Game.TEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
 
     CopyFileA(sourceLibraryPath, temporaryLibraryPath, FALSE);
 

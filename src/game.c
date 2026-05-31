@@ -12,7 +12,7 @@
 
 EXPORTED UPDATE_AND_RENDER(UpdateAndRender) {
     if (!memory->isInitialized) {
-        MemoryStreamWriteString(memory->standardInfoStream, "Game says hi!");
+        MemoryStreamWriteLine(memory->standardInfoStream, "Game says hi!");
 
         static const char watermelon[] = {
 #include "watermelon.png.h"

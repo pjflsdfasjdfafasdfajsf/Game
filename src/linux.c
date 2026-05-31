@@ -38,65 +38,68 @@ static void AbsoluteLibaryPath(const char *libraryFileName, char *destinationBuf
     }
 
     executablePath[executablePathLength] = '\0';
+
+    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
+
+    if (finalSlashIndex != -1) {
+        executablePath[finalSlashIndex + 1] = '\0';
+    }
+
     StringCopy(destinationBuffer, destinationCapacity, executablePath);
     StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
 }
 
-// https://stackoverflow.com/questions/2180079/how-can-i-copy-a-file-on-unix-using-c
-static int CopyFile(const char *from, const char *to) {
-    int fileDescriptorTo, fileDescriptorFrom;
-    char buffer[PATH_MAX];
-
-    isize numberRead = 0;
-    int savedErrno;
-
-    fileDescriptorFrom = open(from, O_RDONLY);
-    if (fileDescriptorFrom < 0) {
-        return -1;
+static bool CopyFile(const char *sourcePath, const char *destinationPath) {
+    int sourceFile = open(sourcePath, O_RDONLY);
+    if (sourceFile < 0) {
+        return false;
     }
 
-    fileDescriptorTo = open(to, O_WRONLY | O_CREAT | O_EXCL, 0x666);
-    if (fileDescriptorTo < 0) {
-        goto error;
+    int destinationFile = open(destinationPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (destinationFile < 0) {
+        close(sourceFile);
+        return false;
     }
 
-    while (numberRead = read(fileDescriptorFrom, buffer, sizeof(buffer)), numberRead > 0) {
-        char *outPtr = buffer;
-        isize numberWritten = 0;
+    char buffer[4096];
 
-        do {
-            numberWritten = write(fileDescriptorTo, outPtr, numberRead);
+    while (true) {
+        isize bytesRead = read(sourceFile, buffer, sizeof(buffer));
 
-            if (numberWritten >= 0) {
-                numberRead -= numberWritten;
-                outPtr += numberWritten;
-            } else if (errno != EINTR) {
-                goto error;
-            }
-        } while (numberRead > 0);
-    }
-
-    if (numberRead == 0) {
-        if (close(fileDescriptorTo) < 0) {
-            fileDescriptorTo = -1;
-            goto error;
+        if (bytesRead == 0) {
+            break;
         }
-        close(fileDescriptorFrom);
-        return 0;
+
+        if (bytesRead < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
+
+        char *writePointer = buffer;
+        isize bytesRemaining = bytesRead;
+
+        while (bytesRemaining > 0) {
+            isize bytesWritten = write(destinationFile, writePointer, bytesRemaining);
+
+            if (bytesWritten >= 0) {
+                bytesRemaining -= bytesWritten;
+                writePointer += bytesWritten;
+            } else if (errno != EINTR) {
+                return false;
+            }
+        }
     }
 
-error:
-    savedErrno = errno;
+    close(sourceFile);
 
-    close(fileDescriptorFrom);
-    if (fileDescriptorTo >= 0) {
-        close(fileDescriptorTo);
+    if (close(destinationFile) < 0) {
+        return false;
     }
 
-    errno = savedErrno;
-    return -1;
+    return true;
 }
-
 static void GameCodeLoad() {
     if (GameSO) {
         dlclose(GameSO);
@@ -109,16 +112,20 @@ static void GameCodeLoad() {
     char sourceLibraryPath[PATH_MAX];
     char temporaryLibraryPath[PATH_MAX];
 
-    AbsoluteLibaryPath("Game.so", sourceLibraryPath, sizeof(sourceLibraryPath));
-    AbsoluteLibaryPath("GameTEMP.so", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+    AbsoluteLibaryPath("libgame.so", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibaryPath("libgame.temp.so", temporaryLibraryPath, sizeof(temporaryLibraryPath));
 
-    CopyFile(sourceLibraryPath, temporaryLibraryPath);
+    if (!CopyFile(sourceLibraryPath, temporaryLibraryPath)) {
+        fprintf(stderr, "Could not copy Game.so.\n");
+    }
 
     GameSO = dlopen(temporaryLibraryPath, RTLD_NOW);
-    if (GameSO) {
-        GameUpdateAndRender = (UpdateAndRenderFunction *)dlsym(GameSO, "UpdateAndRender");
-        GameGetSoundSamples = (GetSoundSamplesFunction *)dlsym(GameSO, "GetSoundSamples");
+    if (!GameSO) {
+        fprintf(stderr, "%s\n", dlerror());
     }
+
+    GameUpdateAndRender = (UpdateAndRenderFunction *)dlsym(GameSO, "UpdateAndRender");
+    GameGetSoundSamples = (GetSoundSamplesFunction *)dlsym(GameSO, "GetSoundSamples");
 }
 
 #else
@@ -155,7 +162,7 @@ static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdg
 
 static void XdgToplevelCloseHandler(void *userData, struct xdg_toplevel *xdgToplevel) {
     Unused(xdgToplevel);
-    
+
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     if (wayland) {
@@ -184,7 +191,7 @@ static const struct xdg_surface_listener xdgSurfaceListener = {
 
 static void XdgWindowManagerBasePingHandler(void *userData, struct xdg_wm_base *xdgWmBase, uint32_t serial) {
     Unused(userData);
-    
+
     xdg_wm_base_pong(xdgWmBase, serial);
 }
 
@@ -194,7 +201,7 @@ static const struct xdg_wm_base_listener xdgWmBaseListener = {
 
 static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     Unused(version);
-    
+
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     usize compositorNameLength = StringGetLength(wl_compositor_interface.name);
@@ -400,6 +407,26 @@ void AudioInitialize(LinuxAudio *audio) {
     }
 }
 
+void MemoryDumpStandardStreams(GameMemory *gameMemory) {
+    if (!gameMemory) {
+        return;
+    }
+
+    if (gameMemory->standardInfoStream && gameMemory->standardInfoStream->offset > 0) {
+        isize bytesWritten = write(STDOUT_FILENO, gameMemory->standardInfoStream->memory, gameMemory->standardInfoStream->offset);
+        Unused(bytesWritten);
+
+        gameMemory->standardInfoStream->offset = 0;
+    }
+
+    if (gameMemory->standardErrorStream && gameMemory->standardErrorStream->offset > 0) {
+        isize bytesWritten = write(STDERR_FILENO, gameMemory->standardErrorStream->memory, gameMemory->standardErrorStream->offset);
+        Unused(bytesWritten);
+
+        gameMemory->standardErrorStream->offset = 0;
+    }
+}
+
 void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer) {
     if (!wayland || !wayland->display) {
         return;
@@ -412,6 +439,8 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMem
     pollfd.events = POLLIN;
 
     while (wayland->isRunning) {
+        MemoryDumpStandardStreams(gameMemory);
+
         wl_display_dispatch_pending(wayland->display);
         wl_display_flush(wayland->display);
 
