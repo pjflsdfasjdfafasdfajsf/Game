@@ -3,8 +3,8 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
         .whitelist = &.{
-            .{ .os_tag = .windows },
-            .{ .os_tag = .linux },
+            .{ .cpu_arch = .x86_64, .os_tag = .windows },
+            .{ .cpu_arch = .x86_64, .os_tag = .linux },
         },
     });
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
@@ -45,7 +45,6 @@ pub fn build(b: *std.Build) void {
             "src/game.c",
             "src/game_png.c",
             "src/game_ttf.c",
-            "src/game_wav.c",
             "src/game_rectangle_pack.c",
         },
     });
@@ -71,32 +70,47 @@ pub fn build(b: *std.Build) void {
     });
 
     main_module.addCSourceFiles(.{
-        .files = &.{
-            "src/linux.c",
+        .files = switch (target.result.os.tag) {
+            .windows => &.{
+                "src/win32.c",
+                "src/win32_d3d12.c",
+            },
+            .linux => &.{
+                "src/linux.c",
+            },
+
+            else => unreachable,
         },
     });
 
     const main_executable = b.addExecutable(.{
-        .name = "linux",
+        .name = "Game",
         .root_module = main_module,
     });
     b.installArtifact(main_executable);
 
-    const wayland_protocols = b.run(&.{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" });
-    const xdg_shell_xml = b.pathJoin(&.{ std.mem.trim(u8, wayland_protocols, "\n"), "stable/xdg-shell/xdg-shell.xml" });
+    switch (target.result.os.tag) {
+        .windows => {},
 
-    main_module.addIncludePath(xdg_shell: {
-        const run = b.addSystemCommand(&.{ "wayland-scanner", "client-header", xdg_shell_xml });
-        break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.h");
-    }.dirname());
+        .linux => {
+            const wayland_protocols = b.run(&.{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" });
+            const xdg_shell_xml = b.pathJoin(&.{ std.mem.trim(u8, wayland_protocols, "\n"), "stable/xdg-shell/xdg-shell.xml" });
 
-    main_module.addCSourceFile(.{ .file = xdg_shell: {
-        const run = b.addSystemCommand(&.{ "wayland-scanner", "private-code", xdg_shell_xml });
-        break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.c");
-    } });
+            main_module.addIncludePath(xdg_shell: {
+                const run = b.addSystemCommand(&.{ "wayland-scanner", "client-header", xdg_shell_xml });
+                break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.h");
+            }.dirname());
 
-    main_module.linkSystemLibrary("wayland-client", .{});
-    main_module.linkSystemLibrary("asound", .{});
+            main_module.addCSourceFile(.{ .file = xdg_shell: {
+                const run = b.addSystemCommand(&.{ "wayland-scanner", "private-code", xdg_shell_xml });
+                break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.c");
+            } });
 
+            main_module.linkSystemLibrary("wayland-client", .{});
+            main_module.linkSystemLibrary("asound", .{});
+        },
+
+        else => unreachable,
+    }
     // TODO: run step
 }
