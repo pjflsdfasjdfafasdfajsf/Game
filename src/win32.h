@@ -2,7 +2,9 @@
 
 #define COBJMACROS
 #define UNICODE
+#define WIDL_C_INLINE_WRAPPERS
 
+#include <initguid.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 

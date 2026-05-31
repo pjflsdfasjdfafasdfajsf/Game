@@ -414,7 +414,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, 
     }
 }
 
-void mainCRTStartup() {
+void wWinMainCRTStartup() {
     HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
