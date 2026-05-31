@@ -3,9 +3,10 @@
 #include <alsa/asoundlib.h>
 
 #include <wayland-client.h>
-#include "xdg-shell-client-protocol.h"
+#include <xdg-shell-client-protocol.h>
 
 #include "game_platform.h"
+#include "game_types.h"
 
 typedef struct {
     struct wl_display *display;

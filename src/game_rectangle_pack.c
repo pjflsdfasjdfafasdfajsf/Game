@@ -1,24 +1,24 @@
 #include "game_rectangle_pack.h"
+#include "game_types.h"
 #include "game_platform.h"
 
 // Skyline packing algortihm I borrowed from Julien Vernay thank you love you twin mwha
 //
 // https://jvernay.fr/blog/skyline-2d-packer/implementation/
 
-Pack2D Pack2DCreate(MemoryArena *arena, u32 maximumWidth, u32 maximumHeight) {
-    Pack2D result;
-    MemoryZero(&result, sizeof(result));
+Pack2D Pack2DCreate(MemoryArena *arena, u32 MaximumWidth, u32 MaximumHeight) {
+    Pack2D result = {0};
 
-    if (maximumWidth == 0 || maximumHeight == 0) {
+    if (MaximumWidth == 0 || MaximumHeight == 0) {
         return result;
     }
 
-    result.maximumWidth = maximumWidth;
-    result.maximumHeight = maximumHeight;
+    result.MaximumWidth = MaximumWidth;
+    result.MaximumHeight = MaximumHeight;
 
-    usize maximumSkylinePoints = (usize)maximumWidth * 2;
+    usize MaximumSkylinePoints = (usize)MaximumWidth * 2;
 
-    result.points = MemoryArenaPushArray(arena, Vector2U, maximumSkylinePoints);
+    result.points = MemoryArenaPushArray(arena, Vector2U, MaximumSkylinePoints);
 
     return result;
 }
@@ -39,8 +39,8 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
         packer->points[0].y = 0;
     }
 
-    u32 maximumWidth = packer->maximumWidth;
-    u32 maximumHeight = packer->maximumHeight;
+    u32 MaximumWidth = packer->MaximumWidth;
+    u32 MaximumHeight = packer->MaximumHeight;
     u32 pointCount = packer->pointCount;
 
     u32 bestIndexStart = 0xFFFFFFFF;
@@ -52,7 +52,7 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
         u32 currentX = packer->points[currentIndex].x;
         u32 currentY = packer->points[currentIndex].y;
 
-        if (rectangleWidth > maximumWidth - currentX) {
+        if (rectangleWidth > MaximumWidth - currentX) {
             break;
         }
 
@@ -77,7 +77,7 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
             continue;
         }
 
-        if (rectangleHeight > maximumHeight - currentY) {
+        if (rectangleHeight > MaximumHeight - currentY) {
             continue;
         }
 
@@ -105,7 +105,7 @@ bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *out
     if (bestIndexEnd < pointCount) {
         hasBottomRightPoint = (newBottomRightPoint.x < packer->points[bestIndexEnd].x);
     } else {
-        hasBottomRightPoint = (newBottomRightPoint.x < maximumWidth);
+        hasBottomRightPoint = (newBottomRightPoint.x < MaximumWidth);
     }
 
     u32 insertedPointsCount = 1 + (hasBottomRightPoint ? 1 : 0);

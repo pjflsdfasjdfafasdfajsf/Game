@@ -1,5 +1,6 @@
 #include "game_png.h"
 #include "game_platform.h"
+#include "game_types.h"
 
 // NOTE: CRC32.
 
@@ -16,7 +17,7 @@ static void CRC32TableInitialize(void) {
     for (u32 i = 0; i < 256; i++) {
         u32 crc = i;
         for (u32 j = 0; j < 8; j++) {
-            if (crc & 1) {
+            if (IsBitSet(crc, 1)) {
                 crc = CRC32Polynomial ^ (crc >> 1);
             } else {
                 crc = (crc >> 1);
@@ -162,8 +163,8 @@ static u32 StreamDecodeSymbol(BitStream *stream, const HuffmanTree *tree) {
 }
 
 static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 count) {
-    MemoryZero(tree->counts, sizeof(tree->counts));
-    MemoryZero(tree->symbols, sizeof(tree->symbols));
+    ZeroArray(tree->counts);
+    ZeroArray(tree->symbols);
 
     for (u32 i = 0; i < count; i++) {
         if (lengths[i] > 15) {
@@ -175,7 +176,7 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
     tree->counts[0] = 0;
 
     u16 nextSymbolIndex[16];
-    MemoryZero(nextSymbolIndex, sizeof(nextSymbolIndex));
+    ZeroArray(nextSymbolIndex);
 
     u16 symbolIndex = 0;
     for (u32 i = 1; i <= 15; i++) {
@@ -194,8 +195,7 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
 }
 
 static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *outputBuffer, usize outputCapacity) {
-    BitStream stream;
-    MemoryZero(&stream, sizeof(stream));
+    BitStream stream = {0};
 
     stream.chunks = chunks;
     stream.chunkCount = chunkCount;
@@ -211,7 +211,7 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
         // NOTE: Checksum failed
         return false;
     }
-    if (zlibAdditionalFlags & 0x20) {
+    if (IsBitSet(zlibAdditionalFlags, 0x20)) {
         // NOTE: Preset dictionaries are not allowed in PNG
         return false;
     }
@@ -241,11 +241,9 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                 outputBuffer[outputPosition++] = (u8)StreamReadBits(&stream, 8);
             }
         } else if (blockType == 1 || blockType == 2) {
-            HuffmanTree literalTree;
-            MemoryZero(&literalTree, sizeof(literalTree));
+            HuffmanTree literalTree = {0};
 
-            HuffmanTree distanceTree;
-            MemoryZero(&distanceTree, sizeof(distanceTree));
+            HuffmanTree distanceTree = {0};
 
             // NOTE: Fixed huffman
             if (blockType == 1) {
@@ -277,19 +275,18 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                 u32 hclen = StreamReadBits(&stream, 4) + 4;
 
                 u8 codeLengthLengths[19];
-                MemoryZero(codeLengthLengths, sizeof(codeLengthLengths));
+                ZeroArray(codeLengthLengths);
 
                 for (u32 i = 0; i < hclen; i++) {
                     codeLengthLengths[deflateCodeLengthOrder[i]] = (u8)StreamReadBits(&stream, 3);
                 }
 
-                HuffmanTree codeLengthTree;
-                MemoryZero(&codeLengthTree, sizeof(codeLengthTree));
+                HuffmanTree codeLengthTree = {0};
 
                 HuffmanTreeInitialize(&codeLengthTree, codeLengthLengths, 19);
 
                 u8 lengths[320];
-                MemoryZero(lengths, sizeof(lengths));
+                ZeroArray(lengths);
 
                 u32 totalCodes = hlit + hdist;
                 u32 index = 0;
@@ -377,9 +374,9 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
     const int c = (int)upLeftByte;
 
     const int initialEstimate = a + b - c;
-    const int distanceA = ABS(initialEstimate - a);
-    const int distanceB = ABS(initialEstimate - b);
-    const int distanceC = ABS(initialEstimate - c);
+    const int distanceA = Abs(initialEstimate - a);
+    const int distanceB = Abs(initialEstimate - b);
+    const int distanceC = Abs(initialEstimate - c);
 
     if (distanceA <= distanceB && distanceA <= distanceC) {
         return (u8)a;
@@ -390,15 +387,18 @@ static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
     }
 }
 
-Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, const void *memory, usize length) {
-    Image result;
-    MemoryZero(&result, sizeof(result));
+Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const void *memory, usize length) {
+    Image result = {0};
 
     if (!memory) {
+        MemoryStreamWriteLine(errorStream, "Invalid parameter: memory.");
+
         return result;
     }
 
     if (length < PNGFileSignatureLength) {
+        MemoryStreamWriteLine(errorStream, "Most likely corrupted PNG file as it is too small to even contain a signature.");
+
         return result;
     }
 
@@ -406,18 +406,23 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     bool hasValidSignature = MemoryEquals(imageBufferPointer, PNGFileSignature, PNGFileSignatureLength);
     if (!hasValidSignature) {
+        MemoryStreamWriteLine(errorStream, "Corrupted PNG file.");
+
         return result;
     }
 
-    usize currentReadOffset = PNGFileSignatureLength;
+    MemoryStream stream;
+    MemoryStreamInitializeReadOnly(&stream, memory, length);
+    stream.offset = PNGFileSignatureLength;
 
     bool hasParsedIHDR = false;
 
-    PNGHeader imageHeader;
-    MemoryZero(&imageHeader, sizeof(imageHeader));
+    PNGHeader imageHeader = {0};
 
     PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
     if (!idatChunks) {
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
+
         return result;
     }
 
@@ -427,35 +432,31 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     bool hasSeenIDAT = false;
     bool isPreviousChunkIDAT = false;
 
-    while (currentReadOffset < length) {
-        usize remainingBytes = length - currentReadOffset;
-        usize headerSize = PNGChunkLengthSize + PNGChunkTypeSize;
-
-        if (remainingBytes < headerSize) {
+    while (stream.offset < stream.capacity) {
+        if (!MemoryStreamHasSpace(&stream, PNGChunkLengthSize + PNGChunkTypeSize)) {
             break;
         }
 
-        u32 chunkLength = ReadUInt32BigEndian(&imageBufferPointer[currentReadOffset]);
-        currentReadOffset += PNGChunkLengthSize;
+        u32 chunkLength = MemoryStreamReadUInt32BigEndian(&stream);
 
-        const u8 *chunkTypePointer = &imageBufferPointer[currentReadOffset];
-        currentReadOffset += PNGChunkTypeSize;
+        const u8 *chunkTypePointer = &stream.memory[stream.offset];
+        stream.offset += PNGChunkTypeSize;
 
-        remainingBytes = length - currentReadOffset;
-        if (remainingBytes < chunkLength + PNGChunkCRCSize) {
+        if (!MemoryStreamHasSpace(&stream, chunkLength + PNGChunkCRCSize)) {
             break;
         }
 
-        const u8 *chunkDataPointer = &imageBufferPointer[currentReadOffset];
-        currentReadOffset += chunkLength;
+        const u8 *chunkDataPointer = &stream.memory[stream.offset];
+        stream.offset += chunkLength;
 
-        u32 expectedCRC = ReadUInt32BigEndian(&imageBufferPointer[currentReadOffset]);
-        currentReadOffset += PNGChunkCRCSize;
+        u32 expectedCRC = MemoryStreamReadUInt32BigEndian(&stream);
 
         usize crcDataLength = PNGChunkTypeSize + chunkLength;
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
 
         if (calculatedCRC != expectedCRC) {
+            MemoryStreamWriteLine(errorStream, "CRC mismatch in PNG chunk.");
+
             break;
         }
 
@@ -510,7 +511,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
             break;
         } else {
-            bool isCriticalChunk = !(chunkTypePointer[0] & 0x20);
+            bool isCriticalChunk = !IsBitSet(chunkTypePointer[0], 0x20);
             if (isCriticalChunk) {
                 break;
             }
@@ -520,6 +521,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     }
 
     if (!hasParsedIHDR || totalIDATDataSize == 0) {
+        MemoryStreamWriteLine(errorStream, "Missing IHDR or no IDAT data.");
+
         return result;
     }
 
@@ -534,6 +537,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     } else if (imageHeader.colorType == PNGColorTypeTrue_ColorAlpha) {
         bytesPerPixel = 4;
     } else {
+        MemoryStreamWriteLine(errorStream, "Unsupported color type.");
+
         return result;
     }
 
@@ -542,11 +547,15 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     u8 *decompressedBuffer = MemoryArenaPushBytes(temporaryArena, decompressedCapacity);
     if (!decompressedBuffer) {
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
+
         return result;
     }
 
     bool succesfullyDecompressed = DecompressDeflate(idatChunks, idatChunkCount, decompressedBuffer, decompressedCapacity);
     if (!succesfullyDecompressed) {
+        MemoryStreamWriteLine(errorStream, "Could not decompress.");
+
         return result;
     }
 
@@ -555,6 +564,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     const usize rawScanlineByteCount = (usize)imageWidth * bytesPerPixel;
     if (imageWidth != 0 && rawScanlineByteCount / imageWidth != bytesPerPixel) {
+        MemoryStreamWriteLine(errorStream, "Scanline byte count overflow.");
+
         return result;
     }
 
@@ -562,12 +573,16 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     const usize expectedDecompressedByteCount = filteredScanlineByteCount * imageHeight;
 
     if (decompressedCapacity < expectedDecompressedByteCount) {
+        MemoryStreamWriteLine(errorStream, "Decompressed PNG data is smaller than expected.");
+
         return result;
     }
 
     const usize totalRawPixelByteCount = rawScanlineByteCount * imageHeight;
     u8 *rawPixelDataBuffer = MemoryArenaPushBytes(permanentArena, totalRawPixelByteCount);
     if (!rawPixelDataBuffer) {
+        MemoryStreamWriteLine(errorStream, "Out of memory.");
+
         return result;
     }
 
@@ -576,6 +591,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
     for (u32 currentScanlineIndex = 0; currentScanlineIndex < imageHeight; currentScanlineIndex++) {
         if (sourceReadOffset + filteredScanlineByteCount > decompressedCapacity) {
+            MemoryStreamWriteLine(errorStream, "Scanline data overruns decompressed buffer.");
+            
             return result;
         }
 
@@ -586,6 +603,8 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         const u8 *previousRawScanlineData = (currentScanlineIndex > 0) ? &rawPixelDataBuffer[destinationWriteOffset - rawScanlineByteCount] : 0;
 
         if (scanlineFilterType > 4) {
+            MemoryStreamWriteLine(errorStream, "Unknown PNG filter type.");
+            
             return result;
         }
 

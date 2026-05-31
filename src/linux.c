@@ -4,13 +4,6 @@
 //     * Image rendering
 //     * Font rendering
 //
-
-#include "linux.h"
-#include "linux_vulkan.h"
-#include "game_platform.h"
-#include "game_png.h"
-#include "xdg-shell-client-protocol.h"
-
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include <poll.h>
@@ -19,8 +12,12 @@
 #include <unistd.h>
 #include <wayland-client-core.h>
 
+#include "linux.h"
+#include "game_platform.h"
+#include "game_types.h"
+
 static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
-    UNUSED(xdgToplevel), UNUSED(width), UNUSED(height);
+    Unused(xdgToplevel), Unused(width), Unused(height);
 
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
@@ -47,8 +44,8 @@ static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdg
 }
 
 static void XdgToplevelCloseHandler(void *userData, struct xdg_toplevel *xdgToplevel) {
-    UNUSED(xdgToplevel);
-
+    Unused(xdgToplevel);
+    
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     if (wayland) {
@@ -76,8 +73,8 @@ static const struct xdg_surface_listener xdgSurfaceListener = {
 };
 
 static void XdgWindowManagerBasePingHandler(void *userData, struct xdg_wm_base *xdgWmBase, uint32_t serial) {
-    UNUSED(userData);
-
+    Unused(userData);
+    
     xdg_wm_base_pong(xdgWmBase, serial);
 }
 
@@ -86,8 +83,8 @@ static const struct xdg_wm_base_listener xdgWmBaseListener = {
 };
 
 static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
-    UNUSED(version);
-
+    Unused(version);
+    
     LinuxWayland *wayland = (LinuxWayland *)userData;
 
     usize compositorNameLength = StringGetLength(wl_compositor_interface.name);
@@ -105,7 +102,7 @@ static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, 
 }
 
 static void RegistryGlobalRemoveHandler(void *userData, struct wl_registry *registry, uint32_t name) {
-    UNUSED(userData), UNUSED(registry), UNUSED(name);
+    Unused(userData), Unused(registry), Unused(name);
 }
 
 static const struct wl_registry_listener registryListener = {
@@ -114,8 +111,7 @@ static const struct wl_registry_listener registryListener = {
 };
 
 LinuxWayland WindowCreate(const char *title) {
-    LinuxWayland result;
-    MemoryZero(&result, sizeof(LinuxWayland));
+    LinuxWayland wayland = {0};
 
     result.width = DEFAULT_WINDOW_WIDTH;
     result.height = DEFAULT_WINDOW_HEIGHT;

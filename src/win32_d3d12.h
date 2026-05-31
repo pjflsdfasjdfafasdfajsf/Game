@@ -1,9 +1,10 @@
 #pragma once
 
-#include "game_platform.h"
-
 #include <d3d12.h>
 #include <dxgi1_4.h>
+
+#include "game_platform.h"
+#include "game_types.h"
 
 #define FRAME_COUNT 3
 
@@ -40,11 +41,6 @@ typedef struct {
 } Win32Direct12;
 
 void D3D12Initialize(Win32Direct12 *d3d12, HWND window);
-u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
-void D3D12FrameBegin(Win32Direct12 *d3d12);
-
-void D3D12RectangleDraw(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector4 color);
-void D3D12RectangleDrawEX(Win32Direct12 *d3d12, u32 textureId, Vector2 origin, Vector2 size, Vector2 uvMin, Vector2 uvMax, Vector4 color);
-
-void D3D12FrameEnd(Win32Direct12 *d3d12);
+void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer);
+void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer);

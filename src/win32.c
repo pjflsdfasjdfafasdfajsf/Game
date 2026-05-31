@@ -1,23 +1,74 @@
 // NOTE: Windows platform layer implementation.
 //
 // TODO:
-//     * Define a proper cross-platform renderer interface
-//     * Separate game and platform
-//
+//     * Add UV support to DrawRectangle
+
+#include <windows.h>
 
 #include "win32.h"
-#include "game_ttf.h"
-#include "game_png.h"
 #include "win32_d3d12.h"
 
 #include "game_platform.h"
+#include "game_types.h"
+#include "game.h"
 
-#include <memoryapi.h>
-#include <windows.h>
-#include <wingdi.h>
-#include <winnt.h>
+#if defined(DEBUG)
+static HMODULE GameDLL = 0;
+static UpdateAndRenderFunction *GameUpdateAndRender = 0;
+static GetSoundSamplesFunc *GameGetSoundSamples = 0;
 
-int _fltused = 0;
+// NOTE: Returns absolute path to a file located in the same folder as the running .exe
+// 
+// For example, if the game is running from "C:\Project\build\Game.exe", and you ask 
+// for "Game.dll", this function returns "C:\Project\build\Game.dll"
+static void AbsoluteLibraryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
+    MemoryZero(destinationBuffer, destinationCapacity);
+
+    char executablePath[MAX_PATH];
+    ZeroArray(executablePath);
+    // NOTE: No W here :( because our String API does not work with wide chars
+    GetModuleFileNameA(0, executablePath, sizeof(executablePath));
+
+    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '\\');
+    if (finalSlashIndex == -1) {
+        finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
+    }
+
+    if (finalSlashIndex != -1) {
+        executablePath[finalSlashIndex + 1] = '\0';
+    }
+
+    StringCopy(destinationBuffer, destinationCapacity, executablePath);
+    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
+}
+
+static void GameCodeLoad() {
+    if (GameDLL) {
+        FreeLibrary(GameDLL);
+
+        GameDLL = 0;
+        GameUpdateAndRender = 0;
+        GameGetSoundSamples = 0;
+    }
+
+    char sourceLibraryPath[MAX_PATH];
+    char temporaryLibraryPath[MAX_PATH];
+
+    AbsoluteLibraryPath("Game.dll", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibraryPath("GameTEMP.dll", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+
+    CopyFileA(sourceLibraryPath, temporaryLibraryPath, FALSE);
+
+    GameDLL = LoadLibraryA(temporaryLibraryPath);
+    if (GameDLL) {
+        GameUpdateAndRender = (UpdateAndRenderFunction *)GetProcAddress(GameDLL, "UpdateAndRender");
+        GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");
+    }
+}
+#else
+#define GameUpdateAndRender UpdateAndRender
+#define GameGetSoundSamples GetSoundSamples
+#endif
 
 void ErrorShowLast(const wchar_t *functionName) {
     if (!functionName) {
@@ -60,56 +111,7 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
     ExitProcess(1);
 }
 
-LRESULT CALLBACK WindowProcedure(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter) {
-    switch (message) {
-    case WM_DESTROY: {
-        PostQuitMessage(0);
-        return 0;
-    } break;
-    }
-
-    return DefWindowProcW(windowHandle, message, wordParameter, longParameter);
-}
-
-HWND WindowCreate(const wchar_t *title) {
-    HINSTANCE instance = GetModuleHandleW(0);
-    if (!instance) {
-        ErrorShowLast(L"GetModuleHandleW");
-        return 0;
-    }
-
-    const wchar_t *className = L"Win32";
-
-    HCURSOR cursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
-    if (!cursor) {
-        ErrorShowLast(L"LoadCursorW");
-        return 0;
-    }
-
-    WNDCLASSW windowClass;
-    MemoryZero(&windowClass, sizeof(windowClass));
-
-    windowClass.lpfnWndProc = WindowProcedure;
-    windowClass.hInstance = instance;
-    windowClass.lpszClassName = className;
-    windowClass.hCursor = cursor;
-    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClassW(&windowClass)) {
-        ErrorShowLast(L"RegisterClassW");
-        return 0;
-    }
-
-    HWND windowHandle = CreateWindowExW(0, className, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, instance, 0);
-    if (!windowHandle) {
-        ErrorShowLast(L"CreateWindowExW");
-        return 0;
-    }
-
-    return windowHandle;
-}
-
-// NOTE: Audio implementation
+// NOTE: Audio API
 
 void AudioUpdate(Win32Audio *audio) {
     if (!audio) {
@@ -136,19 +138,15 @@ void AudioUpdate(Win32Audio *audio) {
         ErrorShowHRESULT(hresult, L"GetBuffer");
     }
 
-    f32 *samplePointer = (f32 *)audioData;
+    AudioBuffer audioBuffer = {0};
 
-    for (u32 frameIndex = 0; frameIndex < availableFrameCount; frameIndex++) {
-        f32 sampleValue = (audio->phase < 0.5f) ? 0.05f : -0.05f;
+    audioBuffer.samplesPerSecond = audio->samplesPerSecond;
+    audioBuffer.channelCount = audio->channels;
+    audioBuffer.frameCount = availableFrameCount;
+    audioBuffer.samples = (f32 *)audioData;
 
-        audio->phase += audio->phaseIncrement;
-        if (audio->phase > 1.0f) {
-            audio->phase -= 1.0f;
-        }
-
-        for (u32 channelIndex = 0; channelIndex < audio->channels; channelIndex++) {
-            *samplePointer++ = sampleValue;
-        }
+    if (GameGetSoundSamples) {
+        GameGetSoundSamples(&audioBuffer);
     }
 
     hresult = IAudioRenderClient_ReleaseBuffer(audio->renderClient, availableFrameCount, 0);
@@ -286,6 +284,86 @@ void AudioResume(Win32Audio *audio) {
     audio->isPaused = false;
 }
 
+//
+
+void MemoryDumpStandardStreams(GameMemory *gameMemory) {
+    if (!gameMemory) {
+        return;
+    }
+
+    if (gameMemory->standardInfoStream && gameMemory->standardInfoStream->offset > 0) {
+        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        if (stdOut && stdOut != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(stdOut, gameMemory->standardInfoStream->memory, (DWORD)gameMemory->standardInfoStream->offset, &bytesWritten, 0);
+        }
+
+        gameMemory->standardInfoStream->offset = 0;
+    }
+
+    if (gameMemory->standardErrorStream && gameMemory->standardErrorStream->offset > 0) {
+        HANDLE stdErr = GetStdHandle(STD_ERROR_HANDLE);
+
+        if (stdErr && stdErr != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(stdErr, gameMemory->standardErrorStream->memory, (DWORD)gameMemory->standardErrorStream->offset, &bytesWritten, 0);
+        }
+
+        gameMemory->standardErrorStream->offset = 0;
+    }
+}
+
+// NOTE: Window API.
+
+LRESULT CALLBACK WindowProcedure(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter) {
+    switch (message) {
+    case WM_DESTROY: {
+        PostQuitMessage(0);
+        return 0;
+    } break;
+    }
+
+    return DefWindowProcW(windowHandle, message, wordParameter, longParameter);
+}
+
+HWND WindowCreate(const wchar_t *title) {
+    HINSTANCE instance = GetModuleHandleW(0);
+    if (!instance) {
+        ErrorShowLast(L"GetModuleHandleW");
+        return 0;
+    }
+
+    const wchar_t *className = L"Win32";
+
+    HCURSOR cursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
+    if (!cursor) {
+        ErrorShowLast(L"LoadCursorW");
+        return 0;
+    }
+
+    WNDCLASSW windowClass = {0};
+
+    windowClass.lpfnWndProc = WindowProcedure;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = className;
+    windowClass.hCursor = cursor;
+    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    if (!RegisterClassW(&windowClass)) {
+        ErrorShowLast(L"RegisterClassW");
+        return 0;
+    }
+
+    HWND windowHandle = CreateWindowExW(0, className, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, instance, 0);
+    if (!windowHandle) {
+        ErrorShowLast(L"CreateWindowExW");
+        return 0;
+    }
+
+    return windowHandle;
+}
+
 void WindowShow(HWND windowHandle) {
     ShowWindow(windowHandle, SW_SHOWDEFAULT);
 
@@ -294,68 +372,8 @@ void WindowShow(HWND windowHandle) {
     }
 }
 
-void DrawTextTEMP(Win32Direct12 *d3d12, u32 atlasTextureId, const TrueTypeBakedGlyph *glyphs, u32 firstCharacter, u32 characterCount, const char *text, Vector2 startPosition, f32 scaleToScreen) {
-    if (!glyphs || !text) {
-        return;
-    }
-
-    Vector2 cursor = startPosition;
-
-    for (u32 stringIndex = 0; text[stringIndex] != '\0'; stringIndex++) {
-        u8 character = (u8)text[stringIndex];
-
-        if (character == '\n') {
-            cursor.x = startPosition.x;
-            cursor.y -= (64.0f * scaleToScreen);
-
-            continue;
-        }
-
-        if (character < firstCharacter || character >= (firstCharacter + characterCount)) {
-            continue;
-        }
-
-        u32 glyphIndex = character - firstCharacter;
-        const TrueTypeBakedGlyph *glyph = &glyphs[glyphIndex];
-
-        if (glyph->isValid) {
-            Vector2 position;
-            position.x = cursor.x + (glyph->offset.x * scaleToScreen);
-            position.y = cursor.y + (glyph->offset.y * scaleToScreen);
-
-            Vector2 size;
-            size.x = glyph->size.x * scaleToScreen;
-            size.y = glyph->size.y * scaleToScreen;
-
-            D3D12RectangleDrawEX(d3d12, atlasTextureId, position, size, glyph->uvMin, glyph->uvMax, V4(1.0f, 1.0f, 1.0f, 1.0f));
-
-            cursor.x += (glyph->size.x + 2.0f) * scaleToScreen;
-        } else if (character == ' ') {
-            cursor.x += 16.0f * scaleToScreen;
-        }
-    }
-}
-
-u32 textureIdTEMP = 0;
-
-void RunDraw(Win32Direct12 *d3d12, const TrueTypeBakedGlyph *glyphsTEMP) {
-    D3D12FrameBegin(d3d12);
-    {
-        f32 scaleToScreenX = 1.0f / (DEFAULT_WINDOW_WIDTH / 2.0f);
-        f32 scaleToScreenY = 1.0f / (DEFAULT_WINDOW_HEIGHT / 2.0f);
-        
-        f32 scale = scaleToScreenY; 
-
-        Vector2 startPosition = V2(-0.8f, 0.5f);
-
-        DrawTextTEMP(d3d12, textureIdTEMP, glyphsTEMP, 32, 95, "eeee omg ! = - ````", startPosition, scale);
-    }
-    D3D12FrameEnd(d3d12);
-}
-
-void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph *glyphsTEMP,  HWND windowHandle) {
-    MSG message;
-    MemoryZero(&message, sizeof(message));
+void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer, HWND window) {
+    MSG message = {0};
 
     bool isRunning = true;
     bool wasFocused = true;
@@ -368,8 +386,9 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
             TranslateMessage(&message);
             DispatchMessageW(&message);
         } else {
+            MemoryDumpStandardStreams(gameMemory);
             // NOTE: This logic below is to stop playing sound when the window is alt-tabbed because I am a good programmer.
-            bool isFocused = (GetForegroundWindow() == windowHandle);
+            bool isFocused = (GetForegroundWindow() == window);
 
             if (!isFocused && wasFocused) {
                 AudioPause(audio);
@@ -380,7 +399,14 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
             wasFocused = isFocused;
 
             if (isFocused) {
-                RunDraw(d3d12, glyphsTEMP);
+                RenderCommandBufferReset(commandBuffer);
+
+                if (GameUpdateAndRender) {
+                    GameUpdateAndRender(gameMemory, commandBuffer);
+                }
+
+                D3D12FrameBegin(d3d12, commandBuffer);
+                D3D12FrameEnd(d3d12, commandBuffer);
             } else {
                 Sleep(10);
             }
@@ -388,7 +414,7 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, const TrueTypeBakedGlyph
     }
 }
 
-void WINAPI WinMainCRTStartup() {
+void mainCRTStartup() {
     HWND window = WindowCreate(L"Win32");
 
     // NOTE: If you're changing something in Error* API and want to test it:
@@ -403,8 +429,8 @@ void WINAPI WinMainCRTStartup() {
         ExitProcess(1);
     }
 
-    usize permanentArenaSize = MEGABYTES(64);
-    usize temporaryArenaSize = MEGABYTES(256);
+    usize permanentArenaSize = Megabytes(64);
+    usize temporaryArenaSize = Megabytes(256);
 
     void *permanentMemoryBlock = VirtualAlloc(0, permanentArenaSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     void *temporaryMemoryBlock = VirtualAlloc(0, temporaryArenaSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -415,31 +441,41 @@ void WINAPI WinMainCRTStartup() {
     MemoryArena temporaryArena;
     MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
 
+    usize errorStreamSize = Kilobytes(64);
+    usize infoStreamSize = Kilobytes(256);
+
+    MemoryStream *errorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+    MemoryStream *infoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+
+    MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
+    MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
+
     static Win32Direct12 d3d12;
     D3D12Initialize(&d3d12, window);
 
     static Win32Audio audio;
     AudioInitialize(&audio);
 
-    //     static const char watermelon[] = {
-    // #include "watermelon.png.h"
-    //     };
+    RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
 
-    //     Image image = ImageLoadFromPNG(watermelon, sizeof(watermelon));
+    usize commandBufferSize = Megabytes(2);
+    void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
+    RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
 
-    static const char arial[] = {
-#include "arial.ttf.h"
-    };
+    GameMemory gameMemory = {0};
+    gameMemory.standardErrorStream = errorStream;
+    gameMemory.standardInfoStream = infoStream;
+    gameMemory.permanentArena = permanentArena;
+    gameMemory.temporaryArena = temporaryArena;
+    gameMemory.isInitialized = false;
 
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(&temporaryArena, arial, sizeof(arial));
-    TrueTypeBakedGlyph *glyphs = MemoryArenaPushArray(&permanentArena, TrueTypeBakedGlyph, TRUETYPE_CHARACTER_COUNT_FOR_ASCII);
-
-    Image image = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &font, 64, 1024, 1024, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
-    textureIdTEMP = D3D12TextureCreate(&d3d12, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
+#if defined(DEBUG)
+    GameCodeLoad();
+#endif
 
     WindowShow(window);
 
-    RunUpdate(&d3d12, &audio, glyphs, window);
+    RunUpdate(&d3d12, &audio, &gameMemory, commandBuffer, window);
 
     ExitProcess(0);
 }
