@@ -10,13 +10,121 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <limits.h>
+#include <dlfcn.h>
 #include <wayland-client-core.h>
 
 #include "linux.h"
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
-#include "game_png.h"
+#include "game.h"
+
+#if defined(DEBUG)
+static void *GameSO = 0;
+static UpdateAndRenderFunction *GameUpdateAndRender = 0;
+static GetSoundSamplesFunction *GameGetSoundSamples = 0;
+
+static void AbsoluteLibaryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
+    MemoryZero(destinationBuffer, destinationCapacity);
+
+    char executablePath[PATH_MAX];
+    isize executablePathLength = readlink("/proc/self/exe", executablePath, sizeof(executablePath) - 1);
+
+    if (executablePathLength == -1) {
+        printf("ERROR: readlink failed.\n");
+
+        return;
+    }
+
+    executablePath[executablePathLength] = '\0';
+    StringCopy(destinationBuffer, destinationCapacity, executablePath);
+    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
+}
+
+// https://stackoverflow.com/questions/2180079/how-can-i-copy-a-file-on-unix-using-c
+static int CopyFile(const char *from, const char *to) {
+    int fileDescriptorTo, fileDescriptorFrom;
+    char buffer[PATH_MAX];
+
+    isize numberRead = 0;
+    int savedErrno;
+
+    fileDescriptorFrom = open(from, O_RDONLY);
+    if (fileDescriptorFrom < 0) {
+        return -1;
+    }
+
+    fileDescriptorTo = open(to, O_WRONLY | O_CREAT | O_EXCL, 0x666);
+    if (fileDescriptorTo < 0) {
+        goto error;
+    }
+
+    while (numberRead = read(fileDescriptorFrom, buffer, sizeof(buffer)), numberRead > 0) {
+        char *outPtr = buffer;
+        isize numberWritten = 0;
+
+        do {
+            numberWritten = write(fileDescriptorTo, outPtr, numberRead);
+
+            if (numberWritten >= 0) {
+                numberRead -= numberWritten;
+                outPtr += numberWritten;
+            } else if (errno != EINTR) {
+                goto error;
+            }
+        } while (numberRead > 0);
+    }
+
+    if (numberRead == 0) {
+        if (close(fileDescriptorTo) < 0) {
+            fileDescriptorTo = -1;
+            goto error;
+        }
+        close(fileDescriptorFrom);
+        return 0;
+    }
+
+error:
+    savedErrno = errno;
+
+    close(fileDescriptorFrom);
+    if (fileDescriptorTo >= 0) {
+        close(fileDescriptorTo);
+    }
+
+    errno = savedErrno;
+    return -1;
+}
+
+static void GameCodeLoad() {
+    if (GameSO) {
+        dlclose(GameSO);
+
+        GameSO = 0;
+        GameUpdateAndRender = 0;
+        GameGetSoundSamples = 0;
+    }
+
+    char sourceLibraryPath[PATH_MAX];
+    char temporaryLibraryPath[PATH_MAX];
+
+    AbsoluteLibaryPath("Game.so", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibaryPath("GameTEMP.so", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+
+    CopyFile(sourceLibraryPath, temporaryLibraryPath);
+
+    GameSO = dlopen(temporaryLibraryPath, RTLD_NOW);
+    if (GameSO) {
+        GameUpdateAndRender = (UpdateAndRenderFunction *)dlsym(GameSO, "UpdateAndRender");
+        GameGetSoundSamples = (GetSoundSamplesFunction *)dlsym(GameSO, "GetSoundSamples");
+    }
+}
+
+#else
+#define GameUpdateAndRender UpdateAndRender
+#define GameGetSoundSamples GetSoundSamples
+#endif
 
 static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
     Unused(xdgToplevel), Unused(width), Unused(height);
@@ -292,18 +400,7 @@ void AudioInitialize(LinuxAudio *audio) {
     }
 }
 
-void RunDraw(LinuxWayland *wayland, Vulkan *vulkan) {
-    if (VulkanFrameBegin(vulkan, wayland)) {
-        VulkanRectangleDraw(vulkan, 0, (Vector2){.x = -0.25f, .y = 0.25f}, (Vector2){ .width = 0.5f, .height = 0.5f },
-                            (Vector4){ .r = 0.0f, .g = 0.0f, .b = 1.0f, .a = 1.0f});
-        VulkanRectangleDraw(vulkan, 1, (Vector2){.x = 0, .y = 0}, (Vector2){ .width = 0.5f, .height = 0.5f },
-                            (Vector4){ .r = 0.0f, .g = 0.0f, .b = 1.0f, .a = 1.0f});
-        
-        VulkanFrameEnd(vulkan);
-    }
-}
-
-void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan) {
+void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer) {
     if (!wayland || !wayland->display) {
         return;
     }
@@ -331,7 +428,15 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan) {
         wasFocused = wayland->isFocused;
 
         if (wayland->isFocused) {
-            RunDraw(wayland, vulkan);
+            RenderCommandBufferReset(commandBuffer);
+
+            if (GameUpdateAndRender) {
+                GameUpdateAndRender(gameMemory, commandBuffer);
+            }
+
+            if (VulkanFrameBegin(vulkan, wayland, commandBuffer)) {
+                VulkanFrameEnd(vulkan, commandBuffer);
+            }
         } else {
             usleep(100000);
         }
@@ -372,15 +477,24 @@ int main() {
     MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
     MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
 
-    static const u8 watermelonImage[] = {
-#include "watermelon.png.h"  
-    };
+    RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
 
-    Image image = ImageLoadFromPNG(&permanentArena, &temporaryArena, errorStream, watermelonImage, sizeof(watermelonImage));
-    u32 watermelonTexture = VulkanTextureCreate(&vulkan, image.size.width, image.size.height, image.bytesPerPixel, image.pixels);
-    Unused(watermelonTexture);
+    usize commandBufferSize = Megabytes(2);
+    void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
+    RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
 
-    RunUpdate(&wayland, &audio, &vulkan);
+    GameMemory gameMemory = {0};
+    gameMemory.standardErrorStream = errorStream;
+    gameMemory.standardInfoStream = infoStream;
+    gameMemory.permanentArena = permanentArena;
+    gameMemory.temporaryArena = temporaryArena;
+    gameMemory.isInitialized = false;
+
+#if defined(DEBUG)
+    GameCodeLoad();
+#endif
+
+    RunUpdate(&wayland, &audio, &vulkan, &gameMemory, commandBuffer);
 
     return 0;
 }

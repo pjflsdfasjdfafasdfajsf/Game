@@ -71,9 +71,9 @@ ifeq ($(PLATFORM),Linux)
     PLATFORM_SOURCES = $(SRC)/linux.c $(SRC)/linux_vulkan.c $(GENERATED)/xdg-shell-client-protocol.c
     MSVC_SRC =
     RES_FILE =
-    OS_PREREQ = $(GENERATED)/xdg-shell-client-protocol.h $(GENERATED)/xdg-shell-client-protocol.c
+    OS_PREREQ = $(GENERATED)/xdg-shell-client-protocol.h $(GENERATED)/BasicGeometry.vert.h $(GENERATED)/BasicGeometry.frag.h $(GENERATED)/xdg-shell-client-protocol.c
 
-    CFLAGS = -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -I $(GENERATED)
+    CFLAGS = -Wall -Wextra -Wpedantic -Wno-strict-prototypes -g -fsanitize=address -I $(GENERATED)
     LDFLAGS =
     LIBS = -lwayland-client -lasound -pthread
 
@@ -82,6 +82,7 @@ ifeq ($(PLATFORM),Linux)
 
     COMPILE_CMD = @$(CC) -c $(CFLAGS) -o $@ $<
     LINK_CMD = @$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(LDFLAGS)
+    DLL_LINK_CMD = @$(LD) $^ $(LIBS) $(DLL_LDFLAGS) /OUT:$@
     PREPROCESS_COMPILE = @$(CC) -O2 -o $@ $<
 endif
 

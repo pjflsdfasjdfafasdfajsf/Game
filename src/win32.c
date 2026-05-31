@@ -15,7 +15,7 @@
 #if defined(DEBUG)
 static HMODULE GameDLL = 0;
 static UpdateAndRenderFunction *GameUpdateAndRender = 0;
-static GetSoundSamplesFunc *GameGetSoundSamples = 0;
+static GetSoundSamplesFunction *GameGetSoundSamples = 0;
 
 // NOTE: Returns absolute path to a file located in the same folder as the running .exe
 // 

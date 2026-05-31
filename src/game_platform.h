@@ -521,5 +521,5 @@ typedef struct {
 } AudioBuffer;
 
 #define GET_SOUND_SAMPLES(name) void name(AudioBuffer *audioBuffer)
-typedef GET_SOUND_SAMPLES(GetSoundSamplesFunc);
+typedef GET_SOUND_SAMPLES(GetSoundSamplesFunction);
 

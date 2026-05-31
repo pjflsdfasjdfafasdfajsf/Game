@@ -155,6 +155,8 @@ typedef struct {
     u32 vertexCapacity;
     u32 vertexCount;
 
+    VkClearValue clearColor;
+
     u32 imageIndex;
     u32 frameIndex;
 
@@ -177,12 +179,8 @@ typedef struct {
 } Vulkan;
 
 void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
-u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel, const void *pixels);
 
-bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window);
-
-void VulkanRectangleDraw(Vulkan *vulkan, u32 textureId, Vector2 origin, Vector2 size, Vector4 color);
-
-void VulkanFrameEnd(Vulkan *vulkan);
+bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer);
+void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);
 
 

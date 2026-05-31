@@ -1,5 +1,6 @@
 #include "game_platform.h"
 #include "game_png.h"
+#include <stdio.h>
 
 UPDATE_AND_RENDER(UpdateAndRender) {
     if (!memory->isInitialized) {

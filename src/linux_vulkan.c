@@ -145,7 +145,7 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
 #if defined(DEBUG)
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userData) {
-    UNUSED(severity); UNUSED(type); UNUSED(userData);
+    Unused(severity); Unused(type); Unused(userData);
     printf("%s\n", data->pMessage);
 
     return VK_FALSE;
@@ -882,7 +882,7 @@ void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
     VulkanCommonInitialize(vulkan, window);
 }
 
-u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel, const void *pixels) {
+u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
     if (vulkan->textureCount + 1 > MAX_TEXTURES) {
         printf("ERROR: maximum number of textures reached: %u.\n", vulkan->textureCount);
     }
@@ -892,7 +892,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
     VkImageCreateInfo imageCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = VK_IMAGE_TYPE_2D,
-        .extent = { width, height, 1 },
+        .extent = { size.width, size.height, 1 },
         .mipLevels = 1,
         .arrayLayers = 1,
         .format = VK_FORMAT_R8G8B8A8_SRGB,
@@ -949,17 +949,17 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
     }
 
     u8 *mappedData;
-    VulkanBuffer stagingBuffer = VulkanBufferHostVisibleCreate(vulkan, width * height * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, (void **)&mappedData);
+    VulkanBuffer stagingBuffer = VulkanBufferHostVisibleCreate(vulkan, size.width * size.height * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, (void **)&mappedData);
    
     const u8 *sourcePixels = (const u8 *)pixels;
-    for (u32 y = 0; y < height; ++y) {
-        u8 *destinationRow = mappedData + (y * width * 4);
-        const u8 *sourceRow = sourcePixels + (y * width * bytesPerPixel);
+    for (u32 y = 0; y < size.height; ++y) {
+        u8 *destinationRow = mappedData + (y * size.width * 4);
+        const u8 *sourceRow = sourcePixels + (y * size.width * bytesPerPixel);
 
         if (bytesPerPixel == 4) {
-            MemoryCopyForwards(destinationRow, sourceRow, width * 4);
+            MemoryCopyForwards(destinationRow, sourceRow, size.width * 4);
         } else if (bytesPerPixel == 3) {
-            for (u32 x = 0; x < width; ++x) {
+            for (u32 x = 0; x < size.width; ++x) {
                 destinationRow[x * 4 + 0] = sourceRow[x * 3 + 0];
                 destinationRow[x * 4 + 1] = sourceRow[x * 3 + 1];
                 destinationRow[x * 4 + 2] = sourceRow[x * 3 + 2];
@@ -1025,7 +1025,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
     vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
     VkBufferImageCopy copyRegion = {
-        .imageExtent = (VkExtent3D){ width, height, 1 },
+        .imageExtent = (VkExtent3D){ size.width, size.height, 1 },
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .layerCount = 1,
@@ -1079,8 +1079,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
     vulkan->vkDestroyCommandPool(vulkan->logicalDevice, commandPool, 0);
     VulkanBufferHostVisibleDestroy(vulkan, stagingBuffer);
 
-    u32 textureIndex = vulkan->textureCount;
-    vulkan->textures[textureIndex] = result;
+    vulkan->textures[index - 1] = result;
     vulkan->textureCount++;
 
     VkDescriptorImageInfo imageInfo = {
@@ -1095,7 +1094,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
         .dstBinding = 0,
         .descriptorCount = 1,
         .pImageInfo = &imageInfo,
-        .dstArrayElement = textureIndex,
+        .dstArrayElement = index - 1,
     };
 
     for (u32 i = 0; i < FRAME_COUNT; i++) {
@@ -1103,11 +1102,97 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 width, u32 height, u32 bytesPerPixel
         vulkan->vkUpdateDescriptorSets(vulkan->logicalDevice, 1, &descriptorWrite, 0, 0);
     }
 
-    return vulkan->textureCount;
+    return index;
 }
 
-bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window) {
+static void VulkanFramePassTransfer(Vulkan *vulkan, const RenderCommandBuffer *commandBuffer) {
+    usize memoryOffset = 0;
+
+    while (memoryOffset < commandBuffer->currentOffset) {
+        RenderCommandHeader *header = (RenderCommandHeader *)(commandBuffer->basePointer + memoryOffset);
+
+         if (header->size == 0 || memoryOffset + header->size > commandBuffer->currentOffset) {
+            break;
+        }
+
+        if (header->type == RenderCommandType_AllocateTexture) {
+            RenderCommandAllocateTexture *command = (RenderCommandAllocateTexture *)header;
+            VulkanTextureCreate(vulkan, command->index, command->size, command->bytesPerPixel, command->pixels);
+        }
+
+        memoryOffset += header->size; 
+    }
+}
+
+static void VulkanFramePassRender(Vulkan *vulkan, const RenderCommandBuffer *commandBuffer) {
     VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
+    usize memoryOffset = 0;
+
+    while (memoryOffset < commandBuffer->currentOffset) {
+        RenderCommandHeader *header = (RenderCommandHeader *)(commandBuffer->basePointer + memoryOffset);
+        if (header->size == 0 || memoryOffset + header->size > commandBuffer->currentOffset) {
+            break;
+        }
+
+        switch (header->type) {
+        case RenderCommandType_ClearEntireScreen: {
+            RenderCommandClearEntireScreen *command = (RenderCommandClearEntireScreen *)header;
+
+            vulkan->clearColor = (VkClearValue){
+                .color = {{ command->color.r, command->color.g, command->color.b, command->color.a, }},
+            };
+                
+        } break;
+        
+        case RenderCommandType_DrawRectangle: {
+            RenderCommandDrawRectangle *command = (RenderCommandDrawRectangle *)header;
+
+            const u32 verticesPerRectangle = 6;
+            if (vulkan->vertexCount + verticesPerRectangle <= vulkan->vertexCapacity) {
+                f32 leftEdge = (command->position.x / (f32)DEFAULT_WINDOW_WIDTH) * 2.0f - 1.0f;
+                f32 rightEdge = ((command->position.x + command->size.x) / (f32)DEFAULT_WINDOW_WIDTH) * 2.0f - 1.0f;
+                f32 topEdge = 1.0f - (command->position.y / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
+                f32 bottomEdge = 1.0f - ((command->position.y + command->size.y) / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
+
+                Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 0.0f}};
+                Vertex topRight = {{rightEdge, topEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 0.0f}};
+                Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 1.0f}};
+                Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 1.0f}};
+
+                Vertex *currentVertexDestination = (Vertex *)vulkan->vertexData + vulkan->vertexCount;
+                currentVertexDestination[0] = topLeft;
+                currentVertexDestination[1] = topRight;
+                currentVertexDestination[2] = bottomLeft;
+                currentVertexDestination[3] = bottomLeft;
+                currentVertexDestination[4] = topRight;
+                currentVertexDestination[5] = bottomRight;
+
+                VkDeviceSize offset = vulkan->vertexCount * sizeof(Vertex);
+                vulkan->vkCmdBindVertexBuffers(frameData->commandBuffer, 0, 1, &vulkan->vertexBuffer.handle, &offset);
+
+                VulkanPushConstant pushConstant = {
+                    .textureIndex = command->texture,  
+                };
+
+                vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
+    
+                vulkan->vkCmdDraw(frameData->commandBuffer, 6, 1, 0, 0);
+
+                vulkan->vertexCount += verticesPerRectangle;            
+            }
+        } break;
+        }
+
+        memoryOffset += header->size;
+    }
+}
+
+bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer) {
+    VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
+
+    if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
+        VulkanFramePassTransfer(vulkan, commandBuffer);
+    }
 
     if (vulkan->swapchain.extent.width != window->width || vulkan->swapchain.extent.height != window->height) {
         VulkanSwapchainRecreate(vulkan, window->width, window->height);
@@ -1150,17 +1235,13 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window) {
 
     vulkan->vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
-    VkClearValue clearColor = {
-        .color = {{0.0f, 1.0f, 0.0f, 1.0f}},
-    };
-
     VkRenderingAttachmentInfo colorAttachmentInfo = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = vulkan->swapchain.imageViews[vulkan->imageIndex],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = clearColor,
+        .clearValue = vulkan->clearColor,
     };
 
     VkRenderingInfo renderingInfo = {
@@ -1200,49 +1281,12 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window) {
     return true;
 }
 
-void VulkanRectangleDraw(Vulkan *vulkan, u32 textureId, Vector2 origin, Vector2 size, Vector4 color) {
+void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
     VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
-    
-    const u32 verticesPerRectangle = 6;
-    if (vulkan->vertexCount + verticesPerRectangle > vulkan->vertexCapacity) {
-        return;
+
+    if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
+        VulkanFramePassRender(vulkan, commandBuffer);
     }
-
-    f32 leftEdge = origin.x;
-    f32 rightEdge = origin.x + size.width;
-    f32 topEdge = origin.y;
-    f32 bottomEdge = origin.y - size.height;
-
-    Vertex topLeft = {{leftEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 1.0f}};
-    Vertex topRight = {{rightEdge, topEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 1.0f}};
-    Vertex bottomLeft = {{leftEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {0.0f, 0.0f}};
-    Vertex bottomRight = {{rightEdge, bottomEdge, 0.0f}, {color.r, color.g, color.b, color.a}, {1.0f, 0.0f}};
-
-    Vertex *currentVertexDestination = (Vertex *)vulkan->vertexData + vulkan->vertexCount;
-
-    currentVertexDestination[0] = topLeft;
-    currentVertexDestination[1] = topRight;
-    currentVertexDestination[2] = bottomLeft;
-    currentVertexDestination[3] = bottomLeft;
-    currentVertexDestination[4] = topRight;
-    currentVertexDestination[5] = bottomRight;
-
-    VkDeviceSize offset = vulkan->vertexCount * sizeof(Vertex);
-    vulkan->vkCmdBindVertexBuffers(frameData->commandBuffer, 0, 1, &vulkan->vertexBuffer.handle, &offset);
-
-    VulkanPushConstant pushConstant = {
-        .textureIndex = textureId,  
-    };
-
-    vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
-    
-    vulkan->vkCmdDraw(frameData->commandBuffer, 6, 1, 0, 0);
-
-    vulkan->vertexCount += verticesPerRectangle;
-}
-
-void VulkanFrameEnd(Vulkan *vulkan) {
-    VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
 
     vulkan->vkCmdEndRendering(frameData->commandBuffer);
 
