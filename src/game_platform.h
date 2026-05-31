@@ -499,12 +499,6 @@ static inline void RenderAllocateTexture(RenderCommandBuffer *commandBuffer, u32
 
 // NOTE: Services that the game provides to platform.
 
-#if defined(DEBUG)
-#define EXPORTED __declspec(dllexport)
-#else
-#define EXPORTED
-#endif
-
 typedef struct {
     // NOTE: These two standard streams are dumped to console by the platform.
     MemoryStream *standardErrorStream;
@@ -512,11 +506,11 @@ typedef struct {
 
     MemoryArena permanentArena;
     MemoryArena temporaryArena;
-    
+
     bool isInitialized;
 } GameMemory;
 
-#define UPDATE_AND_RENDER(name) EXPORTED void name(GameMemory *memory, RenderCommandBuffer *commandBuffer)
+#define UPDATE_AND_RENDER(name) void name(GameMemory *memory, RenderCommandBuffer *commandBuffer)
 typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
 
 typedef struct {
@@ -526,6 +520,5 @@ typedef struct {
     f32 *samples;
 } AudioBuffer;
 
-#define GET_SOUND_SAMPLES(name) EXPORTED void name(AudioBuffer *audioBuffer)
+#define GET_SOUND_SAMPLES(name) void name(AudioBuffer *audioBuffer)
 typedef GET_SOUND_SAMPLES(GetSoundSamplesFunc);
-

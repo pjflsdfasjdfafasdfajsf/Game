@@ -40,7 +40,6 @@ pub fn build(b: *std.Build) void {
     if (optimize == .Debug) {
         main_module.addCMacro("DEBUG", "1");
     }
-
     main_module.addCSourceFiles(.{
         .files = switch (target.result.os.tag) {
             .windows => &.{ "src/win32.c", "src/win32_d3d12.c" },
@@ -53,7 +52,6 @@ pub fn build(b: *std.Build) void {
         .name = "Game",
         .root_module = main_module,
     });
-
     b.installArtifact(main_executable);
 
     switch (target.result.os.tag) {
@@ -126,6 +124,7 @@ pub fn build(b: *std.Build) void {
         game_module.addCMacro("DEBUG", "1");
         game_module.addCSourceFiles(.{ .files = game_source_files });
         addGameAssets(b, game_module, asset_preprocessor_executable);
+        addPlatformMacro(target, game_module);
 
         // NOTE: https://codeberg.org/ziglang/zig/issues/35559
         if (target.result.os.tag == .windows) {
@@ -153,6 +152,7 @@ pub fn build(b: *std.Build) void {
     } else {
         main_module.addCSourceFiles(.{ .files = game_source_files });
         addGameAssets(b, main_module, asset_preprocessor_executable);
+        addPlatformMacro(target, main_module);
     }
 
     //
@@ -165,6 +165,15 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the game");
     run_step.dependOn(&run_main_executable.step);
+}
+
+fn addPlatformMacro(target: std.Build.ResolvedTarget, module: *std.Build.Module) void {
+    module.addCMacro(switch (target.result.os.tag) {
+        .windows => "WIN32",
+        .linux => "LINUX",
+
+        else => unreachable,
+    }, "");
 }
 
 fn addGameAssets(b: *std.Build, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {

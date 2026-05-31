@@ -1,7 +1,13 @@
 #include "game_platform.h"
 #include "game_png.h"
 
-UPDATE_AND_RENDER(UpdateAndRender) {
+#if defined(WIN32)
+#define EXPORTED __declspec(dllexport)
+#elif defined(LINUX)
+#define EXPORTED __attribute__((visibility("default")))
+#endif
+
+EXPORTED UPDATE_AND_RENDER(UpdateAndRender) {
     if (!memory->isInitialized) {
         MemoryStreamWriteString(memory->standardInfoStream, "Game says hi!");
 
@@ -20,7 +26,7 @@ UPDATE_AND_RENDER(UpdateAndRender) {
 }
 
 // Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.
-GET_SOUND_SAMPLES(GetSoundSamples) {
+EXPORTED GET_SOUND_SAMPLES(GetSoundSamples) {
     Unused(audioBuffer);
 
     // // TODO: Move this into GameState later!
