@@ -71,11 +71,11 @@ pub fn build(b: *std.Build) void {
                 .{ "src/hlsl/BasicGeometry.hlsl", "PSMain", "ps_6_6", "BasicGeometryPS.h" },
             }) |shader| {
                 // NOTE: would have used b.addSystemCommand if it did not require initial argv[0]
-                const run = std.Build.Step.Run.create(b, "dxc");
-                run.addFileArg(dxc);
-                run.addArgs(&.{ "-T", shader[2], "-E", shader[1], "-Fh" });
-                main_module.addIncludePath(run.addOutputFileArg(shader[3]).dirname());
-                run.addFileArg(b.path(shader[0]));
+                const dxc_run_step = std.Build.Step.Run.create(b, "dxc");
+                dxc_run_step.addFileArg(dxc);
+                dxc_run_step.addArgs(&.{ "-T", shader[2], "-E", shader[1], "-Fh" });
+                main_module.addIncludePath(dxc_run_step.addOutputFileArg(shader[3]).dirname());
+                dxc_run_step.addFileArg(b.path(shader[0]));
             }
 
             main_module.addWin32ResourceFile(.{
@@ -117,9 +117,9 @@ pub fn build(b: *std.Build) void {
                 .{ "src/glsl/BasicGeometry.vert", "BasicGeometry.vert.spv" },
                 .{ "src/glsl/BasicGeometry.frag", "BasicGeometry.frag.spv" },
             }) |shader| {
-                const run = b.addSystemCommand(&.{ "glslc", shader[0] });
-                const compiled_spirv_path = run.addPrefixedOutputFileArg("-o", shader[1]);
-                preprocessAsset(b, compiled_spirv_path, shader[1], main_module, asset_preprocessor_executable);
+                const glslc_run_step = b.addSystemCommand(&.{ "glslc", shader[0] });
+                const compiled_spirv_path = glslc_run_step.addPrefixedOutputFileArg("-o", shader[1]);
+                processAsset(b, compiled_spirv_path, shader[1], main_module, asset_preprocessor_executable);
             }
 
             main_module.linkSystemLibrary("wayland-client", .{});
@@ -203,12 +203,12 @@ fn addGameAssets(b: *std.Build, module: *std.Build.Module, asset_preprocessor: *
             continue;
         }
 
-        preprocessAsset(b, b.path(b.pathJoin(&.{ "assets", entry.path })), entry.basename, module, asset_preprocessor);
+        processAsset(b, b.path(b.pathJoin(&.{ "assets", entry.path })), entry.basename, module, asset_preprocessor);
     }
 }
 
-fn preprocessAsset(b: *std.Build, path: std.Build.LazyPath, basename: []const u8, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {
-    const run = b.addRunArtifact(asset_preprocessor);
-    run.addFileArg(path);
-    module.addIncludePath(run.addOutputFileArg(b.fmt("{s}.h", .{basename})).dirname());
+fn processAsset(b: *std.Build, path: std.Build.LazyPath, basename: []const u8, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {
+    const asset_preprocessor_run_step = b.addRunArtifact(asset_preprocessor);
+    asset_preprocessor_run_step.addFileArg(path);
+    module.addIncludePath(asset_preprocessor_run_step.addOutputFileArg(b.fmt("{s}.h", .{basename})).dirname());
 }
