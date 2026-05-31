@@ -5,6 +5,9 @@
 #define EXPORTED __declspec(dllexport)
 #elif defined(LINUX)
 #define EXPORTED __attribute__((visibility("default")))
+#else
+#warning "EXPORTED macro was not defined."
+#define EXPORTED
 #endif
 
 EXPORTED UPDATE_AND_RENDER(UpdateAndRender) {
