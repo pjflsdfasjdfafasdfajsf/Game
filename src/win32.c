@@ -3,13 +3,12 @@
 // TODO:
 //     * Add UV support to DrawRectangle
 
-#include <windows.h>
-
 #include "win32.h"
 #include "win32_d3d12.h"
 
 #include "game_platform.h"
 #include "game_types.h"
+#include "game.h"
 
 void ErrorShowLast(const wchar_t *functionName) {
     if (!functionName) {
@@ -55,7 +54,7 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
 #if defined(DEBUG)
 static HMODULE GameDLL = 0;
 static UpdateAndRenderFunction *GameUpdateAndRender = 0;
-static GetSoundSamplesFunc *GameGetSoundSamples = 0;
+static GetSoundSamplesFunction *GameGetSoundSamples = 0;
 
 // NOTE: Returns absolute path to a file located in the same folder as the running .exe
 //
@@ -112,7 +111,7 @@ static bool GameCodeLoad() {
 
         return false;
     }
-    GameGetSoundSamples = (GetSoundSamplesFunc *)GetProcAddress(GameDLL, "GetSoundSamples");
+    GameGetSoundSamples = (GetSoundSamplesFunction *)GetProcAddress(GameDLL, "GetSoundSamples");
     if (!GameGetSoundSamples) {
         ErrorShowLast(L"GetProcAddress GetSoundSamples");
 
@@ -170,6 +169,9 @@ void AudioUpdate(Win32Audio *audio) {
 
 DWORD WINAPI AudioThreadProcedure(void *threadParameter) {
     Win32Audio *audio = (Win32Audio *)threadParameter;
+    if (!audio->audioClient) {
+        return 0;
+    }
 
     HRESULT hresult = CoInitializeEx(0, COINIT_MULTITHREADED);
     if (FAILED(hresult)) {
@@ -220,7 +222,9 @@ void AudioInitialize(Win32Audio *audio) {
 
     hresult = IMMDeviceEnumerator_GetDefaultAudioEndpoint(audio->deviceEnumerator, eRender, eConsole, &audio->audioDevice);
     if (FAILED(hresult)) {
-        ErrorShowHRESULT(hresult, L"GetDefaultAudioEndpoint");
+        CoUninitialize();
+
+        return;
     }
 
     hresult = IMMDevice_Activate(audio->audioDevice, &iid_IAudioClient, CLSCTX_ALL, 0, COM_OUT_POINTER(&audio->audioClient));

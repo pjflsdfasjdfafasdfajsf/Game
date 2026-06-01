@@ -5,8 +5,8 @@
 #include "game_types.h"
 
 // NOTE: Compiled shaders.
-#include "BasicGeometryVS.h"
-#include "BasicGeometryPS.h"
+#include "BasicGeometry.VS.h"
+#include "BasicGeometry.PS.h"
 
 void D3D12DeviceInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
@@ -137,6 +137,7 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     staticSamplerDescription.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplerDescription.ShaderRegister = 0;
+    staticSamplerDescription.RegisterSpace = 1;
     staticSamplerDescription.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDescription = {0};

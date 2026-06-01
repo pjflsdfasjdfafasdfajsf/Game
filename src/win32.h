@@ -4,12 +4,12 @@
 #define UNICODE
 #define WIDL_C_INLINE_WRAPPERS
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 #include <initguid.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 
 #include "game_types.h"
 
