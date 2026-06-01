@@ -1,3 +1,13 @@
+// TODO:
+// * Currently Linux uses `fprintf` for error logging and Win32 uses popups. I'm almost fine with Win32 (except for the part that I want it also to print to the console besides using popups),
+// but I am not satisfied with Linux. `fprintf` is a dependency on `stdio.h` which we can get rid of just by using our MemoryStream API. So they aren't passed to every call we can store them
+// in the context structs (`LinuxVulkan` for example), so the API would be something like:
+//
+// VulkanInitialize(memory->standardErrorStream, ...)
+//
+// VulkanSomeFunction(LinuxVulkan *vulkan) {
+//     MemoryStreamWriteLine(vulkan->errorStream, "Something went wrong.");
+// }
 #pragma once
 
 #include "game_types.h"

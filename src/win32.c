@@ -1,8 +1,6 @@
-// NOTE: Windows platform layer implementation.
-//
 // TODO:
-//     * Add UV support to DrawRectangle
-//     * Why this does not work with Wine in Debug?
+// * Add UV support to DrawRectangle
+// * Why this does not work with Wine in Debug?
 
 #include "win32.h"
 #include "win32_d3d12.h"

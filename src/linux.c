@@ -1,9 +1,3 @@
-// TODO:
-//     * Simple Vulkan renderer for a triangle
-//     * Audio
-//     * Image rendering
-//     * Font rendering
-//
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include <poll.h>
