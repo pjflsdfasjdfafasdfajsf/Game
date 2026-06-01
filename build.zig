@@ -245,7 +245,7 @@ const CompileFlagsStep = struct {
 
         var file_write_buffer: [4096]u8 = undefined;
 
-        const file: std.Io.File = try std.Io.Dir.cwd().createFile(io, "compile_flags.txt", .{});
+        const file = try std.Io.Dir.cwd().createFile(io, "compile_flags.txt", .{});
         defer file.close(io);
 
         var file_writer = file.writer(io, &file_write_buffer);
