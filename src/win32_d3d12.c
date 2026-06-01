@@ -8,9 +8,9 @@
 #include "BasicGeometry.VS.h"
 #include "BasicGeometry.PS.h"
 
-void D3D12DeviceInitialize(Win32Direct12 *d3d12) {
+bool D3D12DeviceInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return true;
     }
 
     HRESULT hresult;
@@ -18,17 +18,23 @@ void D3D12DeviceInitialize(Win32Direct12 *d3d12) {
     hresult = CreateDXGIFactory1(&IID_IDXGIFactory4, COM_OUT_POINTER(&d3d12->factory));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateDXGIFactory1");
+
+        return false;
     }
 
     hresult = D3D12CreateDevice(0, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, COM_OUT_POINTER(&d3d12->device));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"D3D12CreateDevice");
+
+        return false;
     }
+
+    return true;
 }
 
-void D3D12CommandsInitialize(Win32Direct12 *d3d12) {
+bool D3D12CommandsInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -40,27 +46,37 @@ void D3D12CommandsInitialize(Win32Direct12 *d3d12) {
     hresult = ID3D12Device_CreateCommandQueue(d3d12->device, &commandQueueDescription, &IID_ID3D12CommandQueue, COM_OUT_POINTER(&d3d12->commandQueue));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandQueue");
+
+        return false;
     }
 
     hresult = ID3D12Device_CreateCommandAllocator(d3d12->device, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, COM_OUT_POINTER(&d3d12->commandAllocator));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandAllocator");
+
+        return false;
     }
 
     hresult = ID3D12Device_CreateCommandList(d3d12->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, d3d12->commandAllocator, 0, &IID_ID3D12GraphicsCommandList, COM_OUT_POINTER(&d3d12->commandList));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommandList");
+
+        return false;
     }
 
     hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Close Initial");
+
+        return false;
     }
+
+    return true;
 }
 
-void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
+bool D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     if (!d3d12 || !windowHandle) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -80,11 +96,15 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     hresult = IDXGIFactory4_CreateSwapChainForHwnd(d3d12->factory, (IUnknown *)d3d12->commandQueue, windowHandle, &swapChainDescription, 0, 0, &temporarySwapChain);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateSwapChainForHwnd");
+
+        return false;
     }
 
     hresult = IDXGISwapChain1_QueryInterface(temporarySwapChain, &IID_IDXGISwapChain3, COM_OUT_POINTER(&d3d12->swapChain));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"QueryInterface SwapChain3");
+
+        return false;
     }
     IDXGISwapChain1_Release(temporarySwapChain);
 
@@ -98,6 +118,8 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
     hresult = ID3D12Device_CreateDescriptorHeap(d3d12->device, &renderTargetViewHeapDescription, &IID_ID3D12DescriptorHeap, COM_OUT_POINTER(&d3d12->renderTargetViewHeap));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateDescriptorHeap");
+
+        return false;
     }
 
     d3d12->renderTargetViewDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -108,16 +130,20 @@ void D3D12SwapChainInitialize(Win32Direct12 *d3d12, HWND windowHandle) {
         hresult = IDXGISwapChain3_GetBuffer(d3d12->swapChain, index, &IID_ID3D12Resource, COM_OUT_POINTER(&d3d12->renderTargets[index]));
         if (FAILED(hresult)) {
             ErrorShowHRESULT(hresult, L"SwapChain GetBuffer");
+
+            return false;
         }
 
         ID3D12Device_CreateRenderTargetView(d3d12->device, d3d12->renderTargets[index], 0, renderTargetViewHandle);
         renderTargetViewHandle.ptr += d3d12->renderTargetViewDescriptorSize;
     }
+
+    return true;
 }
 
-void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
+bool D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -166,11 +192,15 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
         }
 
         ErrorShowHRESULT(hresult, L"SerializeVersionedRootSignature");
+
+        return false;
     }
 
     hresult = ID3D12Device_CreateRootSignature(d3d12->device, 0, signatureBlob->lpVtbl->GetBufferPointer(signatureBlob), signatureBlob->lpVtbl->GetBufferSize(signatureBlob), &IID_ID3D12RootSignature, COM_OUT_POINTER(&d3d12->rootSignature));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateRootSignature");
+
+        return false;
     }
 
     signatureBlob->lpVtbl->Release(signatureBlob);
@@ -213,12 +243,16 @@ void D3D12PipelineInitialize(Win32Direct12 *d3d12) {
     hresult = ID3D12Device_CreateGraphicsPipelineState(d3d12->device, &pipelineStateDescription, &IID_ID3D12PipelineState, COM_OUT_POINTER(&d3d12->pipelineState));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateGraphicsPipelineState");
+
+        return false;
     }
+
+    return true;
 }
 
-void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
+bool D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -226,6 +260,8 @@ void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
     hresult = ID3D12Device_CreateFence(d3d12->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, COM_OUT_POINTER(&d3d12->fence));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateFence");
+
+        return false;
     }
 
     d3d12->fenceValue = 1;
@@ -233,12 +269,16 @@ void D3D12SynchronizationInitialize(Win32Direct12 *d3d12) {
     d3d12->fenceEvent = CreateEventW(0, FALSE, FALSE, 0);
     if (!d3d12->fenceEvent) {
         ErrorShowLast(L"CreateEventW");
+
+        return false;
     }
+
+    return true;
 }
 
-void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
+bool D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -247,6 +287,8 @@ void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
     hresult = ID3D12CommandQueue_Signal(d3d12->commandQueue, d3d12->fence, fenceToWaitFor);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandQueue Signal");
+
+        return false;
     }
 
     d3d12->fenceValue++;
@@ -256,17 +298,21 @@ void D3D12DeviceWaitForGPU(Win32Direct12 *d3d12) {
 
         if (FAILED(hresult)) {
             ErrorShowHRESULT(hresult, L"SetEventOnCompletion");
+
+            return false;
         }
 
         WaitForSingleObject(d3d12->fenceEvent, INFINITE);
     }
 
     d3d12->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(d3d12->swapChain);
+
+    return true;
 }
 
-void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacity) {
+bool D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacity) {
     if (!d3d12 || !d3d12->device) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -292,7 +338,8 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacit
 
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CreateCommittedResource");
-        return;
+
+        return false;
     }
 
     D3D12_RANGE readRange = {0};
@@ -300,7 +347,8 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacit
     hresult = ID3D12Resource_Map(d3d12->vertexBuffer, 0, &readRange, &d3d12->vertexData);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"Map");
-        return;
+
+        return false;
     }
 
     d3d12->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(d3d12->vertexBuffer);
@@ -309,11 +357,13 @@ void D3D12VertexBufferInitialize(Win32Direct12 *d3d12, UINT MaximumVertexCapacit
 
     d3d12->vertexCapacity = MaximumVertexCapacity;
     d3d12->vertexCount = 0;
+
+    return true;
 }
 
-void D3D12HeapInitialize(Win32Direct12 *d3d12) {
+bool D3D12HeapInitialize(Win32Direct12 *d3d12) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -326,7 +376,11 @@ void D3D12HeapInitialize(Win32Direct12 *d3d12) {
     hresult = ID3D12Device_CreateDescriptorHeap(d3d12->device, &heapDescription, &IID_ID3D12DescriptorHeap, COM_OUT_POINTER(&d3d12->descriptorHeap));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"ID3D12Device_CreateDescriptorHeap");
+
+        return false;
     }
+
+    return true;
 }
 
 u32 D3D12TextureCreate(Win32Direct12 *d3d12, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
@@ -527,9 +581,9 @@ static void D3D12FramePassRender(Win32Direct12 *d3d12, const RenderCommandBuffer
     }
 }
 
-void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer) {
+bool D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
@@ -542,11 +596,15 @@ void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer) {
     hresult = ID3D12CommandAllocator_Reset(d3d12->commandAllocator);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandAllocator Reset");
+
+        return false;
     }
 
     hresult = ID3D12GraphicsCommandList_Reset(d3d12->commandList, d3d12->commandAllocator, d3d12->pipelineState);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Reset");
+
+        return false;
     }
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(d3d12->commandList, d3d12->rootSignature);
@@ -575,11 +633,13 @@ void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer) {
     ID3D12GraphicsCommandList_OMSetRenderTargets(d3d12->commandList, 1, &renderTargetViewHandle, FALSE, 0);
 
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(d3d12->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    return true;
 }
 
-void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer) {
+bool D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
@@ -600,6 +660,8 @@ void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffe
     hresult = ID3D12GraphicsCommandList_Close(d3d12->commandList);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CommandList Close");
+
+        return false;
     }
 
     ID3D12CommandList *commandLists[] = {(ID3D12CommandList *)d3d12->commandList};
@@ -608,26 +670,46 @@ void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffe
     hresult = IDXGISwapChain3_Present(d3d12->swapChain, 1, 0);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"SwapChain Present");
+
+        return false;
     }
 
     D3D12DeviceWaitForGPU(d3d12);
+
+    return true;
 }
 
-void D3D12Initialize(Win32Direct12 *d3d12, HWND window) {
+bool D3D12Initialize(Win32Direct12 *d3d12, HWND window) {
     if (!d3d12) {
-        return;
+        return false;
     }
 
     MemoryZero(d3d12, sizeof(Win32Direct12));
 
-    D3D12DeviceInitialize(d3d12);
-    D3D12CommandsInitialize(d3d12);
-    D3D12SwapChainInitialize(d3d12, window);
-    D3D12HeapInitialize(d3d12);
-    D3D12PipelineInitialize(d3d12);
-    D3D12SynchronizationInitialize(d3d12);
-    D3D12VertexBufferInitialize(d3d12, 4096);
+    if (!D3D12DeviceInitialize(d3d12)) {
+        return false;
+    }
+    if (!D3D12CommandsInitialize(d3d12)) {
+        return false;
+    }
+    if (!D3D12SwapChainInitialize(d3d12, window)) {
+        return false;
+    }
+    if (!D3D12HeapInitialize(d3d12)) {
+        return false;
+    }
+    if (!D3D12PipelineInitialize(d3d12)) {
+        return false;
+    }
+    if (!D3D12SynchronizationInitialize(d3d12)) {
+        return false;
+    }
+    if (!D3D12VertexBufferInitialize(d3d12, 4096)) {
+        return false;
+    }
 
     u32 whitePixel = 0xFFFFFFFF;
     D3D12TextureCreate(d3d12, 0, V2U(1, 1), 4, &whitePixel);
+
+    return true;
 }

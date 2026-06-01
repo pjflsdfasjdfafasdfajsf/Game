@@ -40,7 +40,7 @@ typedef struct {
     ID3D12DescriptorHeap *descriptorHeap;
 } Win32Direct12;
 
-void D3D12Initialize(Win32Direct12 *d3d12, HWND window);
+bool D3D12Initialize(Win32Direct12 *d3d12, HWND window);
 
-void D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer);
-void D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer);
+bool D3D12FrameBegin(Win32Direct12 *d3d12, RenderCommandBuffer *commandBuffer);
+bool D3D12FrameEnd(Win32Direct12 *d3d12, const RenderCommandBuffer *commandBuffer);

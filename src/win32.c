@@ -2,6 +2,7 @@
 //
 // TODO:
 //     * Add UV support to DrawRectangle
+//     * Why this does not work with Wine in Debug?
 
 #include "win32.h"
 #include "win32_d3d12.h"
@@ -47,8 +48,6 @@ void ErrorShowHRESULT(HRESULT hresult, const wchar_t *functionName) {
     if (errorString) {
         LocalFree(errorString);
     }
-
-    ExitProcess(1);
 }
 
 #if defined(DEBUG)
@@ -190,9 +189,9 @@ DWORD WINAPI AudioThreadProcedure(void *threadParameter) {
     return 0;
 }
 
-void AudioInitialize(Win32Audio *audio) {
+bool AudioInitialize(Win32Audio *audio) {
     if (!audio) {
-        return;
+        return false;
     }
 
     HRESULT hresult;
@@ -213,29 +212,37 @@ void AudioInitialize(Win32Audio *audio) {
     hresult = CoInitializeEx(0, COINIT_MULTITHREADED);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CoInitializeEX");
+
+        return false;
     }
 
     hresult = CoCreateInstance(&clsid_MMDeviceEnumerator, 0, CLSCTX_ALL, &iid_IMMDeviceEnumerator, COM_OUT_POINTER(&audio->deviceEnumerator));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"CoCreateInstance MMDeviceEnumerator");
+
+        return false;
     }
 
     hresult = IMMDeviceEnumerator_GetDefaultAudioEndpoint(audio->deviceEnumerator, eRender, eConsole, &audio->audioDevice);
     if (FAILED(hresult)) {
-        CoUninitialize();
-
-        return;
+        ErrorShowHRESULT(hresult, L"IMMDeviceEnumerator_GetDefaultAudioEndpoint");
+        // NOTE: not fatal, it is just that there won't be audio
+        return true;
     }
 
     hresult = IMMDevice_Activate(audio->audioDevice, &iid_IAudioClient, CLSCTX_ALL, 0, COM_OUT_POINTER(&audio->audioClient));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IMMDevice_Activate");
+
+        return false;
     }
 
     WAVEFORMATEX *waveFormat = 0;
     hresult = IAudioClient_GetMixFormat(audio->audioClient, &waveFormat);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_GetMixFormat");
+
+        return false;
     }
 
     audio->channels = waveFormat->nChannels;
@@ -247,6 +254,8 @@ void AudioInitialize(Win32Audio *audio) {
     hresult = IAudioClient_Initialize(audio->audioClient, AUDCLNT_SHAREMODE_SHARED, 0, bufferDuration, 0, waveFormat, 0);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_Initialize");
+
+        return false;
     }
 
     CoTaskMemFree(waveFormat);
@@ -254,16 +263,22 @@ void AudioInitialize(Win32Audio *audio) {
     hresult = IAudioClient_GetBufferSize(audio->audioClient, &audio->bufferFrameCount);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_GetBufferSize");
+
+        return false;
     }
 
     hresult = IAudioClient_GetService(audio->audioClient, &iid_IAudioRenderClient, COM_OUT_POINTER(&audio->renderClient));
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_GetService");
+
+        return false;
     }
 
     hresult = IAudioClient_Start(audio->audioClient);
     if (FAILED(hresult)) {
         ErrorShowHRESULT(hresult, L"IAudioClient_Start");
+
+        return false;
     }
 
     audio->isRunning = true;
@@ -422,8 +437,12 @@ void RunUpdate(Win32Direct12 *d3d12, Win32Audio *audio, GameMemory *gameMemory, 
                     GameUpdateAndRender(gameMemory, commandBuffer);
                 }
 
-                D3D12FrameBegin(d3d12, commandBuffer);
-                D3D12FrameEnd(d3d12, commandBuffer);
+                if (!D3D12FrameBegin(d3d12, commandBuffer)) {
+                    continue;
+                }
+                if (!D3D12FrameEnd(d3d12, commandBuffer)) {
+                    ExitProcess(1);
+                }
             } else {
                 Sleep(10);
             }
@@ -468,10 +487,14 @@ void wWinMainCRTStartup() {
     MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
 
     static Win32Direct12 d3d12;
-    D3D12Initialize(&d3d12, window);
+    if (!D3D12Initialize(&d3d12, window)) {
+        ExitProcess(1);
+    }
 
     static Win32Audio audio;
-    AudioInitialize(&audio);
+    if (!AudioInitialize(&audio)) {
+        ExitProcess(1);
+    }
 
     RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
 
