@@ -9,6 +9,10 @@
 #include <dlfcn.h>
 #include <assert.h>
 
+// NOTE: Compiled shaders.
+#include "BasicGeometry.VS.spv.h"
+#include "BasicGeometry.PS.spv.h"
+
 typedef struct {
     VkSurfaceCapabilitiesKHR capabilities;
 
@@ -22,14 +26,6 @@ typedef struct {
 typedef struct {
     u32 textureIndex;
 } VulkanPushConstant;
-
-static u8 vertexShaderData[] = {
-#include "BasicGeometry.vert.spv.h"
-};
-
-static u8 fragmentShaderData[] = {
-#include "BasicGeometry.frag.spv.h"
-};
 
 static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -127,10 +123,10 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
     VkInstanceCreateInfo instanceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &applicationInfo,
-        .enabledExtensionCount = Array_Count(extensions),
+        .enabledExtensionCount = ArrayCount(extensions),
         .ppEnabledExtensionNames = extensions,
 #if defined(DEBUG)
-        .enabledLayerCount = Array_Count(layers),
+        .enabledLayerCount = ArrayCount(layers),
         .ppEnabledLayerNames = layers,
 #endif
     };
@@ -283,6 +279,7 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .pNext = &dynamicRendering,
         .descriptorBindingPartiallyBound = VK_TRUE,
         .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+        .runtimeDescriptorArray = VK_TRUE,
     };
 
     VkDeviceCreateInfo deviceCreateInfo = {
@@ -290,7 +287,7 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .pNext = &indexingFeatures,
         .pQueueCreateInfos = queueCreateInfos,
         .queueCreateInfoCount = uniqueCount,
-        .enabledExtensionCount = Array_Count(extensions),
+        .enabledExtensionCount = ArrayCount(extensions),
         .ppEnabledExtensionNames = extensions,
     };
 
@@ -546,7 +543,7 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = FRAME_COUNT,
-        .poolSizeCount = Array_Count(poolSizes),
+        .poolSizeCount = ArrayCount(poolSizes),
         .pPoolSizes = poolSizes,
     };
 
@@ -571,14 +568,14 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetBindingFlagsInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-        .bindingCount = Array_Count(descriptorBindings),
+        .bindingCount = ArrayCount(descriptorBindings),
         .pBindingFlags = descriptorBindingFlags,
     };
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = &descriptorSetBindingFlagsInfo,
-        .bindingCount = Array_Count(descriptorBindings),
+        .bindingCount = ArrayCount(descriptorBindings),
         .pBindings = descriptorBindings,
     };
 
@@ -611,14 +608,14 @@ static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
 static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkShaderModuleCreateInfo vertexShaderCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = sizeof(vertexShaderData),
-        .pCode = (const u32 *)vertexShaderData,
+        .pCode = (const u32 *)g_VSMain,
+        .codeSize = sizeof(g_VSMain),
     };
 
     VkShaderModuleCreateInfo fragmentShaderCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = sizeof(fragmentShaderData),
-        .pCode = (const u32 *)fragmentShaderData,
+        .pCode = (const u32 *)g_PSMain,
+        .codeSize = sizeof(g_PSMain),
     };
 
     VkShaderModule vertexModule, fragmentModule;
@@ -639,13 +636,13 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
             .module = vertexModule,
-            .pName = "main",
+            .pName = "VSMain",
         },
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
             .module = fragmentModule,
-            .pName = "main",
+            .pName = "PSMain",
         },
     };
 
@@ -680,7 +677,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
         .pVertexBindingDescriptions = &bindingDescription,
-        .vertexAttributeDescriptionCount = Array_Count(attributeDescription),
+        .vertexAttributeDescriptionCount = ArrayCount(attributeDescription),
         .pVertexAttributeDescriptions = attributeDescription,
     };
 
@@ -738,7 +735,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
 
     VkPipelineDynamicStateCreateInfo dynamicState = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = Array_Count(dynamicStates),
+        .dynamicStateCount = ArrayCount(dynamicStates),
         .pDynamicStates = dynamicStates,
     };
 
@@ -771,7 +768,7 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &renderingCreateInfo,
-        .stageCount = Array_Count(shaderStages),
+        .stageCount = ArrayCount(shaderStages),
         .pStages = shaderStages,
         .pVertexInputState = &vertexInputInfo,
         .pInputAssemblyState = &inputAssembly,
@@ -1336,10 +1333,10 @@ void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
         .pCommandBuffers = &frameData->commandBuffer,
-        .waitSemaphoreCount = Array_Count(waitSemaphores),
+        .waitSemaphoreCount = ArrayCount(waitSemaphores),
         .pWaitSemaphores = waitSemaphores,
         .pWaitDstStageMask = waitStages,
-        .signalSemaphoreCount = Array_Count(signalSemaphores),
+        .signalSemaphoreCount = ArrayCount(signalSemaphores),
         .pSignalSemaphores = signalSemaphores,
     };
 
@@ -1354,7 +1351,7 @@ void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
         .swapchainCount = 1,
         .pSwapchains = &vulkan->swapchain.handle,
         .pImageIndices = &vulkan->imageIndex,
-        .waitSemaphoreCount = Array_Count(signalSemaphores),
+        .waitSemaphoreCount = ArrayCount(signalSemaphores),
         .pWaitSemaphores = signalSemaphores,
     };
 

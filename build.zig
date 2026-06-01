@@ -20,6 +20,11 @@ const win32_source_files: []const []const u8 = &.{
     "src/win32_d3d12.c",
 };
 
+const basic_geometry_shader = .{
+    .{ .input = "src/shaders/BasicGeometry.hlsl", .entrypoint = "VSMain", .stage = "vs_6_6", .output = "BasicGeometry.VS" },
+    .{ .input = "src/shaders/BasicGeometry.hlsl", .entrypoint = "PSMain", .stage = "ps_6_6", .output = "BasicGeometry.PS" },
+};
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
         .whitelist = &.{
@@ -68,26 +73,23 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(main_executable);
 
+    // NOTE: This is for cross-compilation
+    const dxc = switch (b.graph.host.result.os.tag) {
+        .windows => (b.lazyDependency("dxc-win32", .{}) orelse return).path("bin/x64/dxc.exe"),
+        .linux => (b.lazyDependency("dxc-linux", .{}) orelse return).path("bin/dxc"),
+
+        else => unreachable,
+    };
+
+    // NOTE: This is another workaround. This time around the fact that `bear` does not work with build.zig
+    const compile_flags_step = CompileFlagsStep.init(b, main_module);
+    b.getInstallStep().dependOn(&compile_flags_step.step);
+
     switch (target.result.os.tag) {
         .windows => {
-            // NOTE: This is for cross-compilation
-            const dxc = switch (b.graph.host.result.os.tag) {
-                .windows => (b.lazyDependency("dxc-win32", .{}) orelse return).path("bin/x64/dxc.exe"),
-                .linux => (b.lazyDependency("dxc-linux", .{}) orelse return).path("bin/dxc"),
-
-                else => unreachable,
-            };
-
-            inline for (.{
-                .{ "src/hlsl/BasicGeometry.hlsl", "VSMain", "vs_6_6", "BasicGeometryVS.h" },
-                .{ "src/hlsl/BasicGeometry.hlsl", "PSMain", "ps_6_6", "BasicGeometryPS.h" },
-            }) |shader| {
-                // NOTE: would have used b.addSystemCommand if it did not require initial argv[0]
-                const dxc_run_step = std.Build.Step.Run.create(b, "dxc");
-                dxc_run_step.addFileArg(dxc);
-                dxc_run_step.addArgs(&.{ "-T", shader[2], "-E", shader[1], "-Fh" });
-                main_module.addIncludePath(dxc_run_step.addOutputFileArg(shader[3]).dirname());
-                dxc_run_step.addFileArg(b.path(shader[0]));
+            inline for (basic_geometry_shader) |shader| {
+                const dxc_run_step = addShaderCompileStep(b, main_module, dxc, shader.stage, shader.input, shader.entrypoint, shader.output ++ ".h", &.{});
+                compile_flags_step.step.dependOn(&dxc_run_step.step);
             }
 
             main_module.addWin32ResourceFile(.{
@@ -110,8 +112,11 @@ pub fn build(b: *std.Build) void {
         },
 
         .linux => {
-            // NOTE: unlike dxc, there are no prebuilt binaries for glslc so we will have to hope that user has it in their
-            // PATH
+            inline for (basic_geometry_shader) |shader| {
+                const dxc_run_step = addShaderCompileStep(b, main_module, dxc, shader.stage, shader.input, shader.entrypoint, shader.output ++ ".spv.h", &.{ "-spirv", "-fspv-target-env=vulkan1.3", "-fvk-use-dx-layout" });
+                compile_flags_step.step.dependOn(&dxc_run_step.step);
+            }
+
             const wayland_protocols = b.run(&.{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" });
             const xdg_shell_xml = b.pathJoin(&.{ std.mem.trim(u8, wayland_protocols, "\n"), "stable/xdg-shell/xdg-shell.xml" });
 
@@ -124,15 +129,6 @@ pub fn build(b: *std.Build) void {
                 const run = b.addSystemCommand(&.{ "wayland-scanner", "private-code", xdg_shell_xml });
                 break :xdg_shell run.addOutputFileArg("xdg-shell-client-protocol.c");
             } });
-
-            inline for (.{
-                .{ "src/glsl/BasicGeometry.vert", "BasicGeometry.vert.spv" },
-                .{ "src/glsl/BasicGeometry.frag", "BasicGeometry.frag.spv" },
-            }) |shader| {
-                const glslc_run_step = b.addSystemCommand(&.{ "glslc", shader[0] });
-                const compiled_spirv_path = glslc_run_step.addPrefixedOutputFileArg("-o", shader[1]);
-                processAsset(b, compiled_spirv_path, shader[1], main_module, asset_preprocessor_executable);
-            }
 
             main_module.linkSystemLibrary("wayland-client", .{});
             main_module.linkSystemLibrary("asound", .{});
@@ -182,12 +178,6 @@ pub fn build(b: *std.Build) void {
         addPlatformMacro(target, main_module);
     }
 
-    // NOTE: This is another workaround. This time around the fact that `bear` does not work with build.zig
-
-    const compile_flags_step = CompileFlagsStep.init(b, main_module);
-    compile_flags_step.step.dependOn(&main_executable.step);
-    b.getInstallStep().dependOn(&compile_flags_step.step);
-
     //
 
     const run_main_executable = b.addRunArtifact(main_executable);
@@ -221,14 +211,26 @@ fn addGameAssets(b: *std.Build, module: *std.Build.Module, asset_preprocessor: *
             continue;
         }
 
-        processAsset(b, b.path(b.pathJoin(&.{ "assets", entry.path })), entry.basename, module, asset_preprocessor);
+        const asset_preprocessor_run_step = b.addRunArtifact(asset_preprocessor);
+        asset_preprocessor_run_step.addFileArg(b.path(b.pathJoin(&.{ "assets", entry.path })));
+        module.addIncludePath(asset_preprocessor_run_step.addOutputFileArg(b.fmt("{s}.h", .{entry.basename})).dirname());
     }
 }
 
-fn processAsset(b: *std.Build, path: std.Build.LazyPath, basename: []const u8, module: *std.Build.Module, asset_preprocessor: *std.Build.Step.Compile) void {
-    const asset_preprocessor_run_step = b.addRunArtifact(asset_preprocessor);
-    asset_preprocessor_run_step.addFileArg(path);
-    module.addIncludePath(asset_preprocessor_run_step.addOutputFileArg(b.fmt("{s}.h", .{basename})).dirname());
+fn addShaderCompileStep(b: *std.Build, module: *std.Build.Module, dxc: std.Build.LazyPath, stage: []const u8, input: []const u8, entrypoint: []const u8, output: []const u8, extra_arguments: []const []const u8) *std.Build.Step.Run {
+    // NOTE: would have used b.addSystemCommand if it did not require initial argv[0]
+    const dxc_run_step = std.Build.Step.Run.create(b, "dxc");
+
+    dxc_run_step.addFileArg(dxc);
+    dxc_run_step.addArgs(&.{ "-T", stage, "-E", entrypoint });
+    dxc_run_step.addArgs(extra_arguments);
+    dxc_run_step.addArgs(&.{"-Fh"});
+
+    module.addIncludePath(dxc_run_step.addOutputFileArg(output).dirname());
+
+    dxc_run_step.addFileArg(b.path(input));
+
+    return dxc_run_step;
 }
 
 const CompileFlagsStep = struct {
@@ -236,7 +238,7 @@ const CompileFlagsStep = struct {
     module: *std.Build.Module,
 
     fn init(b: *std.Build, module: *std.Build.Module) *CompileFlagsStep {
-        const compile_flags = b.allocator.create(CompileFlagsStep) catch @panic("OOM");
+        const compile_flags = b.allocator.create(CompileFlagsStep) catch std.debug.panic("Out of memory.", .{});
         compile_flags.* = .{
             .step = .init(.{
                 .id = .custom,
@@ -268,6 +270,10 @@ const CompileFlagsStep = struct {
                 .path, .path_system, .path_after => |lazy_path| lazy_path,
                 else => continue,
             };
+
+            if (lazy_path == .generated and lazy_path.generated.file.path == null) {
+                continue;
+            }
 
             const cache_path = try lazy_path.getPath4(b, step);
             const full_path = b.pathResolve(&.{ cache_path.root_dir.path orelse ".", cache_path.sub_path });

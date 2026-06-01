@@ -10,11 +10,11 @@ struct PixelShaderInput {
     float2 textureCoordinate  : TEXCOORD;
 };
 
-cbuffer RootConstant : register(b0) {
+cbuffer RootConstant : register(b0, space0) {
     uint activeTextureIndex;
 };
 
-SamplerState linearClampSampler : register(s0);
+SamplerState linearClampSampler : register(s0, space1);
 
 // NOTE: Vertex shader
 // -------------------------------------------------------------------------
