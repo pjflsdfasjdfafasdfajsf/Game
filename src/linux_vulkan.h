@@ -184,7 +184,7 @@ typedef struct {
 #undef DEVICE_FUNCTION
 } Vulkan;
 
-void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
+bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer);
-void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);
+bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);

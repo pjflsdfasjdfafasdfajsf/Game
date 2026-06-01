@@ -355,9 +355,9 @@ void *AudioThreadRoutine(void *threadParameter) {
     return 0;
 }
 
-void AudioInitialize(LinuxAudio *audio) {
+bool AudioInitialize(LinuxAudio *audio) {
     if (!audio) {
-        return;
+        return false;
     }
 
     MemoryZero(audio, sizeof(LinuxAudio));
@@ -370,7 +370,7 @@ void AudioInitialize(LinuxAudio *audio) {
     if (errorCode < 0) {
         fprintf(stderr, "snd_pcm_open: %s\n", snd_strerror(errorCode));
 
-        return;
+        return false;
     }
 
     snd_pcm_hw_params_t *hardwareParameters;
@@ -386,7 +386,7 @@ void AudioInitialize(LinuxAudio *audio) {
     if (errorCode < 0) {
         fprintf(stderr, "snd_pcm_hw_params: %s\n", snd_strerror(errorCode));
 
-        return;
+        return false;
     }
 
     snd_pcm_hw_params_get_buffer_size(hardwareParameters, (snd_pcm_uframes_t *)&audio->bufferFrameCount);
@@ -399,6 +399,8 @@ void AudioInitialize(LinuxAudio *audio) {
     if (pthread_create(&audio->threadHandle, 0, AudioThreadRoutine, audio) != 0) {
         fprintf(stderr, "Could not start audio thread.\n");
     }
+
+    return true;
 }
 
 void MemoryDumpStandardStreams(GameMemory *gameMemory) {
@@ -457,8 +459,11 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMem
                 GameUpdateAndRender(gameMemory, commandBuffer);
             }
 
-            if (VulkanFrameBegin(vulkan, wayland, commandBuffer)) {
-                VulkanFrameEnd(vulkan, commandBuffer);
+            if (!VulkanFrameBegin(vulkan, wayland, commandBuffer)) {
+                continue;
+            }
+            if (!VulkanFrameEnd(vulkan, commandBuffer)) {
+                exit(1);
             }
         } else {
             usleep(100000);
@@ -474,10 +479,14 @@ int main() {
     }
 
     LinuxAudio audio;
-    AudioInitialize(&audio);
+    if (!AudioInitialize(&audio)) {
+        return 1;
+    }
 
     Vulkan vulkan;
-    VulkanInitialize(&vulkan, &wayland);
+    if (!VulkanInitialize(&vulkan, &wayland)) {
+        return 1;
+    }
 
     usize permanentArenaSize = Megabytes(64);
     usize temporaryArenaSize = Megabytes(256);
