@@ -1,5 +1,3 @@
-// TODO:
-// * Flip Y.
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
@@ -8,6 +6,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <assert.h>
+#include <vulkan/vulkan_core.h>
 
 // NOTE: Compiled shaders.
 #include "BasicGeometry.VS.spv.h"
@@ -274,8 +273,8 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .dynamicRendering = VK_TRUE,
     };
 
-    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+    VkPhysicalDeviceVulkan12Features vulkan12Features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &dynamicRendering,
         .descriptorBindingPartiallyBound = VK_TRUE,
         .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
@@ -284,7 +283,7 @@ static void VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 
     VkDeviceCreateInfo deviceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &indexingFeatures,
+        .pNext = &vulkan12Features,
         .pQueueCreateInfos = queueCreateInfos,
         .queueCreateInfoCount = uniqueCount,
         .enabledExtensionCount = ArrayCount(extensions),
@@ -493,6 +492,10 @@ static void VulkanFrameResourcesCreate(Vulkan *vulkan) {
         return;
     }
 
+    VkPhysicalDeviceProperties properties;
+    vulkan->vkGetPhysicalDeviceProperties(vulkan->physicalDevice, &properties);
+    vulkan->uniformStride = (sizeof(u32) + properties.limits.minUniformBufferOffsetAlignment - 1) & ~(properties.limits.minUniformBufferOffsetAlignment - 1);
+
     for (u32 i = 0; i < FRAME_COUNT; i++) {
         VulkanFrameData *frameData = &vulkan->frameData[i];
 
@@ -529,79 +532,96 @@ static void VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
             return;
         }
+
+        frameData->uniformBuffer = VulkanBufferHostVisibleCreate(vulkan, vulkan->uniformStride * 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, (void **)&frameData->uniformData);
+        frameData->uniformCount = 0;
     }
 }
 
 static void VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     VkDescriptorPoolSize poolSizes[] = {
-        {
-            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = MAX_TEXTURES * FRAME_COUNT,
-        },
+        {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = FRAME_COUNT},
+        {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_TEXTURES * FRAME_COUNT},
+        {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = FRAME_COUNT},
     };
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = FRAME_COUNT,
+        .maxSets = FRAME_COUNT * 2,
         .poolSizeCount = ArrayCount(poolSizes),
         .pPoolSizes = poolSizes,
     };
 
-    if (vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan descriptor pool.\n");
+    vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool);
 
-        return;
-    }
-
-    VkDescriptorSetLayoutBinding descriptorBindings[] = {
-        {
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = MAX_TEXTURES,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        },
+    VkDescriptorSetLayoutBinding resourcesSetLayoutBinding[] = {
+        {.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
+        {.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_TEXTURES, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
     };
 
-    VkDescriptorBindingFlags descriptorBindingFlags[] = {
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,
-    };
-
-    VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetBindingFlagsInfo = {
+    VkDescriptorBindingFlags resourcesDescriptorBindingFlags[] = {0, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT};
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo0 = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-        .bindingCount = ArrayCount(descriptorBindings),
-        .pBindingFlags = descriptorBindingFlags,
+        .bindingCount = ArrayCount(resourcesDescriptorBindingFlags),
+        .pBindingFlags = resourcesDescriptorBindingFlags,
     };
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+    VkDescriptorSetLayoutCreateInfo resourcesDescriptorSetLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = &descriptorSetBindingFlagsInfo,
-        .bindingCount = ArrayCount(descriptorBindings),
-        .pBindings = descriptorBindings,
+        .pNext = &flagsInfo0,
+        .bindingCount = ArrayCount(resourcesSetLayoutBinding),
+        .pBindings = resourcesSetLayoutBinding,
+    };
+    vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout);
+
+    VkDescriptorSetLayoutBinding samplersSetLayoutBinding[] = {
+        {.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
     };
 
-    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &descriptorSetLayoutCreateInfo, 0, &vulkan->descriptorLayout) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan descriptor set layout.\n");
-
-        return;
-    }
-
-    VkDescriptorSetLayout perSetLayouts[] = {
-        vulkan->descriptorLayout,
-        vulkan->descriptorLayout,
-        vulkan->descriptorLayout,
+    VkDescriptorSetLayoutCreateInfo samplersDescriptorSetLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = ArrayCount(samplersSetLayoutBinding),
+        .pBindings = samplersSetLayoutBinding,
     };
+    vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout);
 
-    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorSetCount = FRAME_COUNT,
-        .pSetLayouts = perSetLayouts,
-        .descriptorPool = vulkan->descriptorPool,
-    };
+    for (u32 i = 0; i < FRAME_COUNT; i++) {
+        VkDescriptorSetLayout descriptorSetLayouts[] = {vulkan->resourceDescriptorLayout, vulkan->samplerDescriptorSetLayout};
 
-    if (vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, vulkan->descriptorSets) != VK_SUCCESS) {
-        printf("ERROR: failed to allocate vulkan descriptor sets.\n");
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = vulkan->descriptorPool,
+            .descriptorSetCount = 2,
+            .pSetLayouts = descriptorSetLayouts,
+        };
 
-        return;
+        VkDescriptorSet descriptorSets[2];
+        vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets);
+        vulkan->resourceDescriptorSets[i] = descriptorSets[0];
+        vulkan->samplerDescriptorSets[i] = descriptorSets[1];
+
+        VkDescriptorBufferInfo descriptorBufferCreateInfo = {.buffer = vulkan->frameData[i].uniformBuffer.handle, .offset = 0, .range = sizeof(u32)};
+        VkWriteDescriptorSet writeResourcesDescriptorSet = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vulkan->resourceDescriptorSets[i],
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .pBufferInfo = &descriptorBufferCreateInfo,
+        };
+
+        VkDescriptorImageInfo samplerDescriptorImageInfo = {.sampler = vulkan->textureSampler};
+        VkWriteDescriptorSet writeSamplerDescriptorSet = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vulkan->samplerDescriptorSets[i],
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .pImageInfo = &samplerDescriptorImageInfo,
+        };
+
+        VkWriteDescriptorSet descriptorSetWrites[] = {writeResourcesDescriptorSet, writeSamplerDescriptorSet};
+        vulkan->vkUpdateDescriptorSets(vulkan->logicalDevice, 2, descriptorSetWrites, 0, 0);
     }
 }
 
@@ -745,17 +765,11 @@ static void VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
         .pColorAttachmentFormats = &vulkan->swapchain.format,
     };
 
-    VkPushConstantRange pushConstantRange = {
-        .size = sizeof(VulkanPushConstant),
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-    };
-
+    VkDescriptorSetLayout descriptorSetLayouts[] = {vulkan->resourceDescriptorLayout, vulkan->samplerDescriptorSetLayout};
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .pPushConstantRanges = &pushConstantRange,
-        .pushConstantRangeCount = 1,
-        .setLayoutCount = 1,
-        .pSetLayouts = &vulkan->descriptorLayout,
+        .setLayoutCount = ArrayCount(descriptorSetLayouts),
+        .pSetLayouts = descriptorSetLayouts,
     };
 
     if (vulkan->vkCreatePipelineLayout(vulkan->logicalDevice, &pipelineLayoutCreateInfo, 0, &vulkan->pipelineLayout) != VK_SUCCESS) {
@@ -808,78 +822,6 @@ static void VulkanSamplerCreate(Vulkan *vulkan) {
 
         return;
     }
-}
-
-static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
-#define INSTANCE_FUNCTION(name) \
-    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
-    VULKAN_INSTANCE_FUNCTIONS
-#undef INSTANCE_FUNCTION
-
-#if defined(DEBUG)
-#define DEBUG_FUNCTION(name) \
-    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
-    VULKAN_DEBUG_FUNCTIONS
-#undef DEBUG_FUNCTION
-    VulkanDebugMessengerCreate(vulkan);
-#endif
-
-    VulkanPhysicalDevicePick(vulkan);
-    VulkanLogicalDeviceCreate(vulkan);
-
-#define DEVICE_FUNCTION(name) \
-    vulkan->name = (PFN_##name)vulkan->vkGetDeviceProcAddr(vulkan->logicalDevice, #name);
-    VULKAN_DEVICE_FUNCTIONS
-#undef DEVICE_FUNCTION
-
-    vulkan->vkGetDeviceQueue(vulkan->logicalDevice, vulkan->queueFamilies.graphicsIndex, 0, &vulkan->graphicsQueue);
-    vulkan->vkGetDeviceQueue(vulkan->logicalDevice, vulkan->queueFamilies.presentIndex, 0, &vulkan->presentQueue);
-
-    VulkanSwapchainCreate(vulkan, window->width, window->height);
-    VulkanFrameResourcesCreate(vulkan);
-    VulkanDescriptorSetsCreate(vulkan);
-    VulkanGraphicsPipelineCreate(vulkan);
-    VulkanSamplerCreate(vulkan);
-
-    vulkan->vertexCount = 0;
-    vulkan->vertexCapacity = 4096;
-    vulkan->vertexBuffer = VulkanBufferHostVisibleCreate(vulkan, vulkan->vertexCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, (void **)&vulkan->vertexData);
-
-    vulkan->frameIndex = 0;
-    vulkan->textureCount = 0;
-}
-
-// NOTE: divide this into windows and linux versions for the future
-void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
-    MemoryZero(vulkan, sizeof(Vulkan));
-
-    void *libVulkan = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
-    if (!libVulkan) {
-        printf("ERROR: Could not load libvulkan.so.1: %s\n", dlerror());
-        return;
-    }
-
-    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(libVulkan, "vkGetInstanceProcAddr");
-    PFN_vkCreateInstance vkCreateInstance = (PFN_vkCreateInstance)vkGetInstanceProcAddr(0, "vkCreateInstance");
-
-    VulkanInstanceCreate(vulkan, vkCreateInstance, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-    vulkan->vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-
-    PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(vulkan->instance, "vkCreateWaylandSurfaceKHR");
-
-    VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
-        .display = window->display,
-        .surface = window->surface,
-    };
-
-    if (vkCreateWaylandSurfaceKHR(vulkan->instance, &surfaceCreateInfo, 0, &vulkan->surface) != VK_SUCCESS) {
-        printf("ERROR: failed to create wayland vulkan surface.\n");
-
-        return;
-    }
-
-    VulkanCommonInitialize(vulkan, window);
 }
 
 u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
@@ -1079,7 +1021,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     vulkan->vkDestroyCommandPool(vulkan->logicalDevice, commandPool, 0);
     VulkanBufferHostVisibleDestroy(vulkan, stagingBuffer);
 
-    vulkan->textures[index - 1] = result;
+    vulkan->textures[index] = result;
     vulkan->textureCount++;
 
     VkDescriptorImageInfo imageInfo = {
@@ -1090,19 +1032,94 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     VkWriteDescriptorSet descriptorWrite = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .dstBinding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+        .dstBinding = 1,
         .descriptorCount = 1,
         .pImageInfo = &imageInfo,
-        .dstArrayElement = index - 1,
+        .dstArrayElement = index,
     };
 
     for (u32 i = 0; i < FRAME_COUNT; i++) {
-        descriptorWrite.dstSet = vulkan->descriptorSets[i];
+        descriptorWrite.dstSet = vulkan->resourceDescriptorSets[i];
         vulkan->vkUpdateDescriptorSets(vulkan->logicalDevice, 1, &descriptorWrite, 0, 0);
     }
 
     return index;
+}
+
+static void VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
+#define INSTANCE_FUNCTION(name) \
+    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
+    VULKAN_INSTANCE_FUNCTIONS
+#undef INSTANCE_FUNCTION
+
+#if defined(DEBUG)
+#define DEBUG_FUNCTION(name) \
+    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
+    VULKAN_DEBUG_FUNCTIONS
+#undef DEBUG_FUNCTION
+    VulkanDebugMessengerCreate(vulkan);
+#endif
+
+    VulkanPhysicalDevicePick(vulkan);
+    VulkanLogicalDeviceCreate(vulkan);
+
+#define DEVICE_FUNCTION(name) \
+    vulkan->name = (PFN_##name)vulkan->vkGetDeviceProcAddr(vulkan->logicalDevice, #name);
+    VULKAN_DEVICE_FUNCTIONS
+#undef DEVICE_FUNCTION
+
+    vulkan->vkGetDeviceQueue(vulkan->logicalDevice, vulkan->queueFamilies.graphicsIndex, 0, &vulkan->graphicsQueue);
+    vulkan->vkGetDeviceQueue(vulkan->logicalDevice, vulkan->queueFamilies.presentIndex, 0, &vulkan->presentQueue);
+
+    VulkanSwapchainCreate(vulkan, window->width, window->height);
+    VulkanFrameResourcesCreate(vulkan);
+    VulkanSamplerCreate(vulkan);
+    VulkanDescriptorSetsCreate(vulkan);
+    VulkanGraphicsPipelineCreate(vulkan);
+
+    u32 whitePixel = 0xFFFFFFFF;
+    VulkanTextureCreate(vulkan, 0, (Vector2U){1, 1}, 4, &whitePixel);
+
+    vulkan->vertexCount = 0;
+    vulkan->vertexCapacity = 4096;
+    vulkan->vertexBuffer = VulkanBufferHostVisibleCreate(vulkan, vulkan->vertexCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, (void **)&vulkan->vertexData);
+
+    vulkan->frameIndex = 0;
+    vulkan->textureCount = 0;
+}
+
+// NOTE: divide this into windows and linux versions for the future
+void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
+    MemoryZero(vulkan, sizeof(Vulkan));
+
+    void *libVulkan = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+    if (!libVulkan) {
+        printf("ERROR: Could not load libvulkan.so.1: %s\n", dlerror());
+        return;
+    }
+
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(libVulkan, "vkGetInstanceProcAddr");
+    PFN_vkCreateInstance vkCreateInstance = (PFN_vkCreateInstance)vkGetInstanceProcAddr(0, "vkCreateInstance");
+
+    VulkanInstanceCreate(vulkan, vkCreateInstance, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
+    vulkan->vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+
+    PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(vulkan->instance, "vkCreateWaylandSurfaceKHR");
+
+    VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+        .display = window->display,
+        .surface = window->surface,
+    };
+
+    if (vkCreateWaylandSurfaceKHR(vulkan->instance, &surfaceCreateInfo, 0, &vulkan->surface) != VK_SUCCESS) {
+        printf("ERROR: failed to create wayland vulkan surface.\n");
+
+        return;
+    }
+
+    VulkanCommonInitialize(vulkan, window);
 }
 
 static void VulkanFramePassTransfer(Vulkan *vulkan, const RenderCommandBuffer *commandBuffer) {
@@ -1175,15 +1192,14 @@ static void VulkanFramePassRender(Vulkan *vulkan, const RenderCommandBuffer *com
                 VkDeviceSize offset = vulkan->vertexCount * sizeof(Vertex);
                 vulkan->vkCmdBindVertexBuffers(frameData->commandBuffer, 0, 1, &vulkan->vertexBuffer.handle, &offset);
 
-                VulkanPushConstant pushConstant = {
-                    .textureIndex = command->texture,
-                };
+                u32 *destination = (u32 *)(frameData->uniformData + (frameData->uniformCount * vulkan->uniformStride));
 
-                vulkan->vkCmdPushConstants(frameData->commandBuffer, vulkan->pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VulkanPushConstant), &pushConstant);
+                *destination = command->texture;
+
+                u32 dynamicOffset = frameData->uniformCount * vulkan->uniformStride;
+                vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 0, 1, &vulkan->resourceDescriptorSets[vulkan->frameIndex], 1, &dynamicOffset);
 
                 vulkan->vkCmdDraw(frameData->commandBuffer, 6, 1, 0, 0);
-
-                vulkan->vertexCount += verticesPerRectangle;
             }
         } break;
         }
@@ -1264,9 +1280,9 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 
     VkViewport viewport = {
         .x = 0.0f,
-        .y = 0.0f,
+        .y = (float)vulkan->swapchain.extent.height,
         .width = (float)vulkan->swapchain.extent.width,
-        .height = (float)vulkan->swapchain.extent.height,
+        .height = -(float)vulkan->swapchain.extent.height,
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
     };
@@ -1280,7 +1296,9 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
     vulkan->vkCmdSetScissor(frameData->commandBuffer, 0, 1, &scissor);
 
     vulkan->vkCmdBindPipeline(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipeline);
-    vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 0, 1, &vulkan->descriptorSets[vulkan->frameIndex], 0, 0);
+    vulkan->vkCmdBindDescriptorSets(frameData->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan->pipelineLayout, 1, 1, &vulkan->samplerDescriptorSets[vulkan->frameIndex], 0, 0);
+
+    frameData->uniformCount = 0;
 
     return true;
 }

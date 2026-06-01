@@ -1,9 +1,7 @@
-
 #pragma once
 
 #include "game_platform.h"
 #include "linux.h"
-#include <vulkan/vulkan_core.h>
 
 #define VK_USE_PLATFORM_WAYLAND_KHR
 #include <vulkan/vulkan.h>
@@ -109,12 +107,6 @@ typedef struct {
 } VulkanSwapchain;
 
 typedef struct {
-    VkCommandBuffer commandBuffer;
-    VkSemaphore imageAvailableSemaphore;
-    VkFence inFlightFence;
-} VulkanFrameData;
-
-typedef struct {
     VkImage handle;
     VkImageView view;
     VkDeviceMemory memory;
@@ -125,6 +117,16 @@ typedef struct {
     VkDeviceMemory memory;
     VkDeviceSize size;
 } VulkanBuffer;
+
+typedef struct {
+    VkCommandBuffer commandBuffer;
+    VkSemaphore imageAvailableSemaphore;
+    VkFence inFlightFence;
+
+    VulkanBuffer uniformBuffer;
+    u8 *uniformData;
+    u32 uniformCount;
+} VulkanFrameData;
 
 typedef struct {
     VkInstance instance;
@@ -145,8 +147,12 @@ typedef struct {
     VkPipelineLayout pipelineLayout;
 
     VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorLayout;
-    VkDescriptorSet descriptorSets[FRAME_COUNT];
+
+    VkDescriptorSetLayout resourceDescriptorLayout;
+    VkDescriptorSetLayout samplerDescriptorSetLayout;
+    VkDescriptorSet resourceDescriptorSets[FRAME_COUNT];
+    VkDescriptorSet samplerDescriptorSets[FRAME_COUNT];
+    u32 uniformStride;
 
     VkSampler textureSampler;
 
@@ -182,5 +188,3 @@ void VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer);
 void VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);
-
-

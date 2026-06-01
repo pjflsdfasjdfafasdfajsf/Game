@@ -27,7 +27,7 @@ EXPORTED UPDATE_AND_RENDER(UpdateAndRender) {
     }
 
     RenderClearEntireScreen(commandBuffer, Black);
-    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(200, 200), Red, 1);
+    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(200, 200), Red, Untextured);
 }
 
 // Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.
