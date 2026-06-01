@@ -10,6 +10,16 @@ const game_source_files: []const []const u8 = &.{
     "src/game_rectangle_pack.c",
 };
 
+const linux_source_files: []const []const u8 = &.{
+    "src/linux.c",
+    "src/linux_vulkan.c",
+};
+
+const win32_source_files: []const []const u8 = &.{
+    "src/win32.c",
+    "src/win32_d3d12.c",
+};
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
         .whitelist = &.{
@@ -45,8 +55,9 @@ pub fn build(b: *std.Build) void {
     }
     main_module.addCSourceFiles(.{
         .files = switch (target.result.os.tag) {
-            .windows => &.{ "src/win32.c", "src/win32_d3d12.c" },
-            .linux => &.{ "src/linux.c", "src/linux_vulkan.c" },
+            .windows => win32_source_files,
+            .linux => linux_source_files,
+
             else => unreachable,
         },
     });
@@ -63,6 +74,7 @@ pub fn build(b: *std.Build) void {
             const dxc = switch (b.graph.host.result.os.tag) {
                 .windows => (b.lazyDependency("dxc-win32", .{}) orelse return).path("bin/x64/dxc.exe"),
                 .linux => (b.lazyDependency("dxc-linux", .{}) orelse return).path("bin/dxc"),
+
                 else => unreachable,
             };
 
