@@ -1,7 +1,8 @@
 // TODO:
 // * Refactor and improve error handling to be more like in Win32.
 //   - [x] Use bool for return type when a function can fail
-//   - [ ] Check all Vulkan API calls
+//   - [x] Check all Vulkan API calls
+//         - [ ] Print all VkResult's
 // * Add support for Windows. So on Windows there must be a choice between DirectX and Vulkan, and on Linux, well, nothing would change. Maybe there will be OpenGL later.
 // * I think I noticed that some things between Vulkan and DirectX are repeated. Maybe we can put them somewhere like game_renderer.c?
 // * Make all `fprintf`s calls (error printing basically) consistent.
@@ -54,7 +55,7 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
     };
 
     if (vulkan->vkCreateBuffer(vulkan->logicalDevice, &bufferCreateInfo, 0, &result.handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan host visible buffer.\n");
+        fprintf(stderr, "ERROR: vkCreateBuffer\n");
 
         return result;
     }
@@ -69,19 +70,19 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
     };
 
     if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to allocate vulkan memory.\n");
+        fprintf(stderr, "ERROR: vkAllocateMemory\n");
 
         return result;
     }
 
     if (vulkan->vkBindBufferMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to bind vulkan host visible buffer.\n");
+        fprintf(stderr, "ERROR: vkBindBufferMemory\n");
 
         return result;
     }
 
     if (vulkan->vkMapMemory(vulkan->logicalDevice, result.memory, 0, result.size, 0, mapped) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to map vulkan host visible memroy.\n");
+        fprintf(stderr, "ERROR: vkMapMemory\n");
 
         return result;
     }
@@ -159,7 +160,7 @@ static void VulkanDebugMessengerCreate(Vulkan *vulkan) {
     };
 
     if (vulkan->vkCreateDebugUtilsMessengerEXT(vulkan->instance, &debugMessengerCreateInfo, 0, &vulkan->debugMessenger) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan debug messenger.\n");
+        fprintf(stderr, "ERROR: vkCreateDebugUtilsMessengerEXT\n");
 
         return;
     }
@@ -190,7 +191,6 @@ static void VulkanQueueFamiliesFind(Vulkan *vulkan, VkPhysicalDevice physicalDev
 
         VkBool32 presentSupport = false;
         vulkan->vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, vulkan->surface, &presentSupport);
-
         if (presentSupport) {
             vulkan->queueFamilies.presentIndex = i;
         }
@@ -213,12 +213,20 @@ static bool VulkanPhysicalDeviceSuitable(Vulkan *vulkan, VkPhysicalDevice physic
 
 static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
     u32 count = 0;
-    vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0);
+    if (vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkEnumeratePhysicalDevices\n");
+
+        return false;
+    };
 
     count = Min(count, 8);
 
     VkPhysicalDevice devices[8];
-    vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices);
+    if (vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkEnumeratePhysicalDevices\n");
+
+        return false;
+    };
 
     for (u32 i = 0; i < count; i++) {
         if (VulkanPhysicalDeviceSuitable(vulkan, devices[i])) {
@@ -297,7 +305,7 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
     };
 
     if (vulkan->vkCreateDevice(vulkan->physicalDevice, &deviceCreateInfo, 0, &vulkan->logicalDevice) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan device.\n");
+        fprintf(stderr, "ERROR: vkCreateDevice\n");
 
         return false;
     }
@@ -308,8 +316,16 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
     VulkanSwapchainSupport result = {0};
 
-    vulkan->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->physicalDevice, vulkan->surface, &result.capabilities);
-    vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, 0);
+    if (vulkan->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->physicalDevice, vulkan->surface, &result.capabilities) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceCapabilitiesKHR\n");
+
+        return result;
+    };
+    if (vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, 0) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceFormatsKHR\n");
+
+        return result;
+    };
     if (!result.formatCount) {
         fprintf(stderr, "ERROR: Failed to get vulkan surface formats.\n");
 
@@ -318,16 +334,28 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 
     // NOTE: There will be a segmentation fault if we don't clamp this because drivers can sometimes return just a lot of them.
     result.formatCount = Min(result.formatCount, 32);
-    vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
+    if (vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceFormatsKHR\n");
 
-    vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
+        return result;
+    };
+
+    if (vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfacePresentModesKHR\n");
+
+        return result;
+    };
     if (!result.presentModeCount) {
         fprintf(stderr, "ERROR: Failed to get vulkan surface present modes.\n");
 
         return result;
     }
     result.presentModeCount = Min(result.presentModeCount, 8);
-    vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
+    if (vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfacePresentModesKHR\n");
+
+        return result;
+    };
 
     return result;
 }
@@ -423,16 +451,24 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
 
     VulkanSwapchain *swapchain = &vulkan->swapchain;
     if (vulkan->vkCreateSwapchainKHR(vulkan->logicalDevice, &swapchainCreateInfo, 0, &swapchain->handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan swapchain.\n");
+        fprintf(stderr, "ERROR: vkCreateSwapchainKHR\n");
 
         return false;
     }
     swapchain->format = surfaceFormat.format;
     swapchain->extent = extent;
 
-    vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, 0);
+    if (vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, 0) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetSwapchainImagesKHR\n");
+
+        return false;
+    };
     assert(swapchain->imageCount <= VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT);
-    vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, swapchain->images);
+    if (vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, swapchain->images) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkGetSwapchainImagesKHR\n");
+
+        return false;
+    };
 
     for (u32 i = 0; i < swapchain->imageCount; i++) {
         VkImageViewCreateInfo imageViewCreateInfo = {
@@ -454,7 +490,7 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
         };
 
         if (vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &swapchain->imageViews[i]) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: Failed to create vulkan swapchain image view.\n");
+            fprintf(stderr, "ERROR: vkCreateImageView\n");
 
             return false;
         }
@@ -464,7 +500,7 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
         };
 
         if (vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &swapchain->renderFinishedSemaphore[i]) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: Failed to create vulkan semaphore.\n");
+            fprintf(stderr, "ERROR: vkCreateSemaphore\n");
 
             return false;
         }
@@ -484,7 +520,9 @@ static void VulkanSwapchainDestroy(Vulkan *vulkan) {
 
 static void VulkanSwapchainRecreate(Vulkan *vulkan, u32 windowWidth, u32 windowHeight) {
     // NOTE: get rid of this wait later for smooth swapchain resizing
-    vulkan->vkDeviceWaitIdle(vulkan->logicalDevice);
+    if (vulkan->vkDeviceWaitIdle(vulkan->logicalDevice) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkDeviceWaitIdle\n");
+    };
     VulkanSwapchainDestroy(vulkan);
     VulkanSwapchainCreate(vulkan, windowWidth, windowHeight);
 }
@@ -497,7 +535,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
     };
 
     if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &vulkan->commandPool) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan command pool.\n");
+        fprintf(stderr, "ERROR: vkCreateCommandPool\n");
 
         return false;
     }
@@ -517,7 +555,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
         };
 
         if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &allocateInfo, &frameData->commandBuffer) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: Failed to create vulkan command buffer.\n");
+            fprintf(stderr, "ERROR: vkAllocateCommandBuffers\n");
 
             return false;
         }
@@ -527,7 +565,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
         };
 
         if (vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &frameData->imageAvailableSemaphore) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: Failed to create vulkan semaphore.\n");
+            fprintf(stderr, "ERROR: vkCreateSemaphore\n");
 
             return false;
         }
@@ -538,7 +576,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
         };
 
         if (vulkan->vkCreateFence(vulkan->logicalDevice, &fenceCreateInfo, 0, &frameData->inFlightFence) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: Failed to create vulkan fence.\n");
+            fprintf(stderr, "ERROR: vkCreateFence\n");
 
             return false;
         }
@@ -565,7 +603,11 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .pPoolSizes = poolSizes,
     };
 
-    vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool);
+    if (vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkCreateDescriptorPool\n");
+
+        return false;
+    };
 
     VkDescriptorSetLayoutBinding resourcesSetLayoutBinding[] = {
         {.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
@@ -585,7 +627,11 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .bindingCount = ArrayCount(resourcesSetLayoutBinding),
         .pBindings = resourcesSetLayoutBinding,
     };
-    vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout);
+    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkCreateDescriptorSetLayout\n");
+
+        return false;
+    };
 
     VkDescriptorSetLayoutBinding samplersSetLayoutBinding[] = {
         {.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
@@ -596,7 +642,11 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .bindingCount = ArrayCount(samplersSetLayoutBinding),
         .pBindings = samplersSetLayoutBinding,
     };
-    vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout);
+    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkCreateDescriptorSetLayout\n");
+
+        return false;
+    };
 
     for (u32 i = 0; i < FRAME_COUNT; i++) {
         VkDescriptorSetLayout descriptorSetLayouts[] = {vulkan->resourceDescriptorLayout, vulkan->samplerDescriptorSetLayout};
@@ -609,7 +659,11 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         };
 
         VkDescriptorSet descriptorSets[2];
-        vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets);
+        if (vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets) != VK_SUCCESS) {
+            fprintf(stderr, "ERROR: vkAllocateDescriptorSets\n");
+
+            return false;
+        };
         vulkan->resourceDescriptorSets[i] = descriptorSets[0];
         vulkan->samplerDescriptorSets[i] = descriptorSets[1];
 
@@ -656,12 +710,12 @@ static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     VkShaderModule vertexModule, fragmentModule;
 
     if (vulkan->vkCreateShaderModule(vulkan->logicalDevice, &vertexShaderCreateInfo, 0, &vertexModule) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan vertex shader module.\n");
+        fprintf(stderr, "ERROR: vkCreateShaderModule\n");
 
         return false;
     }
     if (vulkan->vkCreateShaderModule(vulkan->logicalDevice, &fragmentShaderCreateInfo, 0, &fragmentModule) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan fragment shader module.\n");
+        fprintf(stderr, "ERROR: vkCreateShaderModule\n");
 
         return false;
     }
@@ -789,7 +843,7 @@ static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
 
     if (vulkan->vkCreatePipelineLayout(vulkan->logicalDevice, &pipelineLayoutCreateInfo, 0, &vulkan->pipelineLayout) != VK_SUCCESS) {
         // NOTE: fatal error so we do not care about destroying shader modules
-        fprintf(stderr, "ERROR: Failed to create vulkan pipeline layout.\n");
+        fprintf(stderr, "ERROR: vkCreatePipelineLayout\n");
 
         return false;
     }
@@ -812,7 +866,7 @@ static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
 
     if (vulkan->vkCreateGraphicsPipelines(vulkan->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, 0, &vulkan->pipeline) != VK_SUCCESS) {
         // NOTE: fatal error so we do not care about destroying shader modules
-        fprintf(stderr, "ERROR: Failed to create vulkan pipeline.\n");
+        fprintf(stderr, "ERROR: vkCreateGraphicsPipelines\n");
 
         return false;
     }
@@ -835,7 +889,7 @@ static bool VulkanSamplerCreate(Vulkan *vulkan) {
     };
 
     if (vulkan->vkCreateSampler(vulkan->logicalDevice, &samplerCreateInfo, 0, &vulkan->textureSampler) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan sampler.\n");
+        fprintf(stderr, "ERROR: vkCreateSampler\n");
 
         return false;
     }
@@ -865,7 +919,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan image.\n");
+        fprintf(stderr, "ERROR: vkCreateImage\n");
 
         return 0;
     }
@@ -880,13 +934,13 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to allocate vulkan image memory.\n");
+        fprintf(stderr, "ERROR: vkAllocateMemory\n");
 
         return 0;
     }
 
     if (vulkan->vkBindImageMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to bind vulkan image memory.\n");
+        fprintf(stderr, "ERROR: vkBindImageMemory\n");
 
         return 0;
     }
@@ -904,7 +958,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &result.view) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan image view.\n");
+        fprintf(stderr, "ERROR: vkCreateImageView\n");
 
         return 0;
     }
@@ -939,7 +993,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan staging command pool.\n");
+        fprintf(stderr, "ERROR: vkCreateCommandPool\n");
 
         return 0;
     }
@@ -952,7 +1006,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to allocate vulkan staging command buffer.\n");
+        fprintf(stderr, "ERROR: vkAllocateCommandBuffers\n");
 
         return 0;
     }
@@ -963,7 +1017,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to beging recording into vulkan staging command buffer.\n");
+        fprintf(stderr, "ERROR: vkBeginCommandBuffer\n");
 
         return 0;
     }
@@ -1014,7 +1068,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
     if (vulkan->vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to end recording into vulkan staging command buffer.\n");
+        fprintf(stderr, "ERROR: vkEndCommandBuffer\n");
 
         return 0;
     }
@@ -1026,13 +1080,13 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     };
 
     if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to submit vulkan staging buffer command.\n");
+        fprintf(stderr, "ERROR: vkQueueSubmit\n");
 
         return 0;
     }
 
     if (vulkan->vkQueueWaitIdle(vulkan->graphicsQueue) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to wait for vulkan graphics queue.\n");
+        fprintf(stderr, "ERROR: vkQueueWaitIdle\n");
 
         return 0;
     }
@@ -1258,15 +1312,27 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
         return false;
     }
 
-    vulkan->vkWaitForFences(vulkan->logicalDevice, 1, &frameData->inFlightFence, VK_TRUE, UINT64_MAX);
+    if (vulkan->vkWaitForFences(vulkan->logicalDevice, 1, &frameData->inFlightFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkWaitForFences\n");
+
+        return false;
+    };
     VkResult result = vulkan->vkAcquireNextImageKHR(vulkan->logicalDevice, vulkan->swapchain.handle, UINT64_MAX, frameData->imageAvailableSemaphore, 0, &vulkan->imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         VulkanSwapchainRecreate(vulkan, window->width, window->height);
         return false;
     }
 
-    vulkan->vkResetFences(vulkan->logicalDevice, 1, &frameData->inFlightFence);
-    vulkan->vkResetCommandBuffer(frameData->commandBuffer, 0);
+    if (vulkan->vkResetFences(vulkan->logicalDevice, 1, &frameData->inFlightFence) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkResetFences\n");
+
+        return false;
+    };
+    if (vulkan->vkResetCommandBuffer(frameData->commandBuffer, 0) != VK_SUCCESS) {
+        fprintf(stderr, "ERROR: vkResetCommandBuffer\n");
+
+        return false;
+    };
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1274,7 +1340,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
     };
 
     if (vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: could not beging command buffer.\n");
+        fprintf(stderr, "ERROR: vkBeginCommandBuffer\n");
     }
 
     VkImageMemoryBarrier imageMemoryBarrier = {
@@ -1368,7 +1434,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
     vulkan->vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
     if (vulkan->vkEndCommandBuffer(frameData->commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to end recording vulkan command buffer.\n");
+        fprintf(stderr, "ERROR: vkEndCommandBuffer\n");
 
         return false;
     }
@@ -1397,7 +1463,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
     };
 
     if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, frameData->inFlightFence) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to present graphics queue.\n");
+        fprintf(stderr, "ERROR: vkQueueSubmit\n");
 
         return false;
     }
@@ -1412,7 +1478,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
     };
 
     if (vulkan->vkQueuePresentKHR(vulkan->presentQueue, &presentInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to present present queue.\n");
+        fprintf(stderr, "ERROR: vkQueuePresentKHR\n");
 
         return false;
     }
