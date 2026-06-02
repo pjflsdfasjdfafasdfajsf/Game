@@ -1,8 +1,4 @@
 // TODO:
-// * Refactor and improve error handling to be more like in Win32.
-//   - [x] Use bool for return type when a function can fail
-//   - [x] Check all Vulkan API calls
-//         - [ ] Print all VkResult's
 // * Add support for Windows. So on Windows there must be a choice between DirectX and Vulkan, and on Linux, well, nothing would change. Maybe there will be OpenGL later.
 // * I think I noticed that some things between Vulkan and DirectX are repeated. Maybe we can put them somewhere like game_renderer.c?
 // * Make all `fprintf`s calls (error printing basically) consistent.
@@ -42,7 +38,14 @@ static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryProperty
     return 0;
 }
 
+// TODO: This will be in linux_vulkan.h once we refactor to use MemoryStream
+static void VkResultPrintError(const char *functionName, VkResult functionResult) {
+    fprintf(stderr, "ERROR: %s: %s\n", functionName, VkResultToString(functionResult));
+}
+
 static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize size, VkBufferUsageFlags flags, void **mapped) {
+    VkResult vkResult;
+
     VulkanBuffer result = {
         .size = size,
     };
@@ -54,9 +57,9 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
         .size = size,
     };
 
-    if (vulkan->vkCreateBuffer(vulkan->logicalDevice, &bufferCreateInfo, 0, &result.handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateBuffer\n");
-
+    vkResult = vulkan->vkCreateBuffer(vulkan->logicalDevice, &bufferCreateInfo, 0, &result.handle);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateBuffer", vkResult);
         return result;
     }
 
@@ -69,21 +72,21 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
         .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
     };
 
-    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkAllocateMemory\n");
-
+    vkResult = vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkAllocateMemory", vkResult);
         return result;
     }
 
-    if (vulkan->vkBindBufferMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkBindBufferMemory\n");
-
+    vkResult = vulkan->vkBindBufferMemory(vulkan->logicalDevice, result.handle, result.memory, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkBindBufferMemory", vkResult);
         return result;
     }
 
-    if (vulkan->vkMapMemory(vulkan->logicalDevice, result.memory, 0, result.size, 0, mapped) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkMapMemory\n");
-
+    vkResult = vulkan->vkMapMemory(vulkan->logicalDevice, result.memory, 0, result.size, 0, mapped);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkMapMemory", vkResult);
         return result;
     }
 
@@ -159,9 +162,9 @@ static void VulkanDebugMessengerCreate(Vulkan *vulkan) {
         .pfnUserCallback = VulkanDebugMessengerCallback,
     };
 
-    if (vulkan->vkCreateDebugUtilsMessengerEXT(vulkan->instance, &debugMessengerCreateInfo, 0, &vulkan->debugMessenger) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateDebugUtilsMessengerEXT\n");
-
+    vkResult = vulkan->vkCreateDebugUtilsMessengerEXT(vulkan->instance, &debugMessengerCreateInfo, 0, &vulkan->debugMessenger);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateDebugUtilsMessengerEXT", vkResult);
         return;
     }
 }
@@ -212,19 +215,22 @@ static bool VulkanPhysicalDeviceSuitable(Vulkan *vulkan, VkPhysicalDevice physic
 }
 
 static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
-    u32 count = 0;
-    if (vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkEnumeratePhysicalDevices\n");
+    VkResult vkResult;
 
+    u32 count = 0;
+
+    vkResult = vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkEnumeratePhysicalDevices", vkResult);
         return false;
     };
 
     count = Min(count, 8);
 
     VkPhysicalDevice devices[8];
-    if (vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkEnumeratePhysicalDevices\n");
-
+    vkResult = vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkEnumeratePhysicalDevices", vkResult);
         return false;
     };
 
@@ -255,6 +261,8 @@ static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
 }
 
 static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
+    VkResult vkResult;
+
     const char *extensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
@@ -304,9 +312,9 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
         .ppEnabledExtensionNames = extensions,
     };
 
-    if (vulkan->vkCreateDevice(vulkan->physicalDevice, &deviceCreateInfo, 0, &vulkan->logicalDevice) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateDevice\n");
-
+    vkResult = vulkan->vkCreateDevice(vulkan->physicalDevice, &deviceCreateInfo, 0, &vulkan->logicalDevice);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateDevice", vkResult);
         return false;
     }
 
@@ -314,16 +322,18 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 }
 
 static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
+    VkResult vkResult;
+
     VulkanSwapchainSupport result = {0};
 
-    if (vulkan->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->physicalDevice, vulkan->surface, &result.capabilities) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceCapabilitiesKHR\n");
-
+    vkResult = vulkan->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->physicalDevice, vulkan->surface, &result.capabilities);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetPhysicalDeviceSurfaceCapabilitiesKHR", vkResult);
         return result;
     };
-    if (vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceFormatsKHR\n");
-
+    vkResult = vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
         return result;
     };
     if (!result.formatCount) {
@@ -334,15 +344,15 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 
     // NOTE: There will be a segmentation fault if we don't clamp this because drivers can sometimes return just a lot of them.
     result.formatCount = Min(result.formatCount, 32);
-    if (vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfaceFormatsKHR\n");
-
+    vkResult = vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
         return result;
     };
 
-    if (vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfacePresentModesKHR\n");
-
+    vkResult = vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
         return result;
     };
     if (!result.presentModeCount) {
@@ -351,9 +361,9 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
         return result;
     }
     result.presentModeCount = Min(result.presentModeCount, 8);
-    if (vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetPhysicalDeviceSurfacePresentModesKHR\n");
-
+    vkResult = vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
         return result;
     };
 
@@ -409,6 +419,8 @@ static VkExtent2D VulkanExtentSelect(VulkanSwapchainSupport *support, u32 width,
 }
 
 static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHeight) {
+    VkResult vkResult;
+
     VulkanSwapchainSupport support = VulkanSwapchainSupportQuery(vulkan);
     VkSurfaceFormatKHR surfaceFormat = VulkanSurfaceFormatSelect(&support);
     VkPresentModeKHR presentMode = VulkanPresentModeSelect(&support);
@@ -450,23 +462,23 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
     };
 
     VulkanSwapchain *swapchain = &vulkan->swapchain;
-    if (vulkan->vkCreateSwapchainKHR(vulkan->logicalDevice, &swapchainCreateInfo, 0, &swapchain->handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateSwapchainKHR\n");
-
+    vkResult = vulkan->vkCreateSwapchainKHR(vulkan->logicalDevice, &swapchainCreateInfo, 0, &swapchain->handle);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateSwapchainKHR", vkResult);
         return false;
     }
     swapchain->format = surfaceFormat.format;
     swapchain->extent = extent;
 
-    if (vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetSwapchainImagesKHR\n");
-
+    vkResult = vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetSwapchainImagesKHR", vkResult);
         return false;
     };
     assert(swapchain->imageCount <= VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT);
-    if (vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, swapchain->images) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkGetSwapchainImagesKHR\n");
-
+    vkResult = vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, swapchain->images);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkGetSwapchainImagesKHR", vkResult);
         return false;
     };
 
@@ -489,9 +501,9 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
             },
         };
 
-        if (vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &swapchain->imageViews[i]) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkCreateImageView\n");
-
+        vkResult = vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &swapchain->imageViews[i]);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkCreateImageView", vkResult);
             return false;
         }
 
@@ -499,9 +511,9 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        if (vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &swapchain->renderFinishedSemaphore[i]) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkCreateSemaphore\n");
-
+        vkResult = vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &swapchain->renderFinishedSemaphore[i]);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkCreateSemaphore", vkResult);
             return false;
         }
     }
@@ -519,24 +531,28 @@ static void VulkanSwapchainDestroy(Vulkan *vulkan) {
 }
 
 static void VulkanSwapchainRecreate(Vulkan *vulkan, u32 windowWidth, u32 windowHeight) {
+    VkResult vkResult;
     // NOTE: get rid of this wait later for smooth swapchain resizing
-    if (vulkan->vkDeviceWaitIdle(vulkan->logicalDevice) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkDeviceWaitIdle\n");
-    };
+    vkResult = vulkan->vkDeviceWaitIdle(vulkan->logicalDevice);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkDeviceWaitIdle", vkResult);
+    }
     VulkanSwapchainDestroy(vulkan);
     VulkanSwapchainCreate(vulkan, windowWidth, windowHeight);
 }
 
 static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
+    VkResult vkResult;
+
     VkCommandPoolCreateInfo commandPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = vulkan->queueFamilies.graphicsIndex,
     };
 
-    if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &vulkan->commandPool) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateCommandPool\n");
-
+    vkResult = vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &vulkan->commandPool);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateCommandPool", vkResult);
         return false;
     }
 
@@ -554,9 +570,9 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
             .commandBufferCount = 1,
         };
 
-        if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &allocateInfo, &frameData->commandBuffer) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkAllocateCommandBuffers\n");
-
+        vkResult = vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &allocateInfo, &frameData->commandBuffer);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkAllocateCommandBuffer", vkResult);
             return false;
         }
 
@@ -564,9 +580,9 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        if (vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &frameData->imageAvailableSemaphore) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkCreateSemaphore\n");
-
+        vkResult = vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &frameData->imageAvailableSemaphore);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkCreateSemaphore", vkResult);
             return false;
         }
 
@@ -575,9 +591,9 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
             .flags = VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        if (vulkan->vkCreateFence(vulkan->logicalDevice, &fenceCreateInfo, 0, &frameData->inFlightFence) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkCreateFence\n");
-
+        vkResult = vulkan->vkCreateFence(vulkan->logicalDevice, &fenceCreateInfo, 0, &frameData->inFlightFence);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkCreateFence", vkResult);
             return false;
         }
 
@@ -590,6 +606,8 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
 // TODO: This function does not return false yet but later it will.
 static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
+    VkResult vkResult;
+
     VkDescriptorPoolSize poolSizes[] = {
         {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = FRAME_COUNT},
         {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_TEXTURES * FRAME_COUNT},
@@ -603,9 +621,9 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .pPoolSizes = poolSizes,
     };
 
-    if (vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateDescriptorPool\n");
-
+    vkResult = vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateDescriptorPool", vkResult);
         return false;
     };
 
@@ -627,9 +645,9 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .bindingCount = ArrayCount(resourcesSetLayoutBinding),
         .pBindings = resourcesSetLayoutBinding,
     };
-    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateDescriptorSetLayout\n");
-
+    vkResult = vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateDescriptorSetLayout", vkResult);
         return false;
     };
 
@@ -642,9 +660,9 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         .bindingCount = ArrayCount(samplersSetLayoutBinding),
         .pBindings = samplersSetLayoutBinding,
     };
-    if (vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateDescriptorSetLayout\n");
-
+    vkResult = vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateDescriptorSetLayout", vkResult);
         return false;
     };
 
@@ -659,9 +677,9 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         };
 
         VkDescriptorSet descriptorSets[2];
-        if (vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets) != VK_SUCCESS) {
-            fprintf(stderr, "ERROR: vkAllocateDescriptorSets\n");
-
+        vkResult = vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets);
+        if (vkResult != VK_SUCCESS) {
+            VkResultPrintError("vkAllocateDescriptorSets", vkResult);
             return false;
         };
         vulkan->resourceDescriptorSets[i] = descriptorSets[0];
@@ -694,190 +712,8 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     return true;
 }
 
-static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
-    VkShaderModuleCreateInfo vertexShaderCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .pCode = (const u32 *)g_VSMain,
-        .codeSize = sizeof(g_VSMain),
-    };
-
-    VkShaderModuleCreateInfo fragmentShaderCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .pCode = (const u32 *)g_PSMain,
-        .codeSize = sizeof(g_PSMain),
-    };
-
-    VkShaderModule vertexModule, fragmentModule;
-
-    if (vulkan->vkCreateShaderModule(vulkan->logicalDevice, &vertexShaderCreateInfo, 0, &vertexModule) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateShaderModule\n");
-
-        return false;
-    }
-    if (vulkan->vkCreateShaderModule(vulkan->logicalDevice, &fragmentShaderCreateInfo, 0, &fragmentModule) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateShaderModule\n");
-
-        return false;
-    }
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = vertexModule,
-            .pName = "VSMain",
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = fragmentModule,
-            .pName = "PSMain",
-        },
-    };
-
-    VkVertexInputBindingDescription bindingDescription = {
-        .binding = 0,
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-        .stride = sizeof(Vertex),
-    };
-
-    VkVertexInputAttributeDescription attributeDescription[] = {
-        {
-            .binding = 0,
-            .location = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = 0, // x, y, z
-        },
-        {
-            .binding = 0,
-            .location = 1,
-            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-            .offset = sizeof(f32) * 3, // r, g, b, a
-        },
-        {
-            .binding = 0,
-            .location = 2,
-            .format = VK_FORMAT_R32G32_SFLOAT,
-            .offset = sizeof(f32) * 7, // u, v
-        },
-    };
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &bindingDescription,
-        .vertexAttributeDescriptionCount = ArrayCount(attributeDescription),
-        .pVertexAttributeDescriptions = attributeDescription,
-    };
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .primitiveRestartEnable = VK_FALSE,
-    };
-
-    VkPipelineViewportStateCreateInfo viewportState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .scissorCount = 1,
-    };
-
-    VkPipelineRasterizationStateCreateInfo rastezier = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .depthClampEnable = VK_FALSE,
-        .depthBiasEnable = VK_FALSE,
-        .rasterizerDiscardEnable = VK_FALSE,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .lineWidth = 1.0f,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-    };
-
-    VkPipelineMultisampleStateCreateInfo multisampling = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .sampleShadingEnable = VK_FALSE,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    };
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-        .blendEnable = VK_TRUE,
-        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-        .colorBlendOp = VK_BLEND_OP_ADD,
-        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-        .alphaBlendOp = VK_BLEND_OP_ADD,
-    };
-
-    VkPipelineColorBlendStateCreateInfo colorBlending = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE,
-        .attachmentCount = 1,
-        .pAttachments = &colorBlendAttachment,
-    };
-
-    VkDynamicState dynamicStates[] = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-    };
-
-    VkPipelineDynamicStateCreateInfo dynamicState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = ArrayCount(dynamicStates),
-        .pDynamicStates = dynamicStates,
-    };
-
-    VkPipelineRenderingCreateInfo renderingCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &vulkan->swapchain.format,
-    };
-
-    VkDescriptorSetLayout descriptorSetLayouts[] = {vulkan->resourceDescriptorLayout, vulkan->samplerDescriptorSetLayout};
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = ArrayCount(descriptorSetLayouts),
-        .pSetLayouts = descriptorSetLayouts,
-    };
-
-    if (vulkan->vkCreatePipelineLayout(vulkan->logicalDevice, &pipelineLayoutCreateInfo, 0, &vulkan->pipelineLayout) != VK_SUCCESS) {
-        // NOTE: fatal error so we do not care about destroying shader modules
-        fprintf(stderr, "ERROR: vkCreatePipelineLayout\n");
-
-        return false;
-    }
-
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &renderingCreateInfo,
-        .stageCount = ArrayCount(shaderStages),
-        .pStages = shaderStages,
-        .pVertexInputState = &vertexInputInfo,
-        .pInputAssemblyState = &inputAssembly,
-        .pViewportState = &viewportState,
-        .pRasterizationState = &rastezier,
-        .pMultisampleState = &multisampling,
-        .pColorBlendState = &colorBlending,
-        .pDynamicState = &dynamicState,
-        .layout = vulkan->pipelineLayout,
-        .renderPass = VK_NULL_HANDLE,
-    };
-
-    if (vulkan->vkCreateGraphicsPipelines(vulkan->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, 0, &vulkan->pipeline) != VK_SUCCESS) {
-        // NOTE: fatal error so we do not care about destroying shader modules
-        fprintf(stderr, "ERROR: vkCreateGraphicsPipelines\n");
-
-        return false;
-    }
-
-    vulkan->vkDestroyShaderModule(vulkan->logicalDevice, vertexModule, 0);
-    vulkan->vkDestroyShaderModule(vulkan->logicalDevice, fragmentModule, 0);
-
-    return true;
-}
-
 static bool VulkanSamplerCreate(Vulkan *vulkan) {
+    VkResult vkResult;
     VkSamplerCreateInfo samplerCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .magFilter = VK_FILTER_NEAREST,
@@ -888,9 +724,9 @@ static bool VulkanSamplerCreate(Vulkan *vulkan) {
         .maxAnisotropy = 1.0f,
     };
 
-    if (vulkan->vkCreateSampler(vulkan->logicalDevice, &samplerCreateInfo, 0, &vulkan->textureSampler) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateSampler\n");
-
+    vkResult = vulkan->vkCreateSampler(vulkan->logicalDevice, &samplerCreateInfo, 0, &vulkan->textureSampler);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateSampler", vkResult);
         return false;
     }
 
@@ -898,6 +734,8 @@ static bool VulkanSamplerCreate(Vulkan *vulkan) {
 }
 
 u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
+    VkResult vkResult;
+
     if (vulkan->textureCount + 1 > MAX_TEXTURES) {
         fprintf(stderr, "ERROR: maximum number of textures reached: %u.\n", vulkan->textureCount);
     }
@@ -918,9 +756,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .samples = VK_SAMPLE_COUNT_1_BIT,
     };
 
-    if (vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateImage\n");
-
+    vkResult = vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateImage", vkResult);
         return 0;
     }
 
@@ -933,15 +771,15 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .memoryTypeIndex = VulkanMemoryTypeFind(vulkan, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
     };
 
-    if (vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkAllocateMemory\n");
-
+    vkResult = vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkAllocateMemory", vkResult);
         return 0;
     }
 
-    if (vulkan->vkBindImageMemory(vulkan->logicalDevice, result.handle, result.memory, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkBindImageMemory\n");
-
+    vkResult = vulkan->vkBindImageMemory(vulkan->logicalDevice, result.handle, result.memory, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkBindImageMemory", vkResult);
         return 0;
     }
 
@@ -957,9 +795,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         },
     };
 
-    if (vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &result.view) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateImageView\n");
-
+    vkResult = vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &result.view);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateImageView", vkResult);
         return 0;
     }
 
@@ -992,9 +830,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .queueFamilyIndex = vulkan->queueFamilies.graphicsIndex,
     };
 
-    if (vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkCreateCommandPool\n");
-
+    vkResult = vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkCreateCommandPool", vkResult);
         return 0;
     }
 
@@ -1005,9 +843,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
     };
 
-    if (vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkAllocateCommandBuffers\n");
-
+    vkResult = vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkAllocateCommandBuffers", vkResult);
         return 0;
     }
 
@@ -1016,9 +854,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
 
-    if (vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkBeginCommandBuffer\n");
-
+    vkResult = vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkBeginCommandBuffer", vkResult);
         return 0;
     }
 
@@ -1067,9 +905,9 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vulkan->vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
-    if (vulkan->vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkEndCommandBuffer\n");
-
+    vkResult = vulkan->vkEndCommandBuffer(commandBuffer);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkEndCommandBuffer", vkResult);
         return 0;
     }
 
@@ -1079,15 +917,15 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
         .pCommandBuffers = &commandBuffer,
     };
 
-    if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkQueueSubmit\n");
-
+    vkResult = vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkQueueSubmit", vkResult);
         return 0;
     }
 
-    if (vulkan->vkQueueWaitIdle(vulkan->graphicsQueue) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkQueueWaitIdle\n");
-
+    vkResult = vulkan->vkQueueWaitIdle(vulkan->graphicsQueue);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkQueueWaitIdle", vkResult);
         return 0;
     }
 
@@ -1301,6 +1139,7 @@ static void VulkanFramePassRender(Vulkan *vulkan, const RenderCommandBuffer *com
 }
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer) {
+    VkResult vkResult;
     VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
 
     if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
@@ -1312,9 +1151,9 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
         return false;
     }
 
-    if (vulkan->vkWaitForFences(vulkan->logicalDevice, 1, &frameData->inFlightFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkWaitForFences\n");
-
+    vkResult = vulkan->vkWaitForFences(vulkan->logicalDevice, 1, &frameData->inFlightFence, VK_TRUE, UINT64_MAX);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkWaitForFences", vkResult);
         return false;
     };
     VkResult result = vulkan->vkAcquireNextImageKHR(vulkan->logicalDevice, vulkan->swapchain.handle, UINT64_MAX, frameData->imageAvailableSemaphore, 0, &vulkan->imageIndex);
@@ -1323,14 +1162,14 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
         return false;
     }
 
-    if (vulkan->vkResetFences(vulkan->logicalDevice, 1, &frameData->inFlightFence) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkResetFences\n");
-
+    vkResult = vulkan->vkResetFences(vulkan->logicalDevice, 1, &frameData->inFlightFence);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkResetFences", vkResult);
         return false;
     };
-    if (vulkan->vkResetCommandBuffer(frameData->commandBuffer, 0) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkResetCommandBuffer\n");
-
+    vkResult = vulkan->vkResetCommandBuffer(frameData->commandBuffer, 0);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkResetCommandBuffer", vkResult);
         return false;
     };
 
@@ -1339,8 +1178,10 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
 
-    if (vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkBeginCommandBuffer\n");
+    vkResult = vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkBeginCommandBuffer", vkResult);
+        return false;
     }
 
     VkImageMemoryBarrier imageMemoryBarrier = {
@@ -1408,6 +1249,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 }
 
 bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
+    VkResult vkResult;
     VulkanFrameData *frameData = &vulkan->frameData[vulkan->frameIndex];
 
     if (commandBuffer && commandBuffer->basePointer && !commandBuffer->hasOverflowed) {
@@ -1433,9 +1275,9 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
 
     vulkan->vkCmdPipelineBarrier(frameData->commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, 0, 0, 0, 1, &imageMemoryBarrier);
 
-    if (vulkan->vkEndCommandBuffer(frameData->commandBuffer) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkEndCommandBuffer\n");
-
+    vkResult = vulkan->vkEndCommandBuffer(frameData->commandBuffer);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkEndCommandBuffer", vkResult);
         return false;
     }
 
@@ -1462,9 +1304,9 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
         .pSignalSemaphores = signalSemaphores,
     };
 
-    if (vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, frameData->inFlightFence) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkQueueSubmit\n");
-
+    vkResult = vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, frameData->inFlightFence);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkQueueSubmit", vkResult);
         return false;
     }
 
@@ -1477,9 +1319,9 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
         .pWaitSemaphores = signalSemaphores,
     };
 
-    if (vulkan->vkQueuePresentKHR(vulkan->presentQueue, &presentInfo) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: vkQueuePresentKHR\n");
-
+    vkResult = vulkan->vkQueuePresentKHR(vulkan->presentQueue, &presentInfo);
+    if (vkResult != VK_SUCCESS) {
+        VkResultPrintError("vkQueuePresentKHR", vkResult);
         return false;
     }
 
