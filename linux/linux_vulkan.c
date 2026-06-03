@@ -1005,7 +1005,7 @@ static bool VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
     }
 
     u32 whitePixel = 0xFFFFFFFF;
-    VulkanTextureCreate(vulkan, 0, (Vector2U){1, 1}, 4, &whitePixel);
+    VulkanTextureCreate(vulkan, 0, V2U(1, 1), 4, &whitePixel);
 
     vulkan->vertexCount = 0;
     vulkan->vertexCapacity = 4096;
