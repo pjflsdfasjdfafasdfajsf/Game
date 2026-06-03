@@ -34,11 +34,11 @@ debug:
 	@$(MAKE) --no-print-directory targets
 
 
-ASSETS =                                    \
-	$(GEN_DIRECTORY)/arial.ttf.h            \
-	$(GEN_DIRECTORY)/watermelon.png.h       \
-	$(GEN_DIRECTORY)/BasicGeometry.VS.spv.h \
-	$(GEN_DIRECTORY)/BasicGeometry.PS.spv.h \
+ASSETS =                                         \
+	$(GEN_DIRECTORY)/arial.ttf.h                 \
+	$(GEN_DIRECTORY)/watermelon.png.h            \
+	$(GEN_DIRECTORY)/basic_geometry_vertex.spv.h \
+	$(GEN_DIRECTORY)/basic_geometry_pixel.spv.h  \
 
 GAME_SO = $(LIB_DIRECTORY)/Game.so
 LINUX_EXE = $(BIN_DIRECTORY)/Game_Linux
@@ -61,10 +61,10 @@ $(GEN_DIRECTORY)/%.png.h: $(ASSETS_DIRECTORY)/images/%.png $(PREPROCESSOR_EXE)
 ###
 
 # NOTE: our boys shaders are very special!
-$(GEN_DIRECTORY)/%.VS.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
+$(GEN_DIRECTORY)/basic_geometry_vertex.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
 	@dxc -spirv -T vs_6_6 -E VSMain $< -Fh $@ -Vn GlobalVertexShader
 
-$(GEN_DIRECTORY)/%.PS.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
+$(GEN_DIRECTORY)/basic_geometry_pixel.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
 	@dxc -spirv -T ps_6_6 -E PSMain $< -Fh $@ -Vn GlobalPixelShader
 
 ########################################

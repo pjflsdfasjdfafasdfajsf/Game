@@ -12,8 +12,8 @@
 #include <assert.h>
 
 // NOTE: Compiled shaders.
-#include "BasicGeometry.VS.spv.h"
-#include "BasicGeometry.PS.spv.h"
+#include "basic_geometry_vertex.spv.h"
+#include "basic_geometry_pixel.spv.h"
 
 typedef struct {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -999,6 +999,7 @@ static bool VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
     if (!VulkanDescriptorSetsCreate(vulkan)) {
         return false;
     }
+    // @ttchef
     if (!VulkanGraphicsPipelineCreate(vulkan)) {
         return false;
     }
