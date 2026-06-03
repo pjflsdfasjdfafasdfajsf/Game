@@ -61,10 +61,10 @@ $(GEN_DIRECTORY)/%.png.h: $(ASSETS_DIRECTORY)/images/%.png $(PREPROCESSOR_EXE)
 ###
 
 # NOTE: our boys shaders are very special!
-$(GEN_DIRECTORY)/%.VS.spv.h: $(ASSETS_DIRECTORY)/shaders/basic_geometry.hlsl
-	@dxc -spirv -T vs_6_6 -E VSMain $< -Fh $@ GlobalVertexShader
+$(GEN_DIRECTORY)/%.VS.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
+	@dxc -spirv -T vs_6_6 -E VSMain $< -Fh $@ -Vn GlobalVertexShader
 
-$(GEN_DIRECTORY)/%.PS.spv.h: $(ASSETS_DIRECTORY)/shaders/basic_geometry.hlsl
+$(GEN_DIRECTORY)/%.PS.spv.h: $(LINUX_DIRECTORY)/shaders/basic_geometry.hlsl
 	@dxc -spirv -T ps_6_6 -E PSMain $< -Fh $@ -Vn GlobalPixelShader
 
 ########################################
