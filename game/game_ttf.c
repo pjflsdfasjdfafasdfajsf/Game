@@ -112,7 +112,7 @@ enum {
 // NOTE: Table tags
 enum {
     TrueTypeTableTag_HEAD = FOURCC('h', 'e', 'a', 'd'),
-    TrueTypeTableTag_MaxP = FOURCC('m', 'a', 'x', 'p'),
+    TrueTypeTableTag_MAXP = FOURCC('m', 'a', 'x', 'p'),
     TrueTypeTableTag_CMAP = FOURCC('c', 'm', 'a', 'p'),
     TrueTypeTableTag_LOCA = FOURCC('l', 'o', 'c', 'a'),
     TrueTypeTableTag_GLYF = FOURCC('g', 'l', 'y', 'f'),
@@ -1058,7 +1058,7 @@ Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryA
     ZeroItems(outGlyphs, characterCount);
 
     const TrueTypeTableDirectoryEntry *headEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_HEAD);
-    const TrueTypeTableDirectoryEntry *MaxpEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_MaxP);
+    const TrueTypeTableDirectoryEntry *MaxpEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_MAXP);
     const TrueTypeTableDirectoryEntry *cmapEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_CMAP);
     const TrueTypeTableDirectoryEntry *locaEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_LOCA);
     const TrueTypeTableDirectoryEntry *glyfEntry = TrueTypeFontGetTable(font, TrueTypeTableTag_GLYF);
