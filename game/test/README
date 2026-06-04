@@ -18,3 +18,7 @@ You can run tests in two modes:
 
   These test for any vulnerabilities or C bugs like UB. Passing here is considered when fuzzing lasted
   15 minutes without any errors. If any errors occured during the process you will see them.  
+
+  They are ran automatically by Github CI but you should not rely on them as I am just economing free
+  minutes there. If you change any of the parsers and willing to commit to this repository, run fuzzies
+  on your machine for full 15 minutes.
