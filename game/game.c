@@ -1,5 +1,6 @@
 // TODO:
 // * WAV files parsing.
+// * Fix hot-reloading
 #include "game_platform.h"
 #include "game_png.h"
 

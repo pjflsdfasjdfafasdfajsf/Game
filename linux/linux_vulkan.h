@@ -9,7 +9,7 @@
 // NOTE: Borrowed from 
 // https://github.com/KhronosGroup/Vulkan-Utility-Libraries/blob/main/include/vulkan/vk_enum_string_helper.h
 
-inline const char* VkResultToString(VkResult inputValue)
+static inline const char* VkResultToString(VkResult inputValue)
 {
     switch ((VkResult)inputValue)
     {

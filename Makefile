@@ -2,7 +2,7 @@
 # NOTE: linux only!
 # 
 CC=clang
-CFLAGS=-Wall -Wextra -Wpedantic -fPIC -I$(GEN_DIRECTORY) -I$(GAME_DIRECTORY)
+CFLAGS=-DDEBUG -Wall -Wextra -Wpedantic -fPIC -I$(GEN_DIRECTORY) -I$(GAME_DIRECTORY)
 
 BUILD_DIRECTORY = build
 BIN_DIRECTORY   = $(BUILD_DIRECTORY)/bin
@@ -122,7 +122,7 @@ LINUX_OBJECTS = \
 $(LINUX_OBJECTS): $(XDG_SHELL_H) $(ASSETS)
 
 $(LINUX_EXE) : $(LINUX_OBJECTS)
-	@$(CC) $(CFLAGS) -o $@ $(LINUX_OBJECTS) -lwayland-client
+	@$(CC) $(CFLAGS) -o $@ $(LINUX_OBJECTS) -lwayland-client -lasound
 
 ###
 	

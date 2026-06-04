@@ -1,5 +1,7 @@
 #include <alsa/asoundlib.h>
 #include <pthread.h>
+#include <limits.h>
+#include <dlfcn.h>
 
 #include "linux.h"
 #include "linux_vulkan.h"
@@ -87,7 +89,8 @@ static bool CopyFile(const char *sourcePath, const char *destinationPath) {
 
     return true;
 }
-static void GameCodeLoad() {
+
+static void GameCodeLoad(void) {
     if (GameSO) {
         dlclose(GameSO);
 
@@ -99,7 +102,7 @@ static void GameCodeLoad() {
     char sourceLibraryPath[PATH_MAX];
     char temporaryLibraryPath[PATH_MAX];
 
-    AbsoluteLibaryPath("libgame.so", sourceLibraryPath, sizeof(sourceLibraryPath));
+    AbsoluteLibaryPath("../lib/Game.so", sourceLibraryPath, sizeof(sourceLibraryPath));
     AbsoluteLibaryPath("libgame.temp.so", temporaryLibraryPath, sizeof(temporaryLibraryPath));
 
     if (!CopyFile(sourceLibraryPath, temporaryLibraryPath)) {
