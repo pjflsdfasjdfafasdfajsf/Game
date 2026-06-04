@@ -12,6 +12,8 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
 
     - name: Install Clang
       run: |
@@ -27,14 +29,3 @@ jobs:
       run: |
         cd game/test
         make fuzz-ttf FUZZING_TIME_IN_SECONDS=180
-
-    - name: Upload
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: fuzzer-crashes
-        path: |
-          game/test/crash-*
-          game/test/timeout-*
-          game/test/leak-*
-        retention-days: 7
