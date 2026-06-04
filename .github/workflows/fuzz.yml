@@ -27,3 +27,8 @@ jobs:
       run: |
         cd game/test
         make fuzz-ttf FUZZING_TIME_IN_SECONDS=180
+
+    - name: Fuzz WAV
+      run: |
+        cd game/test
+        make fuzz-wav FUZZING_TIME_IN_SECONDS=180

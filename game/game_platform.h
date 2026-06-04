@@ -49,9 +49,9 @@ static inline void memory_zero(void *destination, usize count) {
 #define ZERO_ARRAY(array) memory_zero((array), sizeof(array))
 #define ZERO_ITEMS(pointer, count) memory_zero((pointer), sizeof(*(pointer)) * (count))
 #define RETURN_ZEROED(instance) \
-    do {                       \
+    do {                        \
         ZERO_STRUCT(instance);  \
-        return (instance);     \
+        return (instance);      \
     } while (0)
 
 static inline void memory_copy_forwards(void *destination, const void *source, usize count) {
@@ -125,6 +125,8 @@ static inline void string_append(char *destination, usize destination_capacity, 
     }
 }
 
+///
+
 static inline u16 read_u_int16_big_endian(const u8 *memory) {
     return ((u16)memory[0] << 8) |
            ((u16)memory[1] << 0);
@@ -154,6 +156,17 @@ static inline u64 read_u_int64_big_endian(const u8 *memory) {
 
 static inline i64 read_int64_big_endian(const u8 *memory) {
     return (i64)read_u_int64_big_endian(memory);
+}
+
+///
+
+static inline u16 read_u_int16_little_endian(const u8 *memory) {
+    return (u16)((u16)memory[0] | ((u16)memory[1] << 8));
+}
+
+static inline u32 read_u_int32_little_endian(const u8 *memory) {
+    return (u32)((u32)memory[0] | ((u32)memory[1] << 8) |
+                 ((u32)memory[2] << 16) | ((u32)memory[3] << 24));
 }
 
 typedef struct {
@@ -289,6 +302,12 @@ static inline u8 memory_stream_read_u_int8(memory_stream *stream) {
     return result;
 }
 
+static inline u32 memory_stream_read_u_int32_little_endian(memory_stream *stream) {
+    u32 result = read_u_int32_little_endian(&stream->memory[stream->offset]);
+    stream->offset += 4;
+    return result;
+}
+
 static inline u16 memory_stream_read_u_int16_big_endian(memory_stream *stream) {
     if (!memory_stream_has_space(stream, 2)) {
         return 0;
@@ -369,7 +388,7 @@ static inline bool memory_stream_write_ascii_from_u64(memory_stream *stream, u64
     do {
         copy_value /= base;
         ++string_length;
-    } while(copy_value != 0);
+    } while (copy_value != 0);
 
     char characters[string_length];
     u32 index = 0;
@@ -379,7 +398,7 @@ static inline bool memory_stream_write_ascii_from_u64(memory_stream *stream, u64
     do {
         characters[index++] = digits[copy_value % base];
         copy_value /= base;
-    } while(copy_value != 0);
+    } while (copy_value != 0);
 
     // write characters into stream
     while (index != 0) {
@@ -407,44 +426,40 @@ static inline bool memory_stream_write_string_format(memory_stream *stream, cons
         ++at;
 
         switch (*at) {
-            case 's':
-            {
-                char *string = va_arg(args, char *);
-                if (!memory_stream_write_string(stream, string)) {
+        case 's': {
+            char *string = va_arg(args, char *);
+            if (!memory_stream_write_string(stream, string)) {
+                return false;
+            }
+        } break;
+        case 'u': {
+            if (!memory_stream_write_ascii_from_u64(stream, (u64)va_arg(args, u32), 10, decimal_characters)) {
+                return false;
+            }
+        } break;
+        case 'd': {
+            i32 n = va_arg(args, i32);
+            if (n < 0) {
+                n = -n;
+                if (!memory_stream_write_u_int8(stream, '-')) {
                     return false;
                 }
-            } break;
-            case 'u':
-            {
-                if (!memory_stream_write_ascii_from_u64(stream ,(u64)va_arg(args, u32), 10, decimal_characters)) {
-                    return false;
-                }
-            } break;
-            case 'd':
-            {
-                i32 n = va_arg(args, i32);
-                if (n < 0) {
-                    n = -n;
-                    if (!memory_stream_write_u_int8(stream, '-')) {
-                        return false;
-                    }
-                }
+            }
 
-                if (!memory_stream_write_ascii_from_u64(stream, (u64)n, 10, decimal_characters)) {
-                    return false;
-                }
-            } break;
-            case 'x':
-            case 'X':
-            {
-                char *characters = *at == 'x' ? lower_hex_characters : upper_hex_characters;
-                if (!memory_stream_write_string(stream, "0x")) {
-                    return false;
-                }
-                if (!memory_stream_write_ascii_from_u64(stream, (u64)va_arg(args, u32), 16, characters)) {
-                    return false;
-                }
-            } break;
+            if (!memory_stream_write_ascii_from_u64(stream, (u64)n, 10, decimal_characters)) {
+                return false;
+            }
+        } break;
+        case 'x':
+        case 'X': {
+            char *characters = *at == 'x' ? lower_hex_characters : upper_hex_characters;
+            if (!memory_stream_write_string(stream, "0x")) {
+                return false;
+            }
+            if (!memory_stream_write_ascii_from_u64(stream, (u64)va_arg(args, u32), 16, characters)) {
+                return false;
+            }
+        } break;
         }
 
         ++at;
