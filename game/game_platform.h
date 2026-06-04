@@ -1,16 +1,11 @@
 // TODO:
-// * Currently Linux uses `fprintf` for error logging and Win32 uses popups. I'm almost fine with Win32 (except for the part that I want it also to print to the console besides using popups),
-// but I am not satisfied with Linux. `fprintf` is a dependency on `stdio.h` which we can get rid of just by using our MemoryStream API. So they aren't passed to every call we can store them
-// in the context structs (`LinuxVulkan` for example), so the API would be something like:
-//
-// VulkanInitialize(memory->standardErrorStream, ...)
-//
-// VulkanSomeFunction(LinuxVulkan *vulkan) {
-//     MemoryStreamWriteLine(vulkan->errorStream, "Something went wrong.");
-// }
+// * Win32 uses popups for displaying error messages. I'm almost fine with Win32 (except for the part that I want it also to print to the console besides using popups),
 #pragma once
 
 #include "game_types.h"
+
+// NOTE: doesnt need linking with libc
+#include <stdarg.h>
 
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
@@ -360,6 +355,104 @@ static inline bool MemoryStreamWriteString(MemoryStream *stream, const char *str
 
 static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *string) {
     return MemoryStreamWriteString(stream, string) && MemoryStreamWriteUInt8(stream, '\n');
+}
+
+static char decimalCharacters[] = "0123456789";
+static char lowerHexCharacters[] = "0123456789abcdef";
+static char upperHexCharacters[] = "0123456789ABCDEF";
+
+static inline bool MemoryStreamWriteAsciiFromU64(MemoryStream *stream, u64 value, u32 base, char *digits) {
+    usize stringLength = 0;
+    u64 copyValue = value;
+
+    // Get string length
+    do {
+        copyValue /= base;
+        ++stringLength;
+    } while(copyValue != 0);
+
+    char characters[stringLength];
+    u32 index = 0;
+    copyValue = value;
+
+    // Write characters into array
+    do {
+        characters[index++] = digits[copyValue % base];
+        copyValue /= base;
+    } while(copyValue != 0);
+
+    // Write characters into stream
+    while (index != 0) {
+        if (!MemoryStreamWriteUInt8(stream, characters[--index])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static inline bool MemoryStreamWriteStringFormat(MemoryStream *stream, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    char *at = (char *)format;
+    while (*at) {
+        if (*at != '%') {
+            if (!MemoryStreamWriteUInt8(stream, *at)) {
+                return false;
+            }
+            ++at;
+            continue;
+        }
+        ++at;
+
+        switch (*at) {
+            case 's':
+            {
+                char *string = va_arg(args, char *);
+                if (!MemoryStreamWriteString(stream, string)) {
+                    return false;
+                }
+            } break;
+            case 'u':
+            {
+                if (!MemoryStreamWriteAsciiFromU64(stream ,(u64)va_arg(args, u32), 10, decimalCharacters)) {
+                    return false;
+                }
+            } break;
+            case 'd':
+            {
+                i32 n = va_arg(args, i32);
+                if (n < 0) {
+                    n = -n;
+                    if (!MemoryStreamWriteUInt8(stream, '-')) {
+                        return false;
+                    }
+                }
+
+                if (!MemoryStreamWriteAsciiFromU64(stream, (u64)n, 10, decimalCharacters)) {
+                    return false;
+                }
+            } break;
+            case 'x':
+            case 'X':
+            {
+                char *characters = *at == 'x' ? lowerHexCharacters : upperHexCharacters;
+                if (!MemoryStreamWriteString(stream, "0x")) {
+                    return false;
+                }
+                if (!MemoryStreamWriteAsciiFromU64(stream, (u64)va_arg(args, u32), 16, characters)) {
+                    return false;
+                }
+            } break;
+        }
+
+        ++at;
+    }
+
+    va_end(args);
+
+    return true;
 }
 
 #define Stringify(x) #x

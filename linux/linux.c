@@ -479,11 +479,6 @@ int main(void) {
         return 1;
     }
 
-    Vulkan vulkan;
-    if (!VulkanInitialize(&vulkan, &wayland)) {
-        return 1;
-    }
-
     usize permanentArenaSize = Megabytes(64);
     usize temporaryArenaSize = Megabytes(256);
 
@@ -504,6 +499,11 @@ int main(void) {
 
     MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
     MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
+
+    Vulkan vulkan;
+    if (!VulkanInitialize(&vulkan, &wayland, infoStream, errorStream)) {
+        return 1;
+    }
 
     RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
 

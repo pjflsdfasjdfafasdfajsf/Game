@@ -245,6 +245,9 @@ typedef struct {
     VulkanImage textures[MAX_TEXTURES];
     u32 textureCount;
 
+    MemoryStream *infoStream;
+    MemoryStream *errorStream;
+
 #if defined(DEBUG)
     VkDebugUtilsMessengerEXT debugMessenger;
 #define DEBUG_FUNCTION(name) PFN_##name name
@@ -260,7 +263,7 @@ typedef struct {
 #undef DEVICE_FUNCTION
 } Vulkan;
 
-bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window);
+bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window, MemoryStream *infoStream, MemoryStream *errorStream);
 
 bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer);
 bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);

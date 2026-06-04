@@ -1,16 +1,12 @@
 // TODO:
 // * Add support for Windows. So on Windows there must be a choice between DirectX and Vulkan, and on Linux, well, nothing would change. Maybe there will be OpenGL later.
 // * I think I noticed that some things between Vulkan and DirectX are repeated. Maybe we can put them somewhere like game_renderer.c?
-// * Make all `fprintf`s calls (error printing basically) consistent.
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
 #include "linux.h"
 
-#include <stdio.h>
 #include <dlfcn.h>
-#include <assert.h>
-#include <vulkan/vulkan_core.h>
 
 // NOTE: Compiled shaders.
 #include "basic_geometry_vertex.spv.h"
@@ -40,8 +36,8 @@ static u32 VulkanMemoryTypeFind(Vulkan *vulkan, u32 typeFilter, VkMemoryProperty
 }
 
 // TODO: This will be in linux_vulkan.h once we refactor to use MemoryStream
-static void VkResultPrintError(const char *functionName, VkResult functionResult) {
-    fprintf(stderr, "ERROR: %s: %s\n", functionName, VkResultToString(functionResult));
+static void VulkanResultPrint(Vulkan *vulkan, const char *functionName, VkResult functionResult) {
+    MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: %s: %s\n", functionName, VkResultToString(functionResult));
 }
 
 static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize size, VkBufferUsageFlags flags, void **mapped) {
@@ -60,7 +56,7 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
 
     vkResult = vulkan->vkCreateBuffer(vulkan->logicalDevice, &bufferCreateInfo, 0, &result.handle);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateBuffer", vkResult);
         return result;
     }
 
@@ -75,19 +71,19 @@ static VulkanBuffer VulkanBufferHostVisibleCreate(Vulkan *vulkan, VkDeviceSize s
 
     vkResult = vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkAllocateMemory", vkResult);
+        VulkanResultPrint(vulkan, "vkAllocateMemory", vkResult);
         return result;
     }
 
     vkResult = vulkan->vkBindBufferMemory(vulkan->logicalDevice, result.handle, result.memory, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkBindBufferMemory", vkResult);
+        VulkanResultPrint(vulkan, "vkBindBufferMemory", vkResult);
         return result;
     }
 
     vkResult = vulkan->vkMapMemory(vulkan->logicalDevice, result.memory, 0, result.size, 0, mapped);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkMapMemory", vkResult);
+        VulkanResultPrint(vulkan, "vkMapMemory", vkResult);
         return result;
     }
 
@@ -110,7 +106,7 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
     };
 
 #if defined(DEBUG)
-    fprintf(stderr, "Validation layers will be enabled\n");
+    MemoryStreamWriteStringFormat(vulkan->errorStream, "Validation layers will be enabled\n");
 
     const char *layers[] = {
         "VK_LAYER_KHRONOS_validation",
@@ -138,7 +134,7 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
     };
 
     if (vkCreateInstance(&instanceCreateInfo, 0, &vulkan->instance) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create vulkan instance.\n");
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: Failed to create vulkan instance.\n");
 
         return;
     }
@@ -149,8 +145,9 @@ static void VulkanInstanceCreate(Vulkan *vulkan, PFN_vkCreateInstance vkCreateIn
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userData) {
     Unused(severity);
     Unused(type);
-    Unused(userData);
-    fprintf(stderr, "%s\n", data->pMessage);
+
+    Vulkan *vulkan = (Vulkan *)userData;
+    MemoryStreamWriteStringFormat(vulkan->errorStream, "%s\n", data->pMessage);
 
     return VK_FALSE;
 }
@@ -163,11 +160,12 @@ static void VulkanDebugMessengerCreate(Vulkan *vulkan) {
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = VulkanDebugMessengerCallback,
+        .pUserData = vulkan,
     };
 
     vkResult = vulkan->vkCreateDebugUtilsMessengerEXT(vulkan->instance, &debugMessengerCreateInfo, 0, &vulkan->debugMessenger);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateDebugUtilsMessengerEXT", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateDebugUtilsMessengerEXT", vkResult);
         return;
     }
 }
@@ -224,7 +222,7 @@ static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
 
     vkResult = vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkEnumeratePhysicalDevices", vkResult);
+        VulkanResultPrint(vulkan, "vkEnumeratePhysicalDevices", vkResult);
         return false;
     };
 
@@ -233,7 +231,7 @@ static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
     VkPhysicalDevice devices[8];
     vkResult = vulkan->vkEnumeratePhysicalDevices(vulkan->instance, &count, devices);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkEnumeratePhysicalDevices", vkResult);
+        VulkanResultPrint(vulkan, "vkEnumeratePhysicalDevices", vkResult);
         return false;
     };
 
@@ -246,19 +244,19 @@ static bool VulkanPhysicalDevicePick(Vulkan *vulkan) {
     }
 
     if (!vulkan->physicalDevice) {
-        fprintf(stderr, "WARNING: I did not find a dedicated GPU!\n");
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "WARNING: I did not find a dedicated GPU!\n");
         vulkan->physicalDevice = devices[0];
     }
 
     if (!vulkan->physicalDevice) {
-        fprintf(stderr, "ERROR: Your GPU is not supported by vulkan!\n");
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: Your GPU is not supported by vulkan!\n");
 
         return false;
     }
 
     VkPhysicalDeviceProperties properties;
     vulkan->vkGetPhysicalDeviceProperties(vulkan->physicalDevice, &properties);
-    fprintf(stderr, "GPU: %s\n", properties.deviceName);
+                MemoryStreamWriteStringFormat(vulkan->infoStream, "GPU: %s\n", properties.deviceName);
 
     return true;
 }
@@ -277,7 +275,7 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 
     uniqueIndices[uniqueCount++] = vulkan->queueFamilies.graphicsIndex;
     if (vulkan->queueFamilies.presentIndex != vulkan->queueFamilies.graphicsIndex) {
-        fprintf(stderr, "Graphics and present queue are from diffrent families.\n");
+        MemoryStreamWriteStringFormat(vulkan->infoStream, "Graphics and present queue are from diffrent families.\n");
 
         uniqueIndices[uniqueCount++] = vulkan->queueFamilies.presentIndex;
     }
@@ -317,7 +315,7 @@ static bool VulkanLogicalDeviceCreate(Vulkan *vulkan) {
 
     vkResult = vulkan->vkCreateDevice(vulkan->physicalDevice, &deviceCreateInfo, 0, &vulkan->logicalDevice);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateDevice", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateDevice", vkResult);
         return false;
     }
 
@@ -331,16 +329,16 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
 
     vkResult = vulkan->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->physicalDevice, vulkan->surface, &result.capabilities);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetPhysicalDeviceSurfaceCapabilitiesKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR", vkResult);
         return result;
     };
     vkResult = vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
         return result;
     };
     if (!result.formatCount) {
-        fprintf(stderr, "ERROR: Failed to get vulkan surface formats.\n");
+            MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: Failed to get vulkan surface formats.\n");
 
         return result;
     }
@@ -349,24 +347,24 @@ static VulkanSwapchainSupport VulkanSwapchainSupportQuery(Vulkan *vulkan) {
     result.formatCount = Min(result.formatCount, 32);
     vkResult = vulkan->vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->physicalDevice, vulkan->surface, &result.formatCount, result.formats);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetPhysicalDeviceSurfaceFormatsKHR", vkResult);
         return result;
     };
 
     vkResult = vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
         return result;
     };
     if (!result.presentModeCount) {
-        fprintf(stderr, "ERROR: Failed to get vulkan surface present modes.\n");
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: Failed to get vulkan surface present modes.\n");
 
         return result;
     }
     result.presentModeCount = Min(result.presentModeCount, 8);
     vkResult = vulkan->vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->physicalDevice, vulkan->surface, &result.presentModeCount, result.presentModes);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetPhysicalDeviceSurfacePresentModesKHR", vkResult);
         return result;
     };
 
@@ -467,7 +465,7 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
     VulkanSwapchain *swapchain = &vulkan->swapchain;
     vkResult = vulkan->vkCreateSwapchainKHR(vulkan->logicalDevice, &swapchainCreateInfo, 0, &swapchain->handle);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateSwapchainKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateSwapchainKHR", vkResult);
         return false;
     }
     swapchain->format = surfaceFormat.format;
@@ -475,13 +473,13 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
 
     vkResult = vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetSwapchainImagesKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetSwapchainImagesKHR", vkResult);
         return false;
     };
     assert(swapchain->imageCount <= VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT);
     vkResult = vulkan->vkGetSwapchainImagesKHR(vulkan->logicalDevice, swapchain->handle, &swapchain->imageCount, swapchain->images);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkGetSwapchainImagesKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkGetSwapchainImagesKHR", vkResult);
         return false;
     };
 
@@ -506,7 +504,7 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
 
         vkResult = vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &swapchain->imageViews[i]);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkCreateImageView", vkResult);
+            VulkanResultPrint(vulkan, "vkCreateImageView", vkResult);
             return false;
         }
 
@@ -516,7 +514,7 @@ static bool VulkanSwapchainCreate(Vulkan *vulkan, u32 windowWidth, u32 windowHei
 
         vkResult = vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &swapchain->renderFinishedSemaphore[i]);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkCreateSemaphore", vkResult);
+            VulkanResultPrint(vulkan, "vkCreateSemaphore", vkResult);
             return false;
         }
     }
@@ -538,7 +536,7 @@ static void VulkanSwapchainRecreate(Vulkan *vulkan, u32 windowWidth, u32 windowH
     // NOTE: get rid of this wait later for smooth swapchain resizing
     vkResult = vulkan->vkDeviceWaitIdle(vulkan->logicalDevice);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkDeviceWaitIdle", vkResult);
+        VulkanResultPrint(vulkan, "vkDeviceWaitIdle", vkResult);
     }
 
     VulkanSwapchainDestroy(vulkan);
@@ -556,7 +554,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
     vkResult = vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &vulkan->commandPool);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateCommandPool", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateCommandPool", vkResult);
         return false;
     }
 
@@ -576,7 +574,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
         vkResult = vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &allocateInfo, &frameData->commandBuffer);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkAllocateCommandBuffer", vkResult);
+            VulkanResultPrint(vulkan, "vkAllocateCommandBuffer", vkResult);
             return false;
         }
 
@@ -586,7 +584,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
         vkResult = vulkan->vkCreateSemaphore(vulkan->logicalDevice, &semaphoreCreateInfo, 0, &frameData->imageAvailableSemaphore);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkCreateSemaphore", vkResult);
+            VulkanResultPrint(vulkan, "vkCreateSemaphore", vkResult);
             return false;
         }
 
@@ -597,7 +595,7 @@ static bool VulkanFrameResourcesCreate(Vulkan *vulkan) {
 
         vkResult = vulkan->vkCreateFence(vulkan->logicalDevice, &fenceCreateInfo, 0, &frameData->inFlightFence);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkCreateFence", vkResult);
+            VulkanResultPrint(vulkan, "vkCreateFence", vkResult);
             return false;
         }
 
@@ -626,7 +624,7 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
 
     vkResult = vulkan->vkCreateDescriptorPool(vulkan->logicalDevice, &descriptorPoolCreateInfo, 0, &vulkan->descriptorPool);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateDescriptorPool", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateDescriptorPool", vkResult);
         return false;
     };
 
@@ -650,7 +648,7 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     };
     vkResult = vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &resourcesDescriptorSetLayoutCreateInfo, 0, &vulkan->resourceDescriptorLayout);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateDescriptorSetLayout", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateDescriptorSetLayout", vkResult);
         return false;
     };
 
@@ -665,7 +663,7 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
     };
     vkResult = vulkan->vkCreateDescriptorSetLayout(vulkan->logicalDevice, &samplersDescriptorSetLayoutCreateInfo, 0, &vulkan->samplerDescriptorSetLayout);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateDescriptorSetLayout", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateDescriptorSetLayout", vkResult);
         return false;
     };
 
@@ -682,7 +680,7 @@ static bool VulkanDescriptorSetsCreate(Vulkan *vulkan) {
         VkDescriptorSet descriptorSets[2];
         vkResult = vulkan->vkAllocateDescriptorSets(vulkan->logicalDevice, &descriptorSetAllocateInfo, descriptorSets);
         if (vkResult != VK_SUCCESS) {
-            VkResultPrintError("vkAllocateDescriptorSets", vkResult);
+            VulkanResultPrint(vulkan, "vkAllocateDescriptorSets", vkResult);
             return false;
         };
         vulkan->resourceDescriptorSets[i] = descriptorSets[0];
@@ -867,7 +865,7 @@ static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     vkResult = vulkan->vkCreatePipelineLayout(vulkan->logicalDevice, &pipelineLayoutCreateInfo, 0, &vulkan->pipelineLayout);
     if (vkResult != VK_SUCCESS) {
         // NOTE: fatal error so we do not care about destroying shader modules
-        VkResultPrintError("vkCreatepipelineLayout", vkResult);
+        VulkanResultPrint(vulkan, "vkCreatepipelineLayout", vkResult);
 
         return false;
     }
@@ -891,7 +889,7 @@ static bool VulkanGraphicsPipelineCreate(Vulkan *vulkan) {
     vkResult = vulkan->vkCreateGraphicsPipelines(vulkan->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, 0, &vulkan->pipeline);
     if (vkResult != VK_SUCCESS) {
         // NOTE: fatal error so we do not care about destroying shader modules
-        VkResultPrintError("vkCreateGraphicsPipeline", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateGraphicsPipeline", vkResult);
 
         return false;
     }
@@ -926,7 +924,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
     VkResult vkResult;
 
     if (vulkan->textureCount + 1 > MAX_TEXTURES) {
-        fprintf(stderr, "ERROR: maximum number of textures reached: %u.\n", vulkan->textureCount);
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: maximum number of textures reached: %u.\n", vulkan->textureCount);
     }
 
     VulkanImage result = {0};
@@ -947,7 +945,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkCreateImage(vulkan->logicalDevice, &imageCreateInfo, 0, &result.handle);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateImage", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateImage", vkResult);
         return 0;
     }
 
@@ -962,13 +960,13 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkAllocateMemory(vulkan->logicalDevice, &allocationInfo, 0, &result.memory);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkAllocateMemory", vkResult);
+        VulkanResultPrint(vulkan, "vkAllocateMemory", vkResult);
         return 0;
     }
 
     vkResult = vulkan->vkBindImageMemory(vulkan->logicalDevice, result.handle, result.memory, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkBindImageMemory", vkResult);
+        VulkanResultPrint(vulkan, "vkBindImageMemory", vkResult);
         return 0;
     }
 
@@ -986,7 +984,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkCreateImageView(vulkan->logicalDevice, &imageViewCreateInfo, 0, &result.view);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateImageView", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateImageView", vkResult);
         return 0;
     }
 
@@ -1021,7 +1019,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkCreateCommandPool(vulkan->logicalDevice, &commandPoolCreateInfo, 0, &commandPool);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkCreateCommandPool", vkResult);
+        VulkanResultPrint(vulkan, "vkCreateCommandPool", vkResult);
         return 0;
     }
 
@@ -1034,7 +1032,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkAllocateCommandBuffers(vulkan->logicalDevice, &commandBufferAllocationInfo, &commandBuffer);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkAllocateCommandBuffers", vkResult);
+        VulkanResultPrint(vulkan, "vkAllocateCommandBuffers", vkResult);
         return 0;
     }
 
@@ -1045,7 +1043,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkBeginCommandBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkBeginCommandBuffer", vkResult);
         return 0;
     }
 
@@ -1096,7 +1094,7 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkEndCommandBuffer(commandBuffer);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkEndCommandBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkEndCommandBuffer", vkResult);
         return 0;
     }
 
@@ -1108,13 +1106,13 @@ u32 VulkanTextureCreate(Vulkan *vulkan, u32 index, Vector2U size, u32 bytesPerPi
 
     vkResult = vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkQueueSubmit", vkResult);
+        VulkanResultPrint(vulkan, "vkQueueSubmit", vkResult);
         return 0;
     }
 
     vkResult = vulkan->vkQueueWaitIdle(vulkan->graphicsQueue);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkQueueWaitIdle", vkResult);
+        VulkanResultPrint(vulkan, "vkQueueWaitIdle", vkResult);
         return 0;
     }
 
@@ -1206,12 +1204,14 @@ static bool VulkanCommonInitialize(Vulkan *vulkan, LinuxWayland *window) {
 }
 
 // NOTE: divide this into windows and linux versions for the future
-bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
+bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window, MemoryStream *infoStream, MemoryStream *errorStream) {
     MemoryZero(vulkan, sizeof(Vulkan));
+    vulkan->infoStream = infoStream;
+    vulkan->errorStream = errorStream;
 
     void *libVulkan = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
     if (!libVulkan) {
-        fprintf(stderr, "%s\n", dlerror());
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: failed to open libvulkan.so.1: %s\n", dlerror());
 
         return false;
     }
@@ -1231,7 +1231,7 @@ bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window) {
     };
 
     if (vkCreateWaylandSurfaceKHR(vulkan->instance, &surfaceCreateInfo, 0, &vulkan->surface) != VK_SUCCESS) {
-        fprintf(stderr, "ERROR: Failed to create wayland vulkan surface.\n");
+        MemoryStreamWriteStringFormat(vulkan->errorStream, "ERROR: Failed to create wayland vulkan surface.\n");
 
         return false;
     }
@@ -1342,7 +1342,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 
     vkResult = vulkan->vkWaitForFences(vulkan->logicalDevice, 1, &frameData->inFlightFence, VK_TRUE, UINT64_MAX);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkWaitForFences", vkResult);
+        VulkanResultPrint(vulkan, "vkWaitForFences", vkResult);
         return false;
     };
     VkResult result = vulkan->vkAcquireNextImageKHR(vulkan->logicalDevice, vulkan->swapchain.handle, UINT64_MAX, frameData->imageAvailableSemaphore, 0, &vulkan->imageIndex);
@@ -1353,12 +1353,12 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 
     vkResult = vulkan->vkResetFences(vulkan->logicalDevice, 1, &frameData->inFlightFence);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkResetFences", vkResult);
+        VulkanResultPrint(vulkan, "vkResetFences", vkResult);
         return false;
     };
     vkResult = vulkan->vkResetCommandBuffer(frameData->commandBuffer, 0);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkResetCommandBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkResetCommandBuffer", vkResult);
         return false;
     };
 
@@ -1369,7 +1369,7 @@ bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer 
 
     vkResult = vulkan->vkBeginCommandBuffer(frameData->commandBuffer, &commandBufferBeginInfo);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkBeginCommandBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkBeginCommandBuffer", vkResult);
         return false;
     }
 
@@ -1466,7 +1466,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
 
     vkResult = vulkan->vkEndCommandBuffer(frameData->commandBuffer);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkEndCommandBuffer", vkResult);
+        VulkanResultPrint(vulkan, "vkEndCommandBuffer", vkResult);
         return false;
     }
 
@@ -1495,7 +1495,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
 
     vkResult = vulkan->vkQueueSubmit(vulkan->graphicsQueue, 1, &submitInfo, frameData->inFlightFence);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkQueueSubmit", vkResult);
+        VulkanResultPrint(vulkan, "vkQueueSubmit", vkResult);
         return false;
     }
 
@@ -1510,7 +1510,7 @@ bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer) {
 
     vkResult = vulkan->vkQueuePresentKHR(vulkan->presentQueue, &presentInfo);
     if (vkResult != VK_SUCCESS) {
-        VkResultPrintError("vkQueuePresentKHR", vkResult);
+        VulkanResultPrint(vulkan, "vkQueuePresentKHR", vkResult);
         return false;
     }
 
