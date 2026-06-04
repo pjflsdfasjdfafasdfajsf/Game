@@ -1,0 +1,29 @@
+name: Fuzz
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  fuzzing:
+    name: Fuzz
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Install Clang
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang
+
+    - name: Fuzz PNG
+      run: |
+        cd game/test
+        make fuzz-png FUZZING_TIME_IN_SECONDS=180
+
+    - name: Fuzz TTF
+      run: |
+        cd game/test
+        make fuzz-ttf FUZZING_TIME_IN_SECONDS=180
