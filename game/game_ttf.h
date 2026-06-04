@@ -8,40 +8,40 @@
 #define TRUETYPE_CHARACTER_COUNT_FOR_ASCII 95
 
 typedef enum {
-    TrueTypeScalerTypeUnknown = 0,
-    TrueTypeScalerTypeWindows,
-    TrueTypeScalerTypeMac,
-    TrueTypeScalerTypePostScript,
-    TrueTypeScalerTypeOpenType
-} TrueTypeScalerType;
+    true_type_scaler_type_unknown = 0,
+    true_type_scaler_type_windows,
+    true_type_scaler_type_mac,
+    true_type_scaler_type_post_script,
+    true_type_scaler_type_open_type
+} true_type_scaler_type;
 
 typedef struct {
     u32 tag;
-    u32 checkSum;
+    u32 check_sum;
     u32 offset;
     u32 length;
     const u8 *memory;
-} TrueTypeTableDirectoryEntry;
+} true_type_table_directory_entry;
 
 typedef struct {
-    TrueTypeScalerType scalerType;
-    u16 numberOfTables;
-    u16 searchRange;
-    u16 entrySelector;
-    u16 rangeShift;
+    true_type_scaler_type scaler_type;
+    u16 number_of_tables;
+    u16 search_range;
+    u16 entry_selector;
+    u16 range_shift;
 
-    TrueTypeTableDirectoryEntry *tables;
-} TrueTypeFont;
+    true_type_table_directory_entry *tables;
+} true_type_font;
 
 typedef struct {
-    u32 characterCode;
-    bool isValid;
-    Vector2 uvMin;
-    Vector2 uvMax;
-    Vector2 size;
-    Vector2 offset;
-} TrueTypeBakedGlyph;
+    u32 character_code;
+    bool is_valid;
+    vector2 uv_min;
+    vector2 uv_max;
+    vector2 size;
+    vector2 offset;
+} true_type_baked_glyph;
 
-TrueTypeFont TrueTypeFontLoadFromMemory(MemoryArena *arena, MemoryStream *errorStream, const void *memory, usize length);
+true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_stream *error_stream, const void *memory, usize length);
 
-Image TrueTypeFontBakeAtlas(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const TrueTypeFont *font, u32 targetPixelHeight, u32 atlasWidth, u32 atlasHeight, u32 firstCharacter, u32 characterCount, TrueTypeBakedGlyph *outGlyphs);
+image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const true_type_font *font, u32 target_pixel_height, u32 atlas_width, u32 atlas_height, u32 first_character, u32 character_count, true_type_baked_glyph *out_glyphs);

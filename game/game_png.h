@@ -4,9 +4,9 @@
 #include "game_types.h"
 
 typedef struct {
-    Vector2U size;
-    u32 bytesPerPixel;
+    vector2_u size;
+    u32 bytes_per_pixel;
     u8 *pixels;
-} Image;
+} image;
 
-Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const void *memory, usize length);
+image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const void *memory, usize length);

@@ -4,13 +4,13 @@
 #include "game_types.h"
 
 typedef struct {
-    Vector2U *points;
-    u32 MaximumWidth;
-    u32 MaximumHeight;
-    u32 pointCount;
-    bool isInitialized;
-} Pack2D;
+    vector2_u *points;
+    u32 maximum_width;
+    u32 maximum_height;
+    u32 point_count;
+    bool is_initialized;
+} pack2d;
 
-Pack2D Pack2DCreate(MemoryArena *arena, u32 MaximumWidth, u32 MaximumHeight);
+pack2d pack2d_create(memory_arena *arena, u32 maximum_width, u32 maximum_height);
 
-bool Pack2DAdd(Pack2D *packer, u32 rectangleWidth, u32 rectangleHeight, u32 *outPositionX, u32 *outPositionY);
+bool pack2d_add(pack2d *packer, u32 rectangle_width, u32 rectangle_height, u32 *out_position_x, u32 *out_position_y);

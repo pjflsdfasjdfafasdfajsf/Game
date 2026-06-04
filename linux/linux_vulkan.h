@@ -6,12 +6,12 @@
 #define VK_USE_PLATFORM_WAYLAND_KHR
 #include <vulkan/vulkan.h>
 
-// NOTE: Borrowed from 
-// https://github.com/KhronosGroup/Vulkan-Utility-Libraries/blob/main/include/vulkan/vk_enum_string_helper.h
+// NOTE: borrowed from 
+// https://github.com/khronos_group/vulkan-utility-libraries/blob/main/include/vulkan/vk_enum_string_helper.h
 
-static inline const char* VkResultToString(VkResult inputValue)
+static inline const char* VkResultToString(VkResult input_value)
 {
-    switch ((VkResult)inputValue)
+    switch ((VkResult)input_value)
     {
         case VK_ERROR_DEVICE_LOST:
             return "VK_ERROR_DEVICE_LOST";
@@ -78,7 +78,7 @@ static inline const char* VkResultToString(VkResult inputValue)
         case VK_TIMEOUT:
             return "VK_TIMEOUT";
         default:
-            return "Unhandled VkResult";
+            return "unhandled VkResult";
     }
 }
 
@@ -166,90 +166,90 @@ static inline const char* VkResultToString(VkResult inputValue)
 #define MAX_TEXTURES 128
 
 typedef struct {
-    u32 graphicsIndex;
-    u32 presentIndex;
-} VulkanQueueFamilies;
+    u32 graphics_index;
+    u32 present_index;
+} vulkan_queue_families;
 
 typedef struct {
     VkSwapchainKHR handle;
     VkFormat format;
     VkExtent2D extent;
 
-    u32 imageCount;
+    u32 image_count;
 
     VkImage images[VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT];
-    VkImageView imageViews[VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT];
-    VkSemaphore renderFinishedSemaphore[VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT];
-} VulkanSwapchain;
+    VkImageView image_views[VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT];
+    VkSemaphore render_finished_semaphore[VULKAN_SWAPCHAIN_MAX_IMAGE_COUNT];
+} vulkan_swapchain;
 
 typedef struct {
     VkImage handle;
     VkImageView view;
     VkDeviceMemory memory;
-} VulkanImage;
+} vulkan_image;
 
 typedef struct {
     VkBuffer handle;
     VkDeviceMemory memory;
     VkDeviceSize size;
-} VulkanBuffer;
+} vulkan_buffer;
 
 typedef struct {
-    VkCommandBuffer commandBuffer;
-    VkSemaphore imageAvailableSemaphore;
-    VkFence inFlightFence;
+    VkCommandBuffer command_buffer;
+    VkSemaphore image_available_semaphore;
+    VkFence in_flight_fence;
 
-    VulkanBuffer uniformBuffer;
-    u8 *uniformData;
-    u32 uniformCount;
-} VulkanFrameData;
+    vulkan_buffer uniform_buffer;
+    u8 *uniform_data;
+    u32 uniform_count;
+} vulkan_frame_data;
 
 typedef struct {
     VkInstance instance;
-    VkPhysicalDevice physicalDevice;
+    VkPhysicalDevice physical_device;
     VkSurfaceKHR surface;
 
-    VulkanQueueFamilies queueFamilies;
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    vulkan_queue_families queue_families;
+    VkQueue graphics_queue;
+    VkQueue present_queue;
 
-    VkDevice logicalDevice;
-    VulkanSwapchain swapchain;
+    VkDevice logical_device;
+    vulkan_swapchain swapchain;
 
-    VkCommandPool commandPool;
-    VulkanFrameData frameData[FRAME_COUNT];
+    VkCommandPool command_pool;
+    vulkan_frame_data frame_data[FRAME_COUNT];
 
     VkPipeline pipeline;
-    VkPipelineLayout pipelineLayout;
+    VkPipelineLayout pipeline_layout;
 
-    VkDescriptorPool descriptorPool;
+    VkDescriptorPool descriptor_pool;
 
-    VkDescriptorSetLayout resourceDescriptorLayout;
-    VkDescriptorSetLayout samplerDescriptorSetLayout;
-    VkDescriptorSet resourceDescriptorSets[FRAME_COUNT];
-    VkDescriptorSet samplerDescriptorSets[FRAME_COUNT];
-    u32 uniformStride;
+    VkDescriptorSetLayout resource_descriptor_layout;
+    VkDescriptorSetLayout sampler_descriptor_set_layout;
+    VkDescriptorSet resource_descriptor_sets[FRAME_COUNT];
+    VkDescriptorSet sampler_descriptor_sets[FRAME_COUNT];
+    u32 uniform_stride;
 
-    VkSampler textureSampler;
+    VkSampler texture_sampler;
 
-    VulkanBuffer vertexBuffer;
-    u8 *vertexData;
-    u32 vertexCapacity;
-    u32 vertexCount;
+    vulkan_buffer vertex_buffer;
+    u8 *vertex_data;
+    u32 vertex_capacity;
+    u32 vertex_count;
 
-    VkClearValue clearColor;
+    VkClearValue clear_color;
 
-    u32 imageIndex;
-    u32 frameIndex;
+    u32 image_index;
+    u32 frame_index;
 
-    VulkanImage textures[MAX_TEXTURES];
-    u32 textureCount;
+    vulkan_image textures[MAX_TEXTURES];
+    u32 texture_count;
 
-    MemoryStream *infoStream;
-    MemoryStream *errorStream;
+    memory_stream *info_stream;
+    memory_stream *error_stream;
 
 #if defined(DEBUG)
-    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerEXT debug_messenger;
 #define DEBUG_FUNCTION(name) PFN_##name name
     VULKAN_DEBUG_FUNCTIONS
 #undef DEBUG_FUNCTION
@@ -261,9 +261,9 @@ typedef struct {
     VULKAN_DEVICE_FUNCTIONS
 #undef INSTANCE_FUNCTION
 #undef DEVICE_FUNCTION
-} Vulkan;
+} vulkan;
 
-bool VulkanInitialize(Vulkan *vulkan, LinuxWayland *window, MemoryStream *infoStream, MemoryStream *errorStream);
+bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *info_stream, memory_stream *error_stream);
 
-bool VulkanFrameBegin(Vulkan *vulkan, LinuxWayland *window, RenderCommandBuffer *commandBuffer);
-bool VulkanFrameEnd(Vulkan *vulkan, RenderCommandBuffer *commandBuffer);
+bool vulkan_frame_begin(vulkan *vulkan, linux_wayland *window, render_command_buffer *command_buffer);
+bool vulkan_frame_end(vulkan *vulkan, render_command_buffer *command_buffer);

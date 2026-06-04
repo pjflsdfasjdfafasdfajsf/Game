@@ -7,136 +7,135 @@
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
-#include "game.h"
 
 #if defined(DEBUG)
-static void *GameSO = 0;
-static UpdateAndRenderFunction *GameUpdateAndRender = 0;
-static GetSoundSamplesFunction *GameGetSoundSamples = 0;
+static void *game_so = 0;
+static update_and_render_function *GAME_UPDATE_AND_RENDER = 0;
+static get_sound_samples_function *GAME_GET_SOUND_SAMPLES = 0;
 
-static void AbsoluteLibaryPath(const char *libraryFileName, char *destinationBuffer, usize destinationCapacity) {
-    MemoryZero(destinationBuffer, destinationCapacity);
+static void absolute_libary_path(const char *library_file_name, char *destination_buffer, usize destination_capacity) {
+    memory_zero(destination_buffer, destination_capacity);
 
-    char executablePath[PATH_MAX];
-    isize executablePathLength = readlink("/proc/self/exe", executablePath, sizeof(executablePath) - 1);
+    char executable_path[PATH_MAX];
+    isize executable_path_length = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
 
-    if (executablePathLength == -1) {
+    if (executable_path_length == -1) {
         printf("ERROR: readlink failed.\n");
 
         return;
     }
 
-    executablePath[executablePathLength] = '\0';
+    executable_path[executable_path_length] = '\0';
 
-    isize finalSlashIndex = StringFindLastOccurrenceOfCharacter(executablePath, '/');
+    isize final_slash_index = string_find_last_occurrence_of_character(executable_path, '/');
 
-    if (finalSlashIndex != -1) {
-        executablePath[finalSlashIndex + 1] = '\0';
+    if (final_slash_index != -1) {
+        executable_path[final_slash_index + 1] = '\0';
     }
 
-    StringCopy(destinationBuffer, destinationCapacity, executablePath);
-    StringAppend(destinationBuffer, destinationCapacity, libraryFileName);
+    string_copy(destination_buffer, destination_capacity, executable_path);
+    string_append(destination_buffer, destination_capacity, library_file_name);
 }
 
-static bool CopyFile(const char *sourcePath, const char *destinationPath) {
-    int sourceFile = open(sourcePath, O_RDONLY);
-    if (sourceFile < 0) {
+static bool copy_file(const char *source_path, const char *destination_path) {
+    int source_file = open(source_path, O_RDONLY);
+    if (source_file < 0) {
         return false;
     }
 
-    int destinationFile = open(destinationPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (destinationFile < 0) {
-        close(sourceFile);
+    int destination_file = open(destination_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (destination_file < 0) {
+        close(source_file);
         return false;
     }
 
     char buffer[4096];
 
     while (true) {
-        isize bytesRead = read(sourceFile, buffer, sizeof(buffer));
+        isize bytes_read = read(source_file, buffer, sizeof(buffer));
 
-        if (bytesRead == 0) {
+        if (bytes_read == 0) {
             break;
         }
 
-        if (bytesRead < 0) {
+        if (bytes_read < 0) {
             if (errno == EINTR) {
                 continue;
             }
             return false;
         }
 
-        char *writePointer = buffer;
-        isize bytesRemaining = bytesRead;
+        char *write_pointer = buffer;
+        isize bytes_remaining = bytes_read;
 
-        while (bytesRemaining > 0) {
-            isize bytesWritten = write(destinationFile, writePointer, bytesRemaining);
+        while (bytes_remaining > 0) {
+            isize bytes_written = write(destination_file, write_pointer, bytes_remaining);
 
-            if (bytesWritten >= 0) {
-                bytesRemaining -= bytesWritten;
-                writePointer += bytesWritten;
+            if (bytes_written >= 0) {
+                bytes_remaining -= bytes_written;
+                write_pointer += bytes_written;
             } else if (errno != EINTR) {
                 return false;
             }
         }
     }
 
-    close(sourceFile);
+    close(source_file);
 
-    if (close(destinationFile) < 0) {
+    if (close(destination_file) < 0) {
         return false;
     }
 
     return true;
 }
 
-static void GameCodeLoad(void) {
-    if (GameSO) {
-        dlclose(GameSO);
+static void game_code_load(void) {
+    if (game_so) {
+        dlclose(game_so);
 
-        GameSO = 0;
-        GameUpdateAndRender = 0;
-        GameGetSoundSamples = 0;
+        game_so = 0;
+        GAME_UPDATE_AND_RENDER = 0;
+        GAME_GET_SOUND_SAMPLES = 0;
     }
 
-    char sourceLibraryPath[PATH_MAX];
-    char temporaryLibraryPath[PATH_MAX];
+    char source_library_path[PATH_MAX];
+    char temporary_library_path[PATH_MAX];
 
-    AbsoluteLibaryPath("../lib/Game.so", sourceLibraryPath, sizeof(sourceLibraryPath));
-    AbsoluteLibaryPath("libgame.temp.so", temporaryLibraryPath, sizeof(temporaryLibraryPath));
+    absolute_libary_path("../lib/Game.so", source_library_path, sizeof(source_library_path));
+    absolute_libary_path("libgame.temp.so", temporary_library_path, sizeof(temporary_library_path));
 
-    if (!CopyFile(sourceLibraryPath, temporaryLibraryPath)) {
-        fprintf(stderr, "Could not copy Game.so.\n");
+    if (!copy_file(source_library_path, temporary_library_path)) {
+        fprintf(stderr, "could not copy Game.so.\n");
     }
 
-    GameSO = dlopen(temporaryLibraryPath, RTLD_NOW);
-    if (!GameSO) {
+    game_so = dlopen(temporary_library_path, RTLD_NOW);
+    if (!game_so) {
         fprintf(stderr, "%s\n", dlerror());
     }
 
-    GameUpdateAndRender = (UpdateAndRenderFunction *)dlsym(GameSO, "UpdateAndRender");
-    GameGetSoundSamples = (GetSoundSamplesFunction *)dlsym(GameSO, "GetSoundSamples");
+    GAME_UPDATE_AND_RENDER = (update_and_render_function *)dlsym(game_so, "update_and_render");
+    GAME_GET_SOUND_SAMPLES = (get_sound_samples_function *)dlsym(game_so, "get_sound_samples");
 }
 
 #else
-#define GameUpdateAndRender UpdateAndRender
-#define GameGetSoundSamples GetSoundSamples
+#define GAME_UPDATE_AND_RENDER update_and_render
+#define GAME_GET_SOUND_SAMPLES get_sound_samples
 #endif
 
-static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdgToplevel, int32_t width, int32_t height, struct wl_array *states) {
-    Unused(xdgToplevel), Unused(width), Unused(height);
+static void xdg_toplevel_configure_handler(void *user_data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states) {
+    UNUSED(xdg_toplevel), UNUSED(width), UNUSED(height);
 
-    LinuxWayland *wayland = (LinuxWayland *)userData;
+    linux_wayland *wayland = (linux_wayland *)user_data;
 
     if (!wayland) {
         return;
     }
 
-    bool isActivated = false;
+    bool is_activated = false;
     uint32_t *state;
     wl_array_for_each(state, states) {
         if (*state == XDG_TOPLEVEL_STATE_ACTIVATED) {
-            isActivated = true;
+            is_activated = true;
         }
     }
 
@@ -147,202 +146,202 @@ static void XdgToplevelConfigureHandler(void *userData, struct xdg_toplevel *xdg
         wayland->height = height;
     }
 
-    wayland->isFocused = isActivated;
+    wayland->is_focused = is_activated;
 }
 
-static void XdgToplevelCloseHandler(void *userData, struct xdg_toplevel *xdgToplevel) {
-    Unused(xdgToplevel);
+static void xdg_toplevel_close_handler(void *user_data, struct xdg_toplevel *xdg_toplevel) {
+    UNUSED(xdg_toplevel);
 
-    LinuxWayland *wayland = (LinuxWayland *)userData;
+    linux_wayland *wayland = (linux_wayland *)user_data;
 
     if (wayland) {
-        wayland->isRunning = false;
+        wayland->is_running = false;
     }
 }
 
-static const struct xdg_toplevel_listener xdgToplevelListener = {
-    .configure = XdgToplevelConfigureHandler,
-    .close = XdgToplevelCloseHandler,
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+    .configure = xdg_toplevel_configure_handler,
+    .close = xdg_toplevel_close_handler,
 };
 
-static void XdgSurfaceConfigureHandler(void *userData, struct xdg_surface *xdgSurface, uint32_t serial) {
-    LinuxWayland *wayland = (LinuxWayland *)userData;
+static void xdg_surface_configure_handler(void *user_data, struct xdg_surface *xdg_surface, uint32_t serial) {
+    linux_wayland *wayland = (linux_wayland *)user_data;
 
-    xdg_surface_ack_configure(xdgSurface, serial);
+    xdg_surface_ack_configure(xdg_surface, serial);
 
     if (wayland) {
-        wayland->isConfigured = true;
+        wayland->is_configured = true;
     }
 }
 
-static const struct xdg_surface_listener xdgSurfaceListener = {
-    .configure = XdgSurfaceConfigureHandler,
+static const struct xdg_surface_listener xdg_surface_listener = {
+    .configure = xdg_surface_configure_handler,
 };
 
-static void XdgWindowManagerBasePingHandler(void *userData, struct xdg_wm_base *xdgWmBase, uint32_t serial) {
-    Unused(userData);
+static void xdg_window_manager_base_ping_handler(void *user_data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
+    UNUSED(user_data);
 
-    xdg_wm_base_pong(xdgWmBase, serial);
+    xdg_wm_base_pong(xdg_wm_base, serial);
 }
 
-static const struct xdg_wm_base_listener xdgWmBaseListener = {
-    .ping = XdgWindowManagerBasePingHandler,
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = xdg_window_manager_base_ping_handler,
 };
 
-static void RegistryGlobalHandler(void *userData, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
-    Unused(version);
+static void registry_global_handler(void *user_data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
+    UNUSED(version);
 
-    LinuxWayland *wayland = (LinuxWayland *)userData;
+    linux_wayland *wayland = (linux_wayland *)user_data;
 
-    usize compositorNameLength = StringGetLength(wl_compositor_interface.name);
-    usize xdgWmBaseNameLength = StringGetLength(xdg_wm_base_interface.name);
+    usize compositor_name_length = string_get_length(wl_compositor_interface.name);
+    usize xdg_wm_base_name_length = string_get_length(xdg_wm_base_interface.name);
 
-    bool isCompositor = MemoryEquals(interface, wl_compositor_interface.name, compositorNameLength + 1);
-    bool isXdgWmBase = MemoryEquals(interface, xdg_wm_base_interface.name, xdgWmBaseNameLength + 1);
+    bool is_compositor = memory_equals(interface, wl_compositor_interface.name, compositor_name_length + 1);
+    bool is_xdg_wm_base = memory_equals(interface, xdg_wm_base_interface.name, xdg_wm_base_name_length + 1);
 
-    if (isCompositor) {
+    if (is_compositor) {
         wayland->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
-    } else if (isXdgWmBase) {
-        wayland->xdgWmBase = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
-        xdg_wm_base_add_listener(wayland->xdgWmBase, &xdgWmBaseListener, wayland);
+    } else if (is_xdg_wm_base) {
+        wayland->xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+        xdg_wm_base_add_listener(wayland->xdg_wm_base, &xdg_wm_base_listener, wayland);
     }
 }
 
-static void RegistryGlobalRemoveHandler(void *userData, struct wl_registry *registry, uint32_t name) {
-    Unused(userData), Unused(registry), Unused(name);
+static void registry_global_remove_handler(void *user_data, struct wl_registry *registry, uint32_t name) {
+    UNUSED(user_data), UNUSED(registry), UNUSED(name);
 }
 
-static const struct wl_registry_listener registryListener = {
-    .global = RegistryGlobalHandler,
-    .global_remove = RegistryGlobalRemoveHandler,
+static const struct wl_registry_listener registry_listener = {
+    .global = registry_global_handler,
+    .global_remove = registry_global_remove_handler,
 };
 
-LinuxWayland WindowCreate(const char *title) {
-    LinuxWayland wayland = {0};
+linux_wayland window_create(const char *title) {
+    linux_wayland wayland = {0};
 
     wayland.width = DEFAULT_WINDOW_WIDTH;
     wayland.height = DEFAULT_WINDOW_HEIGHT;
 
     wayland.display = wl_display_connect(0);
     if (!wayland.display) {
-        fprintf(stderr, "Could not connect to Wayland display.\n");
+        fprintf(stderr, "could not connect to wayland display.\n");
         return wayland;
     }
 
     wayland.registry = wl_display_get_registry(wayland.display);
-    wl_registry_add_listener(wayland.registry, &registryListener, &wayland);
+    wl_registry_add_listener(wayland.registry, &registry_listener, &wayland);
 
     wl_display_roundtrip(wayland.display);
 
-    if (!wayland.compositor || !wayland.xdgWmBase) {
-        fprintf(stderr, "Failed to bind Wayland compositor or xdg_wm_base.\n");
+    if (!wayland.compositor || !wayland.xdg_wm_base) {
+        fprintf(stderr, "failed to bind wayland compositor or xdg_wm_base.\n");
         return wayland;
     }
 
     wayland.surface = wl_compositor_create_surface(wayland.compositor);
-    wayland.xdgSurface = xdg_wm_base_get_xdg_surface(wayland.xdgWmBase, wayland.surface);
-    xdg_surface_add_listener(wayland.xdgSurface, &xdgSurfaceListener, &wayland);
+    wayland.xdg_surface = xdg_wm_base_get_xdg_surface(wayland.xdg_wm_base, wayland.surface);
+    xdg_surface_add_listener(wayland.xdg_surface, &xdg_surface_listener, &wayland);
 
-    wayland.xdgToplevel = xdg_surface_get_toplevel(wayland.xdgSurface);
-    xdg_toplevel_add_listener(wayland.xdgToplevel, &xdgToplevelListener, &wayland);
+    wayland.xdg_toplevel = xdg_surface_get_toplevel(wayland.xdg_surface);
+    xdg_toplevel_add_listener(wayland.xdg_toplevel, &xdg_toplevel_listener, &wayland);
 
-    xdg_toplevel_set_title(wayland.xdgToplevel, title);
-    xdg_toplevel_set_app_id(wayland.xdgToplevel, "wayland-game-linux");
+    xdg_toplevel_set_title(wayland.xdg_toplevel, title);
+    xdg_toplevel_set_app_id(wayland.xdg_toplevel, "wayland-game-linux");
 
     wl_surface_commit(wayland.surface);
     wl_display_roundtrip(wayland.display);
 
-    wayland.isRunning = true;
-    wayland.isFocused = true;
+    wayland.is_running = true;
+    wayland.is_focused = true;
 
     return wayland;
 }
 
-// NOTE: Audio
-// How it comes that Alsa does not need to be ran on separate thread and the audio works perfectly fine when resizing/moving the
+// NOTE: audio
+// how it comes that alsa does not need to be ran on separate thread and the audio works perfectly fine when resizing/moving the
 // window?
-// It still will be on separate thread though. Just in case.
+// it still will be on separate thread though. just in case.
 
-void AudioPause(LinuxAudio *audio) {
-    if (!audio || !audio->pcmHandle) {
+void audio_pause(linux_audio *audio) {
+    if (!audio || !audio->pcm_handle) {
         return;
     }
 
-    audio->isPaused = true;
+    audio->is_paused = true;
 
-    snd_pcm_drop(audio->pcmHandle);
+    snd_pcm_drop(audio->pcm_handle);
 }
 
-void AudioResume(LinuxAudio *audio) {
-    if (!audio || !audio->pcmHandle) {
+void audio_resume(linux_audio *audio) {
+    if (!audio || !audio->pcm_handle) {
         return;
     }
 
-    snd_pcm_prepare(audio->pcmHandle);
+    snd_pcm_prepare(audio->pcm_handle);
 
-    audio->isPaused = false;
+    audio->is_paused = false;
 }
 
-void AudioUpdate(LinuxAudio *audio) {
-    if (!audio || !audio->pcmHandle) {
+void audio_update(linux_audio *audio) {
+    if (!audio || !audio->pcm_handle) {
         return;
     }
 
-    snd_pcm_sframes_t availableFrames = snd_pcm_avail_update(audio->pcmHandle);
+    snd_pcm_sframes_t available_frames = snd_pcm_avail_update(audio->pcm_handle);
 
-    if (availableFrames < 0) {
-        if (availableFrames == -EPIPE) {
-            snd_pcm_prepare(audio->pcmHandle);
+    if (available_frames < 0) {
+        if (available_frames == -EPIPE) {
+            snd_pcm_prepare(audio->pcm_handle);
         }
 
         return;
     }
 
-    if (availableFrames == 0) {
+    if (available_frames == 0) {
         return;
     }
 
-    if (availableFrames > audio->bufferFrameCount) {
-        availableFrames = audio->bufferFrameCount;
+    if (available_frames > audio->buffer_frame_count) {
+        available_frames = audio->buffer_frame_count;
     }
 
-    u32 bytesPerFrame = audio->channels * sizeof(f32);
+    u32 bytes_per_frame = audio->channels * sizeof(f32);
     // TODO: DO NOT ALLOCATE!
-    f32 *audioData = (f32 *)malloc(availableFrames * bytesPerFrame);
+    f32 *audio_data = (f32 *)malloc(available_frames * bytes_per_frame);
 
-    if (!audioData) {
+    if (!audio_data) {
         return;
     }
 
-    f32 *samplePointer = audioData;
+    f32 *sample_pointer = audio_data;
 
-    for (u32 frameIndex = 0; frameIndex < availableFrames; frameIndex++) {
-        f32 sampleValue = (audio->phase < 0.5f) ? 0.05f : -0.05f;
+    for (u32 frame_index = 0; frame_index < available_frames; frame_index++) {
+        f32 sample_value = (audio->phase < 0.5f) ? 0.05f : -0.05f;
 
-        audio->phase += audio->phaseIncrement;
+        audio->phase += audio->phase_increment;
         if (audio->phase > 1.0f) {
             audio->phase -= 1.0f;
         }
 
-        for (u32 channelIndex = 0; channelIndex < audio->channels; channelIndex++) {
-            *samplePointer++ = sampleValue;
+        for (u32 channel_index = 0; channel_index < audio->channels; channel_index++) {
+            *sample_pointer++ = sample_value;
         }
     }
 
-    snd_pcm_sframes_t framesWritten = snd_pcm_writei(audio->pcmHandle, audioData, availableFrames);
-    if (framesWritten < 0) {
-        snd_pcm_prepare(audio->pcmHandle);
+    snd_pcm_sframes_t frames_written = snd_pcm_writei(audio->pcm_handle, audio_data, available_frames);
+    if (frames_written < 0) {
+        snd_pcm_prepare(audio->pcm_handle);
     }
 
-    free(audioData);
+    free(audio_data);
 }
 
-void *AudioThreadRoutine(void *threadParameter) {
-    LinuxAudio *audio = (LinuxAudio *)threadParameter;
+void *audio_thread_routine(void *thread_parameter) {
+    linux_audio *audio = (linux_audio *)thread_parameter;
 
-    while (audio->isRunning) {
-        if (!audio->isPaused) {
-            AudioUpdate(audio);
+    while (audio->is_running) {
+        if (!audio->is_paused) {
+            audio_update(audio);
         }
 
         usleep(10000);
@@ -351,87 +350,87 @@ void *AudioThreadRoutine(void *threadParameter) {
     return 0;
 }
 
-bool AudioInitialize(LinuxAudio *audio) {
+bool audio_initialize(linux_audio *audio) {
     if (!audio) {
         return false;
     }
 
-    MemoryZero(audio, sizeof(LinuxAudio));
+    memory_zero(audio, sizeof(linux_audio));
 
-    audio->samplesPerSecond = 48000;
+    audio->samples_per_second = 48000;
     audio->channels = 2;
-    audio->phaseIncrement = 440.0f / (f32)audio->samplesPerSecond;
+    audio->phase_increment = 440.0f / (f32)audio->samples_per_second;
 
-    int errorCode = snd_pcm_open(&audio->pcmHandle, "default", SND_PCM_STREAM_PLAYBACK, 0);
-    if (errorCode < 0) {
-        fprintf(stderr, "snd_pcm_open: %s\n", snd_strerror(errorCode));
-
-        return false;
-    }
-
-    snd_pcm_hw_params_t *hardwareParameters;
-    snd_pcm_hw_params_alloca(&hardwareParameters);
-    snd_pcm_hw_params_any(audio->pcmHandle, hardwareParameters);
-
-    snd_pcm_hw_params_set_access(audio->pcmHandle, hardwareParameters, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(audio->pcmHandle, hardwareParameters, SND_PCM_FORMAT_FLOAT_LE);
-    snd_pcm_hw_params_set_channels(audio->pcmHandle, hardwareParameters, audio->channels);
-    snd_pcm_hw_params_set_rate_near(audio->pcmHandle, hardwareParameters, &audio->samplesPerSecond, 0);
-
-    errorCode = snd_pcm_hw_params(audio->pcmHandle, hardwareParameters);
-    if (errorCode < 0) {
-        fprintf(stderr, "snd_pcm_hw_params: %s\n", snd_strerror(errorCode));
+    int error_code = snd_pcm_open(&audio->pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    if (error_code < 0) {
+        fprintf(stderr, "snd_pcm_open: %s\n", snd_strerror(error_code));
 
         return false;
     }
 
-    snd_pcm_hw_params_get_buffer_size(hardwareParameters, (snd_pcm_uframes_t *)&audio->bufferFrameCount);
+    snd_pcm_hw_params_t *hardware_parameters;
+    snd_pcm_hw_params_alloca(&hardware_parameters);
+    snd_pcm_hw_params_any(audio->pcm_handle, hardware_parameters);
 
-    snd_pcm_prepare(audio->pcmHandle);
+    snd_pcm_hw_params_set_access(audio->pcm_handle, hardware_parameters, SND_PCM_ACCESS_RW_INTERLEAVED);
+    snd_pcm_hw_params_set_format(audio->pcm_handle, hardware_parameters, SND_PCM_FORMAT_FLOAT_LE);
+    snd_pcm_hw_params_set_channels(audio->pcm_handle, hardware_parameters, audio->channels);
+    snd_pcm_hw_params_set_rate_near(audio->pcm_handle, hardware_parameters, &audio->samples_per_second, 0);
 
-    audio->isRunning = true;
-    audio->isPaused = false;
+    error_code = snd_pcm_hw_params(audio->pcm_handle, hardware_parameters);
+    if (error_code < 0) {
+        fprintf(stderr, "snd_pcm_hw_params: %s\n", snd_strerror(error_code));
 
-    if (pthread_create(&audio->threadHandle, 0, AudioThreadRoutine, audio) != 0) {
-        fprintf(stderr, "Could not start audio thread.\n");
+        return false;
+    }
+
+    snd_pcm_hw_params_get_buffer_size(hardware_parameters, (snd_pcm_uframes_t *)&audio->buffer_frame_count);
+
+    snd_pcm_prepare(audio->pcm_handle);
+
+    audio->is_running = true;
+    audio->is_paused = false;
+
+    if (pthread_create(&audio->thread_handle, 0, audio_thread_routine, audio) != 0) {
+        fprintf(stderr, "could not start audio thread.\n");
     }
 
     return true;
 }
 
-void MemoryDumpStandardStreams(GameMemory *gameMemory) {
-    if (!gameMemory) {
+void memory_dump_standard_streams(game_memory *game_memory) {
+    if (!game_memory) {
         return;
     }
 
-    if (gameMemory->standardInfoStream && gameMemory->standardInfoStream->offset > 0) {
-        isize bytesWritten = write(STDOUT_FILENO, gameMemory->standardInfoStream->memory, gameMemory->standardInfoStream->offset);
-        Unused(bytesWritten);
+    if (game_memory->standard_info_stream && game_memory->standard_info_stream->offset > 0) {
+        isize bytes_written = write(STDOUT_FILENO, game_memory->standard_info_stream->memory, game_memory->standard_info_stream->offset);
+        UNUSED(bytes_written);
 
-        gameMemory->standardInfoStream->offset = 0;
+        game_memory->standard_info_stream->offset = 0;
     }
 
-    if (gameMemory->standardErrorStream && gameMemory->standardErrorStream->offset > 0) {
-        isize bytesWritten = write(STDERR_FILENO, gameMemory->standardErrorStream->memory, gameMemory->standardErrorStream->offset);
-        Unused(bytesWritten);
+    if (game_memory->standard_error_stream && game_memory->standard_error_stream->offset > 0) {
+        isize bytes_written = write(STDERR_FILENO, game_memory->standard_error_stream->memory, game_memory->standard_error_stream->offset);
+        UNUSED(bytes_written);
 
-        gameMemory->standardErrorStream->offset = 0;
+        game_memory->standard_error_stream->offset = 0;
     }
 }
 
-void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMemory *gameMemory, RenderCommandBuffer *commandBuffer) {
+void run_update(linux_wayland *wayland, linux_audio *audio, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
     if (!wayland || !wayland->display) {
         return;
     }
 
-    bool wasFocused = wayland->isFocused;
+    bool was_focused = wayland->is_focused;
 
     struct pollfd pollfd;
     pollfd.fd = wl_display_get_fd(wayland->display);
     pollfd.events = POLLIN;
 
-    while (wayland->isRunning) {
-        MemoryDumpStandardStreams(gameMemory);
+    while (wayland->is_running) {
+        memory_dump_standard_streams(game_memory);
 
         wl_display_dispatch_pending(wayland->display);
         wl_display_flush(wayland->display);
@@ -440,25 +439,25 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMem
             wl_display_dispatch(wayland->display);
         }
 
-        if (!wayland->isFocused && wasFocused) {
-            AudioPause(audio);
-        } else if (wayland->isFocused && !wasFocused) {
-            AudioResume(audio);
+        if (!wayland->is_focused && was_focused) {
+            audio_pause(audio);
+        } else if (wayland->is_focused && !was_focused) {
+            audio_resume(audio);
         }
 
-        wasFocused = wayland->isFocused;
+        was_focused = wayland->is_focused;
 
-        if (wayland->isFocused) {
-            RenderCommandBufferReset(commandBuffer);
+        if (wayland->is_focused) {
+            render_command_buffer_reset(command_buffer);
 
-            if (GameUpdateAndRender) {
-                GameUpdateAndRender(gameMemory, commandBuffer);
+            if (GAME_UPDATE_AND_RENDER) {
+                GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
             }
 
-            if (!VulkanFrameBegin(vulkan, wayland, commandBuffer)) {
+            if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
                 continue;
             }
-            if (!VulkanFrameEnd(vulkan, commandBuffer)) {
+            if (!vulkan_frame_end(vulkan, command_buffer)) {
                 exit(1);
             }
         } else {
@@ -468,61 +467,61 @@ void RunUpdate(LinuxWayland *wayland, LinuxAudio *audio, Vulkan *vulkan, GameMem
 }
 
 int main(void) {
-    LinuxWayland wayland = WindowCreate("Linux Wayland");
+    linux_wayland wayland = window_create("linux wayland");
 
     if (!wayland.display) {
         return 1;
     }
 
-    LinuxAudio audio;
-    if (!AudioInitialize(&audio)) {
+    linux_audio audio;
+    if (!audio_initialize(&audio)) {
         return 1;
     }
 
-    usize permanentArenaSize = Megabytes(64);
-    usize temporaryArenaSize = Megabytes(256);
+    usize permanent_arena_size = MEGABYTES(64);
+    usize temporary_arena_size = MEGABYTES(256);
 
-    void *permanentMemoryBlock = malloc(permanentArenaSize);
-    void *temporaryMemoryBlock = malloc(temporaryArenaSize);
+    void *permanent_memory_block = malloc(permanent_arena_size);
+    void *temporary_memory_block = malloc(temporary_arena_size);
 
-    MemoryArena permanentArena;
-    MemoryArenaInitialize(&permanentArena, permanentMemoryBlock, permanentArenaSize);
+    memory_arena permanent_arena;
+    memory_arena_initialize(&permanent_arena, permanent_memory_block, permanent_arena_size);
 
-    MemoryArena temporaryArena;
-    MemoryArenaInitialize(&temporaryArena, temporaryMemoryBlock, temporaryArenaSize);
+    memory_arena temporary_arena;
+    memory_arena_initialize(&temporary_arena, temporary_memory_block, temporary_arena_size);
 
-    usize errorStreamSize = Kilobytes(64);
-    usize infoStreamSize = Kilobytes(256);
+    usize error_stream_size = KILOBYTES(64);
+    usize info_stream_size = KILOBYTES(256);
 
-    MemoryStream *errorStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
-    MemoryStream *infoStream = MemoryArenaPushArray(&permanentArena, MemoryStream, 1);
+    memory_stream *error_stream = MEMORY_ARENA_PUSH_ARRAY(&permanent_arena, memory_stream, 1);
+    memory_stream *info_stream = MEMORY_ARENA_PUSH_ARRAY(&permanent_arena, memory_stream, 1);
 
-    MemoryStreamInitializeWritable(errorStream, MemoryArenaPushBytes(&permanentArena, errorStreamSize), errorStreamSize);
-    MemoryStreamInitializeWritable(infoStream, MemoryArenaPushBytes(&permanentArena, infoStreamSize), infoStreamSize);
+    memory_stream_initialize_writable(error_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, error_stream_size), error_stream_size);
+    memory_stream_initialize_writable(info_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, info_stream_size), info_stream_size);
 
-    Vulkan vulkan;
-    if (!VulkanInitialize(&vulkan, &wayland, infoStream, errorStream)) {
+    vulkan vulkan;
+    if (!vulkan_initialize(&vulkan, &wayland, info_stream, error_stream)) {
         return 1;
     }
 
-    RenderCommandBuffer *commandBuffer = MemoryArenaPushArray(&permanentArena, RenderCommandBuffer, 1);
+    render_command_buffer *command_buffer = MEMORY_ARENA_PUSH_ARRAY(&permanent_arena, render_command_buffer, 1);
 
-    usize commandBufferSize = Megabytes(2);
-    void *commandBufferMemory = MemoryArenaPushBytes(&permanentArena, commandBufferSize);
-    RenderCommandBufferInitialize(commandBuffer, commandBufferMemory, commandBufferSize);
+    usize command_buffer_size = MEGABYTES(2);
+    void *command_buffer_memory = MEMORY_ARENA_PUSH_BYTES(&permanent_arena, command_buffer_size);
+    render_command_buffer_initialize(command_buffer, command_buffer_memory, command_buffer_size);
 
-    GameMemory gameMemory = {0};
-    gameMemory.standardErrorStream = errorStream;
-    gameMemory.standardInfoStream = infoStream;
-    gameMemory.permanentArena = permanentArena;
-    gameMemory.temporaryArena = temporaryArena;
-    gameMemory.isInitialized = false;
+    game_memory game_memory = {0};
+    game_memory.standard_error_stream = error_stream;
+    game_memory.standard_info_stream = info_stream;
+    game_memory.permanent_arena = permanent_arena;
+    game_memory.temporary_arena = temporary_arena;
+    game_memory.is_initialized = false;
 
 #if defined(DEBUG)
-    GameCodeLoad();
+    game_code_load();
 #endif
 
-    RunUpdate(&wayland, &audio, &vulkan, &gameMemory, commandBuffer);
+    run_update(&wayland, &audio, &vulkan, &game_memory, command_buffer);
 
     return 0;
 }

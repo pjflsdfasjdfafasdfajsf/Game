@@ -2,8 +2,8 @@
 
 #include "game_types.h"
 
-static inline bool PPMWrite(const char *filename, u32 width, u32 height, u32 bytesPerPixel, const u8 *pixels) {
-    if (!filename || !width || !height || !bytesPerPixel || !pixels) {
+static inline bool ppm_write(const char *filename, u32 width, u32 height, u32 bytes_per_pixel, const u8 *pixels) {
+    if (!filename || !width || !height || !bytes_per_pixel || !pixels) {
         return false;
     }
 
@@ -17,15 +17,15 @@ static inline bool PPMWrite(const char *filename, u32 width, u32 height, u32 byt
     for (u32 i = 0; i < width * height; i++) {
         u8 r = 0, g = 0, b = 0;
 
-        if (bytesPerPixel == 1) {
+        if (bytes_per_pixel == 1) {
             r = g = b = pixels[i];
-        } else if (bytesPerPixel == 2) {
+        } else if (bytes_per_pixel == 2) {
             r = g = b = pixels[i * 2];
-        } else if (bytesPerPixel == 3) {
+        } else if (bytes_per_pixel == 3) {
             r = pixels[i * 3 + 0];
             g = pixels[i * 3 + 1];
             b = pixels[i * 3 + 2];
-        } else if (bytesPerPixel == 4) {
+        } else if (bytes_per_pixel == 4) {
             u8 alpha = pixels[i * 4 + 3];
 
             r = (pixels[i * 4 + 0] * alpha) / 255;

@@ -1,47 +1,48 @@
 // TODO:
 // * WAV files parsing.
-// * Fix hot-reloading
+// * fix hot-reloading
 #include "game_platform.h"
 #include "game_png.h"
+#include "game_types.h"
 
-UPDATE_AND_RENDER(UpdateAndRender) {
-    if (!memory->isInitialized) {
-        MemoryStreamWriteLine(memory->standardInfoStream, "Game says hi!");
+UPDATE_AND_RENDER(update_and_render) {
+    if (!memory->is_initialized) {
+        memory_stream_write_line(memory->standard_info_stream, "game says hi!");
 
         static const char watermelon[] = {
 #include "watermelon.png.h"
         };
 
-        Image image = ImageLoadFromPNG(&memory->permanentArena, &memory->temporaryArena, memory->standardErrorStream, watermelon, sizeof(watermelon));
-        RenderAllocateTexture(commandBuffer, 1, image.size, image.bytesPerPixel, image.pixels);
+        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, watermelon, sizeof(watermelon));
+        render_allocate_texture(command_buffer, 1, image.size, image.bytes_per_pixel, image.pixels);
 
-        memory->isInitialized = true;
+        memory->is_initialized = true;
     }
 
-    RenderClearEntireScreen(commandBuffer, Black);
-    RenderDrawRectangle(commandBuffer, V2(10, 10), V2(200, 200), Red, Untextured);
+    render_clear_entire_screen(command_buffer, black);
+    render_draw_rectangle(command_buffer, V2(10, 10), V2(200, 200), red, UNTEXTURED);
 }
 
-// Commented out temporarily until we have WAV parser so this sine wave does not bless our ears. But it works.
-GET_SOUND_SAMPLES(GetSoundSamples) {
-    Unused(audioBuffer);
+// commented out temporarily until we have WAV parser so this sine wave does not bless our ears. but it works.
+GET_SOUND_SAMPLES(get_sound_samples) {
+    UNUSED(audio_buffer);
 
-    // // TODO: Move this into GameState later!
+    // // TODO: move this into game_state later!
     // static f32 phase = 0.0f;
 
-    // f32 phaseIncrement = 440.0f / (f32)audioBuffer->samplesPerSecond;
-    // f32 *samplePointer = audioBuffer->samples;
+    // f32 phase_increment = 440.0f / (f32)audio_buffer->samples_per_second;
+    // f32 *sample_pointer = audio_buffer->samples;
 
-    // for (u32 frameIndex = 0; frameIndex < audioBuffer->frameCount; frameIndex++) {
-    //     f32 sampleValue = (phase < 0.5f) ? 0.05f : -0.05f;
+    // for (u32 frame_index = 0; frame_index < audio_buffer->frame_count; frame_index++) {
+    //     f32 sample_value = (phase < 0.5f) ? 0.05f : -0.05f;
 
-    //     phase += phaseIncrement;
+    //     phase += phase_increment;
     //     if (phase > 1.0f) {
     //         phase -= 1.0f;
     //     }
 
-    //     for (u32 channelIndex = 0; channelIndex < audioBuffer->channelCount; channelIndex++) {
-    //         *samplePointer++ = sampleValue;
+    //     for (u32 channel_index = 0; channel_index < audio_buffer->channel_count; channel_index++) {
+    //         *sample_pointer++ = sample_value;
     //     }
     // }
 }

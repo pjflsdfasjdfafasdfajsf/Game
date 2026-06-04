@@ -7,8 +7,8 @@
 #if defined(FUZZING)
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    UtilitiesInitialize();
-    ImageLoadFromPNG(&permanentArena, &temporaryArena, &errorStream, data, size);
+    utilities_initialize();
+    image_load_from_png(&permanent_arena, &temporary_arena, &error_stream, data, size);
 
     return 0;
 }
@@ -16,28 +16,28 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 #else ///////////////////////////////////////////////////////
 
 int main(void) {
-    UtilitiesInitialize();
+    utilities_initialize();
 
-    usize fileSize = 0;
-    void *fileData = ReadEntireFile("data/image.png", &fileSize);
+    usize file_size = 0;
+    void *file_data = read_entire_file("data/image.png", &file_size);
 
-    if (!fileData) {
+    if (!file_data) {
         printf("test data missing\n");
 
         return 1;
     }
 
-    Image result = ImageLoadFromPNG(&permanentArena, &temporaryArena, &errorStream, fileData, fileSize);
+    image result = image_load_from_png(&permanent_arena, &temporary_arena, &error_stream, file_data, file_size);
 
     if (result.pixels) {
-        if (PPMWrite("png.ppm", result.size.width, result.size.height, result.bytesPerPixel, result.pixels)) {
+        if (ppm_write("png.ppm", result.size.width, result.size.height, result.bytes_per_pixel, result.pixels)) {
             printf("wrote png.ppm\n");
         } else {
             printf("could not write png.ppm\n");
         }
     } else {
         printf("could not parse png\n");
-        printf("error stream: %.*s\n", (int)errorStream.offset, errorStream.memory);
+        printf("error stream: %.*s\n", (int)error_stream.offset, error_stream.memory);
     }
 
     return 0;

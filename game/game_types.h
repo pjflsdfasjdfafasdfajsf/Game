@@ -1,6 +1,6 @@
 #pragma once
 
-// NOTE: These headers do not require CRT/libc so it's fine.
+// NOTE: these headers do not require CRT/libc so it's fine.
 #include <stddef.h>
 #include <stdint.h>
 
@@ -8,7 +8,7 @@
 #define true 1
 #define false 0
 
-// NOTE: Integer types.
+// NOTE: integer types.
 
 typedef uintptr_t usize;
 typedef intptr_t isize;
@@ -28,24 +28,28 @@ typedef int64_t i64;
 
 typedef float f32;
 
-// NOTE: Macros.
+// NOTE: macros.
 
-#define IsBitSet(value, bitFlag) (((value) & (bitFlag)) != 0)
+#define IS_BIT_SET(value, bit_flag) (((value) & (bit_flag)) != 0)
 
-#define Abs(x) (((x) < 0) ? -(x) : (x))
-#define Min(x, y) ((x) > (y) ? (y) : (x))
-#define Max(x, y) ((x) < (y) ? (y) : (x))
-#define Unused(x) (void)x
-#define ArrayCount(array) (sizeof((array)) / sizeof((array)[0]))
+#define ABS(x) (((x) < 0) ? -(x) : (x))
+#define MIN(x, y) ((x) > (y) ? (y) : (x))
+#define MAX(x, y) ((x) < (y) ? (y) : (x))
+#define UNUSED(x) (void)x
+#define ARRAY_COUNT(array) (sizeof((array)) / sizeof((array)[0]))
+#define ASSERT(expression)     \
+    if (!(expression)) {       \
+        *(volatile int*)0 = 0; \
+    }
 
-#define Kilobytes(value) ((value) * 1024ULL)
-#define Megabytes(value) (Kilobytes(value) * 1024ULL)
-#define Gigabytes(value) (Megabytes(value) * 1024ULL)
-#define Terabytes(value) (Gigabytes(value) * 1024ULL)
+#define KILOBYTES(value) ((value) * 1024ULL)
+#define MEGABYTES(value) (KILOBYTES(value) * 1024ULL)
+#define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
+#define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
 
 #define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
-// NOTE: Math types.
+// NOTE: math types.
 
 typedef struct {
     union {
@@ -65,18 +69,18 @@ typedef struct {
 
         f32 e[4];
     };
-} Vector4;
+} vector4;
 
-static inline Vector4 V4(f32 x, f32 y, f32 z, f32 w) {
-    return (Vector4){{{x, y, z, w}}};
+static inline vector4 V4(f32 x, f32 y, f32 z, f32 w) {
+    return (vector4){{{x, y, z, w}}};
 }
 
-// NOTE: Colors
+// NOTE: colors
 
-static const Vector4 Red = { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
-static const Vector4 Green = { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f};
-static const Vector4 Blue = { .r = 0.0f, .g = 0.0f, .b = 1.0f, .a = 1.0f};
-static const Vector4 Black = { .r = 0.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
+static const vector4 red = { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
+static const vector4 green = { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f};
+static const vector4 blue = { .r = 0.0f, .g = 0.0f, .b = 1.0f, .a = 1.0f};
+static const vector4 black = { .r = 0.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
 
 typedef struct {
     union {
@@ -90,10 +94,10 @@ typedef struct {
             f32 y;
         };
     };
-} Vector2;
+} vector2;
 
-static inline Vector2 V2(f32 x, f32 y) {
-    return (Vector2){{{x, y}}};
+static inline vector2 V2(f32 x, f32 y) {
+    return (vector2){{{x, y}}};
 }
 
 typedef struct {
@@ -108,8 +112,8 @@ typedef struct {
             u32 y;
         };
     };
-} Vector2U;
+} vector2_u;
 
-static inline Vector2U V2U(u32 x, u32 y) {
-    return (Vector2U){{{x, y}}};
+static inline vector2_u V2U(u32 x, u32 y) {
+    return (vector2_u){{{x, y}}};
 }

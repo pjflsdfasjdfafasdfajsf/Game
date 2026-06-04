@@ -2,8 +2,8 @@
 
 #include "game_platform.h"
 
-// NOTE: Function definitions below are for Release builds where the game is not built as a separate dynamic library but rather
+// NOTE: function definitions below are for release builds where the game is not built as a separate dynamic library but rather
 // just as one executable with the platform
 
-GET_SOUND_SAMPLES(GetSoundSamples);
-UPDATE_AND_RENDER(UpdateAndRender);
+GET_SOUND_SAMPLES(get_sound_samples);
+UPDATE_AND_RENDER(update_and_render);

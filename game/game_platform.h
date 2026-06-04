@@ -1,5 +1,5 @@
 // TODO:
-// * Win32 uses popups for displaying error messages. I'm almost fine with Win32 (except for the part that I want it also to print to the console besides using popups),
+// * win32 uses popups for displaying error messages. I'm almost fine with win32 (except for the part that I want it also to print to the console besides using popups),
 #pragma once
 
 #include "game_types.h"
@@ -10,65 +10,65 @@
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
-#define Untextured 0
+#define UNTEXTURED 0
 
-// NOTE: This vertex type must be shared between all renderer implementations.
+// NOTE: this vertex type must be shared between all renderer implementations.
 typedef struct {
     f32 position[3];
     f32 color[4];
     f32 uv[2];
-} Vertex;
+} vertex;
 
-// NOTE: Shared utilities.
+// NOTE: shared utilities.
 
-static inline bool IsPowerOfTwo(usize value) {
+static inline bool is_power_of_two(usize value) {
     return (value != 0) && ((value & (value - 1)) == 0);
 }
 
 // NOTE: `alignment` must be power of two
-static inline usize MemoryAlignSize(usize currentSize, usize alignment) {
-    if (!IsPowerOfTwo(alignment)) {
-        return currentSize;
+static inline usize memory_align_size(usize current_size, usize alignment) {
+    if (!is_power_of_two(alignment)) {
+        return current_size;
     }
 
-    usize alignmentMask = alignment - 1;
-    usize alignedSize = (currentSize + alignmentMask) & ~alignmentMask;
+    usize alignment_mask = alignment - 1;
+    usize aligned_size = (current_size + alignment_mask) & ~alignment_mask;
 
-    return alignedSize;
+    return aligned_size;
 }
 
-static inline void MemoryZero(void *destination, usize count) {
-    char *bytePointer = (char *)destination;
+static inline void memory_zero(void *destination, usize count) {
+    char *byte_pointer = (char *)destination;
 
     while (count--) {
-        *bytePointer++ = 0;
+        *byte_pointer++ = 0;
     }
 }
 
-#define ZeroStruct(instance) MemoryZero(&(instance), sizeof(instance))
-#define ZeroArray(array) MemoryZero((array), sizeof(array))
-#define ZeroItems(pointer, count) MemoryZero((pointer), sizeof(*(pointer)) * (count))
-#define ReturnZeroed(instance) \
+#define ZERO_STRUCT(instance) memory_zero(&(instance), sizeof(instance))
+#define ZERO_ARRAY(array) memory_zero((array), sizeof(array))
+#define ZERO_ITEMS(pointer, count) memory_zero((pointer), sizeof(*(pointer)) * (count))
+#define RETURN_ZEROED(instance) \
     do {                       \
-        ZeroStruct(instance);  \
+        ZERO_STRUCT(instance);  \
         return (instance);     \
     } while (0)
 
-static inline void MemoryCopyForwards(void *destination, const void *source, usize count) {
-    char *destinationPointer = (char *)destination;
-    const char *sourcePointer = (const char *)source;
+static inline void memory_copy_forwards(void *destination, const void *source, usize count) {
+    char *destination_pointer = (char *)destination;
+    const char *source_pointer = (const char *)source;
 
     while (count--) {
-        *destinationPointer++ = *sourcePointer++;
+        *destination_pointer++ = *source_pointer++;
     }
 }
 
-static inline bool MemoryEquals(const void *memoryA, const void *memoryB, usize count) {
-    const u8 *bytePointerA = (const u8 *)memoryA;
-    const u8 *bytePointerB = (const u8 *)memoryB;
+static inline bool memory_equals(const void *memory_a, const void *memory_b, usize count) {
+    const u8 *byte_pointer_a = (const u8 *)memory_a;
+    const u8 *byte_pointer_b = (const u8 *)memory_b;
 
     while (count--) {
-        if (*bytePointerA++ != *bytePointerB++) {
+        if (*byte_pointer_a++ != *byte_pointer_b++) {
             return false;
         }
     }
@@ -76,72 +76,72 @@ static inline bool MemoryEquals(const void *memoryA, const void *memoryB, usize 
     return true;
 }
 
-static inline usize StringGetLength(const char *string) {
-    const char *characterPointer = string;
+static inline usize string_get_length(const char *string) {
+    const char *character_pointer = string;
 
-    while (*characterPointer) {
-        characterPointer++;
+    while (*character_pointer) {
+        character_pointer++;
     }
 
-    return characterPointer - string;
+    return character_pointer - string;
 }
 
-static inline isize StringFindLastOccurrenceOfCharacter(const char *string, char targetCharacter) {
-    isize lastFoundIndex = -1;
-    usize currentIndex = 0;
+static inline isize string_find_last_occurrence_of_character(const char *string, char target_character) {
+    isize last_found_index = -1;
+    usize current_index = 0;
 
-    while (string[currentIndex] != '\0') {
-        if (string[currentIndex] == targetCharacter) {
-            lastFoundIndex = (isize)currentIndex;
+    while (string[current_index] != '\0') {
+        if (string[current_index] == target_character) {
+            last_found_index = (isize)current_index;
         }
-        currentIndex++;
+        current_index++;
     }
 
-    return lastFoundIndex;
+    return last_found_index;
 }
 
-static inline void StringCopy(char *destination, usize destinationCapacity, const char *source) {
-    if (!destination || !source || destinationCapacity == 0) {
+static inline void string_copy(char *destination, usize destination_capacity, const char *source) {
+    if (!destination || !source || destination_capacity == 0) {
         return;
     }
 
-    usize sourceLength = StringGetLength(source);
-    usize bytesToCopy = (sourceLength < (destinationCapacity - 1)) ? sourceLength : (destinationCapacity - 1);
+    usize source_length = string_get_length(source);
+    usize bytes_to_copy = (source_length < (destination_capacity - 1)) ? source_length : (destination_capacity - 1);
 
-    MemoryCopyForwards(destination, source, bytesToCopy);
-    destination[bytesToCopy] = '\0';
+    memory_copy_forwards(destination, source, bytes_to_copy);
+    destination[bytes_to_copy] = '\0';
 }
 
-static inline void StringAppend(char *destination, usize destinationCapacity, const char *source) {
-    if (!destination || !source || destinationCapacity == 0) {
+static inline void string_append(char *destination, usize destination_capacity, const char *source) {
+    if (!destination || !source || destination_capacity == 0) {
         return;
     }
 
-    usize currentLength = StringGetLength(destination);
-    usize remainingCapacity = destinationCapacity - currentLength;
+    usize current_length = string_get_length(destination);
+    usize remaining_capacity = destination_capacity - current_length;
 
-    if (remainingCapacity > 0) {
-        StringCopy(destination + currentLength, remainingCapacity, source);
+    if (remaining_capacity > 0) {
+        string_copy(destination + current_length, remaining_capacity, source);
     }
 }
 
-static inline u16 ReadUInt16BigEndian(const u8 *memory) {
+static inline u16 read_u_int16_big_endian(const u8 *memory) {
     return ((u16)memory[0] << 8) |
            ((u16)memory[1] << 0);
 }
 
-static inline i16 ReadInt16BigEndian(const u8 *memory) {
-    return (i16)ReadUInt16BigEndian(memory);
+static inline i16 read_int16_big_endian(const u8 *memory) {
+    return (i16)read_u_int16_big_endian(memory);
 }
 
-static inline u32 ReadUInt32BigEndian(const u8 *memory) {
+static inline u32 read_u_int32_big_endian(const u8 *memory) {
     return ((u32)memory[0] << 24) |
            ((u32)memory[1] << 16) |
            ((u32)memory[2] << 8) |
            ((u32)memory[3] << 0);
 }
 
-static inline u64 ReadUInt64BigEndian(const u8 *memory) {
+static inline u64 read_u_int64_big_endian(const u8 *memory) {
     return ((u64)memory[0] << 56) |
            ((u64)memory[1] << 48) |
            ((u64)memory[2] << 40) |
@@ -152,41 +152,41 @@ static inline u64 ReadUInt64BigEndian(const u8 *memory) {
            ((u64)memory[7] << 0);
 }
 
-static inline i64 ReadInt64BigEndian(const u8 *memory) {
-    return (i64)ReadUInt64BigEndian(memory);
+static inline i64 read_int64_big_endian(const u8 *memory) {
+    return (i64)read_u_int64_big_endian(memory);
 }
 
 typedef struct {
-    u8 *basePointer;
-    usize totalCapacity;
-    usize currentOffset;
-} MemoryArena;
+    u8 *base_pointer;
+    usize total_capacity;
+    usize current_offset;
+} memory_arena;
 
 typedef struct {
-    MemoryArena *arena;
-    usize savedOffset;
-} MemoryArenaCheckpoint;
+    memory_arena *arena;
+    usize saved_offset;
+} memory_arena_checkpoint;
 
-static inline void MemoryArenaInitialize(MemoryArena *arena, void *backingMemory, usize totalCapacity) {
+static inline void memory_arena_initialize(memory_arena *arena, void *backing_memory, usize total_capacity) {
     if (!arena) {
         return;
     }
 
-    arena->basePointer = (u8 *)backingMemory;
-    arena->totalCapacity = totalCapacity;
-    arena->currentOffset = 0;
+    arena->base_pointer = (u8 *)backing_memory;
+    arena->total_capacity = total_capacity;
+    arena->current_offset = 0;
 }
 
-static inline usize MemoryArenaGetRemainingCapacity(const MemoryArena *arena) {
+static inline usize memory_arena_get_remaining_capacity(const memory_arena *arena) {
     if (!arena) {
         return 0;
     }
 
-    return arena->totalCapacity - arena->currentOffset;
+    return arena->total_capacity - arena->current_offset;
 }
 
-static inline void *MemoryArenaAllocateBytesAligned(MemoryArena *arena, usize allocationSize, usize alignment) {
-    if (!arena || !arena->basePointer || allocationSize == 0 || alignment == 0) {
+static inline void *memory_arena_allocate_bytes_aligned(memory_arena *arena, usize allocation_size, usize alignment) {
+    if (!arena || !arena->base_pointer || allocation_size == 0 || alignment == 0) {
         return 0;
     }
 
@@ -194,84 +194,84 @@ static inline void *MemoryArenaAllocateBytesAligned(MemoryArena *arena, usize al
         return 0;
     }
 
-    usize alignedOffset = MemoryAlignSize(arena->currentOffset, alignment);
+    usize aligned_offset = memory_align_size(arena->current_offset, alignment);
 
-    if (alignedOffset + allocationSize > arena->totalCapacity) {
+    if (aligned_offset + allocation_size > arena->total_capacity) {
         return 0;
     }
 
-    void *allocatedMemory = (void *)(arena->basePointer + alignedOffset);
-    arena->currentOffset = alignedOffset + allocationSize;
+    void *allocated_memory = (void *)(arena->base_pointer + aligned_offset);
+    arena->current_offset = aligned_offset + allocation_size;
 
-    return allocatedMemory;
+    return allocated_memory;
 }
 
-static inline void *MemoryArenaAllocateBytes(MemoryArena *arena, usize allocationSize) {
-    return MemoryArenaAllocateBytesAligned(arena, allocationSize, 8);
+static inline void *memory_arena_allocate_bytes(memory_arena *arena, usize allocation_size) {
+    return memory_arena_allocate_bytes_aligned(arena, allocation_size, 8);
 }
 
-static inline void *MemoryArenaAllocateBytesAndZero(MemoryArena *arena, usize allocationSize) {
-    void *allocatedMemory = MemoryArenaAllocateBytes(arena, allocationSize);
+static inline void *memory_arena_allocate_bytes_and_zero(memory_arena *arena, usize allocation_size) {
+    void *allocated_memory = memory_arena_allocate_bytes(arena, allocation_size);
 
-    if (allocatedMemory) {
-        MemoryZero(allocatedMemory, allocationSize);
+    if (allocated_memory) {
+        memory_zero(allocated_memory, allocation_size);
     }
 
-    return allocatedMemory;
+    return allocated_memory;
 }
 
-static inline void MemoryArenaClear(MemoryArena *arena) {
+static inline void memory_arena_clear(memory_arena *arena) {
     if (arena) {
-        arena->currentOffset = 0;
+        arena->current_offset = 0;
     }
 }
 
-static inline MemoryArenaCheckpoint MemoryArenaCreateCheckpoint(MemoryArena *arena) {
-    MemoryArenaCheckpoint result = {0};
+static inline memory_arena_checkpoint memory_arena_create_checkpoint(memory_arena *arena) {
+    memory_arena_checkpoint result = {0};
 
     if (arena) {
         result.arena = arena;
-        result.savedOffset = arena->currentOffset;
+        result.saved_offset = arena->current_offset;
     }
 
     return result;
 }
 
-static inline void MemoryArenaRestoreCheckpoint(MemoryArenaCheckpoint checkpoint) {
+static inline void memory_arena_restore_checkpoint(memory_arena_checkpoint checkpoint) {
     if (checkpoint.arena) {
-        checkpoint.arena->currentOffset = checkpoint.savedOffset;
+        checkpoint.arena->current_offset = checkpoint.saved_offset;
     }
 }
 
-#define MemoryArenaPushArray(arena, type, count) (type *)MemoryArenaAllocateBytesAndZero((arena), sizeof(type) * (count))
-#define MemoryArenaPushBytes(arena, size) MemoryArenaAllocateBytesAndZero((arena), (size))
+#define MEMORY_ARENA_PUSH_ARRAY(arena, type, count) (type *)memory_arena_allocate_bytes_and_zero((arena), sizeof(type) * (count))
+#define MEMORY_ARENA_PUSH_BYTES(arena, size) memory_arena_allocate_bytes_and_zero((arena), (size))
 
 typedef struct {
     const u8 *memory;
     usize capacity;
     usize offset;
 
-    bool hasOverflowed;
-    bool isWritable;
-} MemoryStream;
+    bool has_overflowed;
+    bool is_writable;
+} memory_stream;
 
-static inline void MemoryStreamInitializeReadOnly(MemoryStream *stream, const void *memory, usize capacity) {
-    ZeroStruct(*stream);
+static inline void memory_stream_initialize_read_only(memory_stream *stream, const void *memory, usize capacity) {
+    ZERO_STRUCT(*stream);
     stream->memory = (const u8 *)memory;
     stream->capacity = capacity;
-    stream->isWritable = false;
+    stream->is_writable = false;
 }
 
-static inline void MemoryStreamInitializeWritable(MemoryStream *stream, void *memory, usize capacity) {
-    ZeroStruct(*stream);
+static inline void memory_stream_initialize_writable(memory_stream *stream, void *memory, usize capacity) {
+    ZERO_STRUCT(*stream);
     stream->memory = (const u8 *)memory;
     stream->capacity = capacity;
-    stream->isWritable = true;
+    stream->is_writable = true;
 }
 
-static inline bool MemoryStreamHasSpace(MemoryStream *stream, usize readSize) {
-    if (stream->hasOverflowed || !stream->memory || stream->offset + readSize > stream->capacity) {
-        stream->hasOverflowed = true;
+static inline bool memory_stream_has_space(memory_stream *stream, usize read_size) {
+    if (stream->has_overflowed || !stream->memory || stream->offset + read_size > stream->capacity) {
+        stream->has_overflowed = true;
 
         return false;
     }
@@ -279,8 +279,8 @@ static inline bool MemoryStreamHasSpace(MemoryStream *stream, usize readSize) {
     return true;
 }
 
-static inline u8 MemoryStreamReadUInt8(MemoryStream *stream) {
-    if (!MemoryStreamHasSpace(stream, 1)) {
+static inline u8 memory_stream_read_u_int8(memory_stream *stream) {
+    if (!memory_stream_has_space(stream, 1)) {
         return 0;
     }
     u8 result = stream->memory[stream->offset];
@@ -289,101 +289,101 @@ static inline u8 MemoryStreamReadUInt8(MemoryStream *stream) {
     return result;
 }
 
-static inline u16 MemoryStreamReadUInt16BigEndian(MemoryStream *stream) {
-    if (!MemoryStreamHasSpace(stream, 2)) {
+static inline u16 memory_stream_read_u_int16_big_endian(memory_stream *stream) {
+    if (!memory_stream_has_space(stream, 2)) {
         return 0;
     }
-    u16 result = ReadUInt16BigEndian(&stream->memory[stream->offset]);
+    u16 result = read_u_int16_big_endian(&stream->memory[stream->offset]);
     stream->offset += 2;
 
     return result;
 }
 
-static inline i16 MemoryStreamReadInt16BigEndian(MemoryStream *stream) {
-    return (i16)MemoryStreamReadUInt16BigEndian(stream);
+static inline i16 memory_stream_read_int16_big_endian(memory_stream *stream) {
+    return (i16)memory_stream_read_u_int16_big_endian(stream);
 }
 
-static inline u32 MemoryStreamReadUInt32BigEndian(MemoryStream *stream) {
-    if (!MemoryStreamHasSpace(stream, 4)) {
+static inline u32 memory_stream_read_u_int32_big_endian(memory_stream *stream) {
+    if (!memory_stream_has_space(stream, 4)) {
         return 0;
     }
-    u32 result = ReadUInt32BigEndian(&stream->memory[stream->offset]);
+    u32 result = read_u_int32_big_endian(&stream->memory[stream->offset]);
     stream->offset += 4;
 
     return result;
 }
 
-static inline i64 MemoryStreamReadInt64BigEndian(MemoryStream *stream) {
-    if (!MemoryStreamHasSpace(stream, 8)) {
+static inline i64 memory_stream_read_int64_big_endian(memory_stream *stream) {
+    if (!memory_stream_has_space(stream, 8)) {
         return 0;
     }
-    i64 result = ReadInt64BigEndian(&stream->memory[stream->offset]);
+    i64 result = read_int64_big_endian(&stream->memory[stream->offset]);
     stream->offset += 8;
 
     return result;
 }
 
-static inline bool MemoryStreamWriteBytes(MemoryStream *stream, const void *data, usize size) {
-    if (!stream->isWritable) {
-        stream->hasOverflowed = true;
+static inline bool memory_stream_write_bytes(memory_stream *stream, const void *data, usize size) {
+    if (!stream->is_writable) {
+        stream->has_overflowed = true;
 
         return false;
     }
 
-    if (!MemoryStreamHasSpace(stream, size)) {
+    if (!memory_stream_has_space(stream, size)) {
         return false;
     }
 
-    u8 *writableMemory = (u8 *)stream->memory;
-    MemoryCopyForwards((void *)(writableMemory + stream->offset), data, size);
+    u8 *writable_memory = (u8 *)stream->memory;
+    memory_copy_forwards((void *)(writable_memory + stream->offset), data, size);
     stream->offset += size;
 
     return true;
 }
 
-static inline bool MemoryStreamWriteUInt8(MemoryStream *stream, u8 value) {
-    return MemoryStreamWriteBytes(stream, &value, 1);
+static inline bool memory_stream_write_u_int8(memory_stream *stream, u8 value) {
+    return memory_stream_write_bytes(stream, &value, 1);
 }
 
-static inline bool MemoryStreamWriteString(MemoryStream *stream, const char *string) {
+static inline bool memory_stream_write_string(memory_stream *stream, const char *string) {
     if (!string) {
         return false;
     }
-    usize length = StringGetLength(string);
-    return MemoryStreamWriteBytes(stream, string, length);
+    usize length = string_get_length(string);
+    return memory_stream_write_bytes(stream, string, length);
 }
 
-static inline bool MemoryStreamWriteLine(MemoryStream *stream, const char *string) {
-    return MemoryStreamWriteString(stream, string) && MemoryStreamWriteUInt8(stream, '\n');
+static inline bool memory_stream_write_line(memory_stream *stream, const char *string) {
+    return memory_stream_write_string(stream, string) && memory_stream_write_u_int8(stream, '\n');
 }
 
-static char decimalCharacters[] = "0123456789";
-static char lowerHexCharacters[] = "0123456789abcdef";
-static char upperHexCharacters[] = "0123456789ABCDEF";
+static char decimal_characters[] = "0123456789";
+static char lower_hex_characters[] = "0123456789abcdef";
+static char upper_hex_characters[] = "0123456789ABCDEF";
 
-static inline bool MemoryStreamWriteAsciiFromU64(MemoryStream *stream, u64 value, u32 base, char *digits) {
-    usize stringLength = 0;
-    u64 copyValue = value;
+static inline bool memory_stream_write_ascii_from_u64(memory_stream *stream, u64 value, u32 base, char *digits) {
+    usize string_length = 0;
+    u64 copy_value = value;
 
-    // Get string length
+    // get string length
     do {
-        copyValue /= base;
-        ++stringLength;
-    } while(copyValue != 0);
+        copy_value /= base;
+        ++string_length;
+    } while(copy_value != 0);
 
-    char characters[stringLength];
+    char characters[string_length];
     u32 index = 0;
-    copyValue = value;
+    copy_value = value;
 
-    // Write characters into array
+    // write characters into array
     do {
-        characters[index++] = digits[copyValue % base];
-        copyValue /= base;
-    } while(copyValue != 0);
+        characters[index++] = digits[copy_value % base];
+        copy_value /= base;
+    } while(copy_value != 0);
 
-    // Write characters into stream
+    // write characters into stream
     while (index != 0) {
-        if (!MemoryStreamWriteUInt8(stream, characters[--index])) {
+        if (!memory_stream_write_u_int8(stream, characters[--index])) {
             return false;
         }
     }
@@ -391,14 +391,14 @@ static inline bool MemoryStreamWriteAsciiFromU64(MemoryStream *stream, u64 value
     return true;
 }
 
-static inline bool MemoryStreamWriteStringFormat(MemoryStream *stream, const char *format, ...) {
+static inline bool memory_stream_write_string_format(memory_stream *stream, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
     char *at = (char *)format;
     while (*at) {
         if (*at != '%') {
-            if (!MemoryStreamWriteUInt8(stream, *at)) {
+            if (!memory_stream_write_u_int8(stream, *at)) {
                 return false;
             }
             ++at;
@@ -410,13 +410,13 @@ static inline bool MemoryStreamWriteStringFormat(MemoryStream *stream, const cha
             case 's':
             {
                 char *string = va_arg(args, char *);
-                if (!MemoryStreamWriteString(stream, string)) {
+                if (!memory_stream_write_string(stream, string)) {
                     return false;
                 }
             } break;
             case 'u':
             {
-                if (!MemoryStreamWriteAsciiFromU64(stream ,(u64)va_arg(args, u32), 10, decimalCharacters)) {
+                if (!memory_stream_write_ascii_from_u64(stream ,(u64)va_arg(args, u32), 10, decimal_characters)) {
                     return false;
                 }
             } break;
@@ -425,23 +425,23 @@ static inline bool MemoryStreamWriteStringFormat(MemoryStream *stream, const cha
                 i32 n = va_arg(args, i32);
                 if (n < 0) {
                     n = -n;
-                    if (!MemoryStreamWriteUInt8(stream, '-')) {
+                    if (!memory_stream_write_u_int8(stream, '-')) {
                         return false;
                     }
                 }
 
-                if (!MemoryStreamWriteAsciiFromU64(stream, (u64)n, 10, decimalCharacters)) {
+                if (!memory_stream_write_ascii_from_u64(stream, (u64)n, 10, decimal_characters)) {
                     return false;
                 }
             } break;
             case 'x':
             case 'X':
             {
-                char *characters = *at == 'x' ? lowerHexCharacters : upperHexCharacters;
-                if (!MemoryStreamWriteString(stream, "0x")) {
+                char *characters = *at == 'x' ? lower_hex_characters : upper_hex_characters;
+                if (!memory_stream_write_string(stream, "0x")) {
                     return false;
                 }
-                if (!MemoryStreamWriteAsciiFromU64(stream, (u64)va_arg(args, u32), 16, characters)) {
+                if (!memory_stream_write_ascii_from_u64(stream, (u64)va_arg(args, u32), 16, characters)) {
                     return false;
                 }
             } break;
@@ -455,127 +455,127 @@ static inline bool MemoryStreamWriteStringFormat(MemoryStream *stream, const cha
     return true;
 }
 
-#define Stringify(x) #x
-#define Stringify2(x) Stringify(x)
+#define STRINGIFY(x) #x
+#define STRINGIFY2(x) STRINGIFY(x)
 
 // --------------------------------------------------
 
-// NOTE: Services that the platform provides to game.
+// NOTE: services that the platform provides to game.
 
 typedef enum {
-    RenderCommandType_None = 0,
-    RenderCommandType_ClearEntireScreen,
-    RenderCommandType_DrawRectangle,
-    RenderCommandType_AllocateTexture,
-} RenderCommandType;
+    render_command_type_none = 0,
+    render_command_type_clear_entire_screen,
+    render_command_type_draw_rectangle,
+    render_command_type_allocate_texture,
+} render_command_type;
 
 typedef struct {
     u32 type;
     u32 size;
-} RenderCommandHeader;
+} render_command_header;
 
 typedef struct {
-    RenderCommandHeader header;
-    Vector4 color;
-} RenderCommandClearEntireScreen;
+    render_command_header header;
+    vector4 color;
+} render_command_clear_entire_screen;
 
 typedef struct {
-    RenderCommandHeader header;
-    Vector2 position;
-    Vector2 size;
-    Vector4 color;
+    render_command_header header;
+    vector2 position;
+    vector2 size;
+    vector4 color;
     u32 texture;
-} RenderCommandDrawRectangle;
+} render_command_draw_rectangle;
 
 typedef struct {
-    RenderCommandHeader header;
+    render_command_header header;
     u32 index;
-    u32 bytesPerPixel;
-    Vector2U size;
+    u32 bytes_per_pixel;
+    vector2_u size;
     const void *pixels;
-} RenderCommandAllocateTexture;
+} render_command_allocate_texture;
 
 typedef struct {
-    u8 *basePointer;
-    usize totalCapacity;
-    usize currentOffset;
-    u32 commandCount;
+    u8 *base_pointer;
+    usize total_capacity;
+    usize current_offset;
+    u32 command_count;
     // NOTE: this becomes true if a command that did not fit was pushed in
-    bool hasOverflowed;
-} RenderCommandBuffer;
+    bool has_overflowed;
+} render_command_buffer;
 
-static inline void RenderCommandBufferInitialize(RenderCommandBuffer *commandBuffer, void *backingMemory, usize totalCapacity) {
-    if (!commandBuffer) {
+static inline void render_command_buffer_initialize(render_command_buffer *command_buffer, void *backing_memory, usize total_capacity) {
+    if (!command_buffer) {
         return;
     }
 
-    MemoryZero(commandBuffer, sizeof(RenderCommandBuffer));
+    memory_zero(command_buffer, sizeof(render_command_buffer));
 
-    if (backingMemory && totalCapacity > 0) {
-        commandBuffer->basePointer = (u8 *)backingMemory;
-        commandBuffer->totalCapacity = totalCapacity;
+    if (backing_memory && total_capacity > 0) {
+        command_buffer->base_pointer = (u8 *)backing_memory;
+        command_buffer->total_capacity = total_capacity;
     }
 }
 
-static inline void RenderCommandBufferReset(RenderCommandBuffer *commandBuffer) {
-    if (!commandBuffer) {
+static inline void render_command_buffer_reset(render_command_buffer *command_buffer) {
+    if (!command_buffer) {
         return;
     }
 
-    commandBuffer->currentOffset = 0;
-    commandBuffer->commandCount = 0;
-    commandBuffer->hasOverflowed = false;
+    command_buffer->current_offset = 0;
+    command_buffer->command_count = 0;
+    command_buffer->has_overflowed = false;
 }
 
-static inline void *RenderCommandBufferAllocateBytes(RenderCommandBuffer *commandBuffer, u32 type, usize requestedSize) {
-    if (!commandBuffer || commandBuffer->hasOverflowed || !commandBuffer->basePointer || requestedSize < sizeof(RenderCommandHeader)) {
+static inline void *render_command_buffer_allocate_bytes(render_command_buffer *command_buffer, u32 type, usize requested_size) {
+    if (!command_buffer || command_buffer->has_overflowed || !command_buffer->base_pointer || requested_size < sizeof(render_command_header)) {
         return 0;
     }
 
-    usize alignedSize = MemoryAlignSize(requestedSize, 8);
+    usize aligned_size = memory_align_size(requested_size, 8);
 
-    if (commandBuffer->currentOffset + alignedSize > commandBuffer->totalCapacity) {
-        commandBuffer->hasOverflowed = true;
+    if (command_buffer->current_offset + aligned_size > command_buffer->total_capacity) {
+        command_buffer->has_overflowed = true;
 
         return 0;
     }
 
-    void *allocatedMemory = (void *)(commandBuffer->basePointer + commandBuffer->currentOffset);
-    MemoryZero(allocatedMemory, alignedSize);
+    void *allocated_memory = (void *)(command_buffer->base_pointer + command_buffer->current_offset);
+    memory_zero(allocated_memory, aligned_size);
 
-    RenderCommandHeader *header = (RenderCommandHeader *)allocatedMemory;
+    render_command_header *header = (render_command_header *)allocated_memory;
     header->type = type;
-    header->size = (u32)alignedSize;
+    header->size = (u32)aligned_size;
 
-    commandBuffer->currentOffset += alignedSize;
-    commandBuffer->commandCount++;
+    command_buffer->current_offset += aligned_size;
+    command_buffer->command_count++;
 
-    return allocatedMemory;
+    return allocated_memory;
 }
 
-#define RenderCommandBufferPushCommand(buffer, commandName) (RenderCommand##commandName *)RenderCommandBufferAllocateBytes((buffer), RenderCommandType_##commandName, sizeof(RenderCommand##commandName))
+#define RENDER_COMMAND_BUFFER_PUSH_COMMAND(buffer, command_name) (render_command_##command_name *)render_command_buffer_allocate_bytes((buffer), render_command_type_##command_name, sizeof(render_command_##command_name))
 
-// NOTE: Even though without Render prefix it looks a bit less pretty, with it you can easily see all render commands by just typing in 'Render'
+// NOTE: even though without render prefix it looks a bit less pretty, with it you can easily see all render commands by just typing in 'render'
 // easily rather than guessing their names
 
-static inline void RenderClearEntireScreen(RenderCommandBuffer *commandBuffer, Vector4 color) {
-    if (!commandBuffer) {
+static inline void render_clear_entire_screen(render_command_buffer *command_buffer, vector4 color) {
+    if (!command_buffer) {
         return;
     }
 
-    RenderCommandClearEntireScreen *command = RenderCommandBufferPushCommand(commandBuffer, ClearEntireScreen);
+    render_command_clear_entire_screen *command = RENDER_COMMAND_BUFFER_PUSH_COMMAND(command_buffer, clear_entire_screen);
 
     if (command) {
         command->color = color;
     }
 }
 
-static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vector2 position, Vector2 size, Vector4 color, u32 texture) {
-    if (!commandBuffer) {
+static inline void render_draw_rectangle(render_command_buffer *command_buffer, vector2 position, vector2 size, vector4 color, u32 texture) {
+    if (!command_buffer) {
         return;
     }
 
-    RenderCommandDrawRectangle *command = RenderCommandBufferPushCommand(commandBuffer, DrawRectangle);
+    render_command_draw_rectangle *command = RENDER_COMMAND_BUFFER_PUSH_COMMAND(command_buffer, draw_rectangle);
 
     if (command) {
         command->position = position;
@@ -585,43 +585,43 @@ static inline void RenderDrawRectangle(RenderCommandBuffer *commandBuffer, Vecto
     }
 }
 
-static inline void RenderAllocateTexture(RenderCommandBuffer *commandBuffer, u32 index, Vector2U size, u32 bytesPerPixel, const void *pixels) {
-    if (!commandBuffer) {
+static inline void render_allocate_texture(render_command_buffer *command_buffer, u32 index, vector2_u size, u32 bytes_per_pixel, const void *pixels) {
+    if (!command_buffer) {
         return;
     }
 
-    RenderCommandAllocateTexture *command = RenderCommandBufferPushCommand(commandBuffer, AllocateTexture);
+    render_command_allocate_texture *command = RENDER_COMMAND_BUFFER_PUSH_COMMAND(command_buffer, allocate_texture);
 
     if (command) {
         command->index = index;
         command->size = size;
-        command->bytesPerPixel = bytesPerPixel;
+        command->bytes_per_pixel = bytes_per_pixel;
         command->pixels = pixels;
     }
 }
 
-// NOTE: Services that the game provides to platform.
+// NOTE: services that the game provides to platform.
 
 typedef struct {
-    // NOTE: These two standard streams are dumped to console by the platform.
-    MemoryStream *standardErrorStream;
-    MemoryStream *standardInfoStream;
+    // NOTE: these two standard streams are dumped to console by the platform.
+    memory_stream *standard_error_stream;
+    memory_stream *standard_info_stream;
 
-    MemoryArena permanentArena;
-    MemoryArena temporaryArena;
+    memory_arena permanent_arena;
+    memory_arena temporary_arena;
 
-    bool isInitialized;
-} GameMemory;
+    bool is_initialized;
+} game_memory;
 
-#define UPDATE_AND_RENDER(name) void name(GameMemory *memory, RenderCommandBuffer *commandBuffer)
-typedef UPDATE_AND_RENDER(UpdateAndRenderFunction);
+#define UPDATE_AND_RENDER(name) void name(game_memory *memory, render_command_buffer *command_buffer)
+typedef UPDATE_AND_RENDER(update_and_render_function);
 
 typedef struct {
-    u32 samplesPerSecond;
-    u32 channelCount;
-    u32 frameCount;
+    u32 samples_per_second;
+    u32 channel_count;
+    u32 frame_count;
     f32 *samples;
-} AudioBuffer;
+} audio_buffer;
 
-#define GET_SOUND_SAMPLES(name) void name(AudioBuffer *audioBuffer)
-typedef GET_SOUND_SAMPLES(GetSoundSamplesFunction);
+#define GET_SOUND_SAMPLES(name) void name(audio_buffer *audio_buffer)
+typedef GET_SOUND_SAMPLES(get_sound_samples_function);

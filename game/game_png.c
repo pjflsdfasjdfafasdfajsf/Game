@@ -4,167 +4,167 @@
 
 // NOTE: CRC32.
 
-static u32 CRC32Table[256];
-static bool CRC32TableInitialized = false;
+static u32 crc32_table[256];
+static bool crc32_table_initialized = false;
 
-static void CRC32TableInitialize(void) {
-    if (CRC32TableInitialized) {
+static void crc32_table_initialize(void) {
+    if (crc32_table_initialized) {
         return;
     }
 
-    const u32 CRC32Polynomial = 0xEDB88320;
+    const u32 crc32_polynomial = 0xEDB88320;
 
     for (u32 i = 0; i < 256; i++) {
         u32 crc = i;
         for (u32 j = 0; j < 8; j++) {
-            if (IsBitSet(crc, 1)) {
-                crc = CRC32Polynomial ^ (crc >> 1);
+            if (IS_BIT_SET(crc, 1)) {
+                crc = crc32_polynomial ^ (crc >> 1);
             } else {
                 crc = (crc >> 1);
             }
         }
-        CRC32Table[i] = crc;
+        crc32_table[i] = crc;
     }
 
-    CRC32TableInitialized = true;
+    crc32_table_initialized = true;
 }
 
-static u32 CRC32Calculate(const u8 *memory, usize length) {
-    CRC32TableInitialize();
+static u32 crc32_calculate(const u8 *memory, usize length) {
+    crc32_table_initialize();
 
     u32 crc = 0xFFFFFFFF;
 
     for (usize i = 0; i < length; i++) {
-        u32 tableIndex = (crc ^ memory[i]) & 0xFF;
-        crc = CRC32Table[tableIndex] ^ (crc >> 8);
+        u32 table_index = (crc ^ memory[i]) & 0xFF;
+        crc = crc32_table[table_index] ^ (crc >> 8);
     }
 
     return crc ^ 0xFFFFFFFF;
 }
 
-// NOTE: Primary PNG stuff.
+// NOTE: primary PNG stuff.
 
-static const u8 PNGFileSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-static const usize PNGFileSignatureLength = 8;
-static const usize PNGChunkLengthSize = 4;
-static const usize PNGChunkTypeSize = 4;
-static const usize PNGChunkCRCSize = 4;
-static const u32 PNGIHDRChunkLength = 13;
-static const u32 PNGMaxIDATChunks = 1024;
+static const u8 png_file_signature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+static const usize png_file_signature_length = 8;
+static const usize png_chunk_length_size = 4;
+static const usize png_chunk_type_size = 4;
+static const usize png_chunk_crc_size = 4;
+static const u32 pngihdr_chunk_length = 13;
+static const u32 png_max_idat_chunks = 1024;
 
 typedef enum {
-    PNGColorType_Grayscale = 0,
-    PNGColorType_TrueColor = 2,
-    PNGColorType_Indexed = 3,
-    PNGColorType_GrayscaleAlpha = 4,
-    PNGColorTypeTrue_ColorAlpha = 6
-} PNGColorType;
+    png_color_type_grayscale = 0,
+    png_color_type_true_color = 2,
+    png_color_type_indexed = 3,
+    png_color_type_grayscale_alpha = 4,
+    png_color_type_true_color_alpha = 6
+} png_color_type;
 
 typedef struct {
     u32 width;
     u32 height;
-    u8 bitDepth;
-    u8 colorType;
-    u8 compressionMethod;
-    u8 filterMethod;
-    u8 interlaceMethod;
-} PNGHeader;
+    u8 bit_depth;
+    u8 color_type;
+    u8 compression_method;
+    u8 filter_method;
+    u8 interlace_method;
+} png_header;
 
 typedef struct {
     const u8 *memory;
     u32 length;
-} PNGIDATChunk;
+} pngidat_chunk;
 
-// NOTE: Deflating.
+// NOTE: deflating.
 
-static const u16 deflateLengthBases[29] = {
+static const u16 deflate_length_bases[29] = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
     35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
 
-static const u8 deflateLengthExtraBits[29] = {
+static const u8 deflate_length_extra_bits[29] = {
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
     3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
 
-static const u16 deflateDistanceBases[30] = {
+static const u16 deflate_distance_bases[30] = {
     1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
     257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
     8193, 12289, 16385, 24577};
 
-static const u8 deflateDistanceExtraBits[30] = {
+static const u8 deflate_distance_extra_bits[30] = {
     0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
     7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
-static const u8 deflateCodeLengthOrder[19] = {
+static const u8 deflate_code_length_order[19] = {
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
 typedef struct {
     u16 counts[16];
     u16 symbols[288];
-} HuffmanTree;
+} huffman_tree;
 
 typedef struct {
-    const PNGIDATChunk *chunks;
-    usize chunkCount;
-    usize currentChunkIndex;
-    usize byteOffsetInChunk;
+    const pngidat_chunk *chunks;
+    usize chunk_count;
+    usize current_chunk_index;
+    usize byte_offset_in_chunk;
 
-    u32 bitBuffer;
-    u32 bitsAvailable;
-    bool hasOverflowed;
-} BitStream;
+    u32 bit_buffer;
+    u32 bits_available;
+    bool has_overflowed;
+} bit_stream;
 
-static inline u32 StreamReadBits(BitStream *stream, u32 bitCount) {
-    while (stream->bitsAvailable < bitCount) {
-        if (stream->currentChunkIndex >= stream->chunkCount) {
-            stream->hasOverflowed = true;
+static inline u32 stream_read_bits(bit_stream *stream, u32 bit_count) {
+    while (stream->bits_available < bit_count) {
+        if (stream->current_chunk_index >= stream->chunk_count) {
+            stream->has_overflowed = true;
             return 0;
         }
 
-        const PNGIDATChunk *currentChunk = &stream->chunks[stream->currentChunkIndex];
+        const pngidat_chunk *current_chunk = &stream->chunks[stream->current_chunk_index];
 
-        u8 nextByte = currentChunk->memory[stream->byteOffsetInChunk];
-        stream->bitBuffer |= ((u32)nextByte << stream->bitsAvailable);
-        stream->bitsAvailable += 8;
+        u8 next_byte = current_chunk->memory[stream->byte_offset_in_chunk];
+        stream->bit_buffer |= ((u32)next_byte << stream->bits_available);
+        stream->bits_available += 8;
 
-        stream->byteOffsetInChunk++;
+        stream->byte_offset_in_chunk++;
 
-        if (stream->byteOffsetInChunk >= currentChunk->length) {
-            stream->currentChunkIndex++;
-            stream->byteOffsetInChunk = 0;
+        if (stream->byte_offset_in_chunk >= current_chunk->length) {
+            stream->current_chunk_index++;
+            stream->byte_offset_in_chunk = 0;
         }
     }
 
-    u32 result = stream->bitBuffer & ((1U << bitCount) - 1);
-    stream->bitBuffer >>= bitCount;
-    stream->bitsAvailable -= bitCount;
+    u32 result = stream->bit_buffer & ((1U << bit_count) - 1);
+    stream->bit_buffer >>= bit_count;
+    stream->bits_available -= bit_count;
 
     return result;
 }
 
-static u32 StreamDecodeSymbol(BitStream *stream, const HuffmanTree *tree) {
+static u32 stream_decode_symbol(bit_stream *stream, const huffman_tree *tree) {
     u32 code = 0;
-    u32 firstCode = 0;
-    u32 firstSymbolIndex = 0;
+    u32 first_code = 0;
+    u32 first_symbol_index = 0;
 
     for (u32 length = 1; length <= 15; length++) {
-        code = (code << 1) | StreamReadBits(stream, 1);
+        code = (code << 1) | stream_read_bits(stream, 1);
 
         u32 count = tree->counts[length];
-        if (code - firstCode < count) {
-            return tree->symbols[firstSymbolIndex + (code - firstCode)];
+        if (code - first_code < count) {
+            return tree->symbols[first_symbol_index + (code - first_code)];
         }
 
-        firstSymbolIndex += count;
-        firstCode = (firstCode + count) << 1;
+        first_symbol_index += count;
+        first_code = (first_code + count) << 1;
     }
 
-    stream->hasOverflowed = true;
+    stream->has_overflowed = true;
     return 0;
 }
 
-static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 count) {
-    ZeroArray(tree->counts);
-    ZeroArray(tree->symbols);
+static bool huffman_tree_initialize(huffman_tree *tree, const u8 *lengths, u32 count) {
+    ZERO_ARRAY(tree->counts);
+    ZERO_ARRAY(tree->symbols);
 
     for (u32 i = 0; i < count; i++) {
         if (lengths[i] > 15) {
@@ -175,78 +175,78 @@ static bool HuffmanTreeInitialize(HuffmanTree *tree, const u8 *lengths, u32 coun
     }
     tree->counts[0] = 0;
 
-    u16 nextSymbolIndex[16];
-    ZeroArray(nextSymbolIndex);
+    u16 next_symbol_index[16];
+    ZERO_ARRAY(next_symbol_index);
 
-    u16 symbolIndex = 0;
+    u16 symbol_index = 0;
     for (u32 i = 1; i <= 15; i++) {
-        nextSymbolIndex[i] = symbolIndex;
-        symbolIndex += tree->counts[i];
+        next_symbol_index[i] = symbol_index;
+        symbol_index += tree->counts[i];
     }
 
     for (u32 i = 0; i < count; i++) {
         u8 length = lengths[i];
 
         if (length != 0) {
-            tree->symbols[nextSymbolIndex[length]++] = (u16)i;
+            tree->symbols[next_symbol_index[length]++] = (u16)i;
         }
     }
     return true;
 }
 
-static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *outputBuffer, usize outputCapacity) {
-    BitStream stream = {0};
+static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u8 *output_buffer, usize output_capacity) {
+    bit_stream stream = {0};
 
     stream.chunks = chunks;
-    stream.chunkCount = chunkCount;
+    stream.chunk_count = chunk_count;
 
-    u32 zlibMethodFlags = StreamReadBits(&stream, 8);
-    u32 zlibAdditionalFlags = StreamReadBits(&stream, 8);
+    u32 zlib_method_flags = stream_read_bits(&stream, 8);
+    u32 zlib_additional_flags = stream_read_bits(&stream, 8);
 
-    if ((zlibMethodFlags & 0x0F) != 8) {
-        // NOTE: Not DEFLATE
+    if ((zlib_method_flags & 0x0F) != 8) {
+        // NOTE: not DEFLATE
         return false;
     }
-    if (((zlibMethodFlags << 8) + zlibAdditionalFlags) % 31 != 0) {
-        // NOTE: Checksum failed
+    if (((zlib_method_flags << 8) + zlib_additional_flags) % 31 != 0) {
+        // NOTE: checksum failed
         return false;
     }
-    if (IsBitSet(zlibAdditionalFlags, 0x20)) {
-        // NOTE: Preset dictionaries are not allowed in PNG
+    if (IS_BIT_SET(zlib_additional_flags, 0x20)) {
+        // NOTE: preset dictionaries are not allowed in PNG
         return false;
     }
 
-    usize outputPosition = 0;
-    bool isFinalBlock = false;
+    usize output_position = 0;
+    bool is_final_block = false;
 
-    while (!isFinalBlock && !stream.hasOverflowed) {
-        isFinalBlock = StreamReadBits(&stream, 1);
-        u32 blockType = StreamReadBits(&stream, 2);
+    while (!is_final_block && !stream.has_overflowed) {
+        is_final_block = stream_read_bits(&stream, 1);
+        u32 block_type = stream_read_bits(&stream, 2);
 
-        if (blockType == 0) {
-            stream.bitBuffer = 0;
-            stream.bitsAvailable = 0;
+        if (block_type == 0) {
+            stream.bit_buffer = 0;
+            stream.bits_available = 0;
 
-            u32 length = StreamReadBits(&stream, 16);
-            u32 invertedLength = StreamReadBits(&stream, 16);
-            if (length != (~invertedLength & 0xFFFF)) {
+            u32 length = stream_read_bits(&stream, 16);
+            u32 inverted_length = stream_read_bits(&stream, 16);
+            if (length != (~inverted_length & 0xFFFF)) {
                 return false;
             }
 
             for (u32 i = 0; i < length; i++) {
-                if (outputPosition >= outputCapacity) {
+                if (output_position >= output_capacity) {
                     return false;
                 }
 
-                outputBuffer[outputPosition++] = (u8)StreamReadBits(&stream, 8);
+                output_buffer[output_position++] = (u8)stream_read_bits(&stream, 8);
             }
-        } else if (blockType == 1 || blockType == 2) {
-            HuffmanTree literalTree = {0};
+        } else if (block_type == 1 || block_type == 2) {
+            huffman_tree literal_tree = {0};
 
-            HuffmanTree distanceTree = {0};
+            huffman_tree distance_tree = {0};
 
-            // NOTE: Fixed huffman
-            if (blockType == 1) {
+            // NOTE: fixed huffman
+            if (block_type == 1) {
                 u8 lengths[288];
                 for (u32 i = 0; i <= 143; i++) {
                     lengths[i] = 8;
@@ -261,73 +261,73 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                     lengths[i] = 8;
                 }
 
-                HuffmanTreeInitialize(&literalTree, lengths, 288);
+                huffman_tree_initialize(&literal_tree, lengths, 288);
 
-                u8 distLengths[32];
+                u8 dist_lengths[32];
                 for (u32 i = 0; i < 32; i++) {
-                    distLengths[i] = 5;
+                    dist_lengths[i] = 5;
                 }
 
-                HuffmanTreeInitialize(&distanceTree, distLengths, 32);
-            } else { // NOTE: Dynamic huffman
-                u32 hlit = StreamReadBits(&stream, 5) + 257;
-                u32 hdist = StreamReadBits(&stream, 5) + 1;
-                u32 hclen = StreamReadBits(&stream, 4) + 4;
+                huffman_tree_initialize(&distance_tree, dist_lengths, 32);
+            } else { // NOTE: dynamic huffman
+                u32 hlit = stream_read_bits(&stream, 5) + 257;
+                u32 hdist = stream_read_bits(&stream, 5) + 1;
+                u32 hclen = stream_read_bits(&stream, 4) + 4;
 
-                u8 codeLengthLengths[19];
-                ZeroArray(codeLengthLengths);
+                u8 code_length_lengths[19];
+                ZERO_ARRAY(code_length_lengths);
 
                 for (u32 i = 0; i < hclen; i++) {
-                    codeLengthLengths[deflateCodeLengthOrder[i]] = (u8)StreamReadBits(&stream, 3);
+                    code_length_lengths[deflate_code_length_order[i]] = (u8)stream_read_bits(&stream, 3);
                 }
 
-                HuffmanTree codeLengthTree = {0};
+                huffman_tree code_length_tree = {0};
 
-                HuffmanTreeInitialize(&codeLengthTree, codeLengthLengths, 19);
+                huffman_tree_initialize(&code_length_tree, code_length_lengths, 19);
 
                 u8 lengths[320];
-                ZeroArray(lengths);
+                ZERO_ARRAY(lengths);
 
-                u32 totalCodes = hlit + hdist;
+                u32 total_codes = hlit + hdist;
                 u32 index = 0;
 
-                while (index < totalCodes) {
-                    u32 symbol = StreamDecodeSymbol(&stream, &codeLengthTree);
+                while (index < total_codes) {
+                    u32 symbol = stream_decode_symbol(&stream, &code_length_tree);
                     if (symbol <= 15) {
                         lengths[index++] = (u8)symbol;
                     } else if (symbol == 16) {
-                        u32 repeatCount = StreamReadBits(&stream, 2) + 3;
+                        u32 repeat_count = stream_read_bits(&stream, 2) + 3;
 
                         if (index == 0) {
                             return false;
                         }
 
-                        if (index + repeatCount > totalCodes) {
+                        if (index + repeat_count > total_codes) {
                             return false;
                         }
 
-                        u8 repeatValue = lengths[index - 1];
-                        while (repeatCount--) {
-                            lengths[index++] = repeatValue;
+                        u8 repeat_value = lengths[index - 1];
+                        while (repeat_count--) {
+                            lengths[index++] = repeat_value;
                         }
                     } else if (symbol == 17) {
-                        u32 repeatCount = StreamReadBits(&stream, 3) + 3;
+                        u32 repeat_count = stream_read_bits(&stream, 3) + 3;
 
-                        if (index + repeatCount > totalCodes) {
+                        if (index + repeat_count > total_codes) {
                             return false;
                         }
 
-                        while (repeatCount--) {
+                        while (repeat_count--) {
                             lengths[index++] = 0;
                         }
                     } else if (symbol == 18) {
-                        u32 repeatCount = StreamReadBits(&stream, 7) + 11;
+                        u32 repeat_count = stream_read_bits(&stream, 7) + 11;
 
-                        if (index + repeatCount > totalCodes) {
+                        if (index + repeat_count > total_codes) {
                             return false;
                         }
 
-                        while (repeatCount--) {
+                        while (repeat_count--) {
                             lengths[index++] = 0;
                         }
                     } else {
@@ -335,19 +335,19 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                     }
                 }
 
-                HuffmanTreeInitialize(&literalTree, lengths, hlit);
-                HuffmanTreeInitialize(&distanceTree, lengths + hlit, hdist);
+                huffman_tree_initialize(&literal_tree, lengths, hlit);
+                huffman_tree_initialize(&distance_tree, lengths + hlit, hdist);
             }
 
-            while (!stream.hasOverflowed) {
-                u32 symbol = StreamDecodeSymbol(&stream, &literalTree);
+            while (!stream.has_overflowed) {
+                u32 symbol = stream_decode_symbol(&stream, &literal_tree);
 
                 if (symbol < 256) {
-                    if (outputPosition >= outputCapacity) {
+                    if (output_position >= output_capacity) {
                         return false;
                     }
 
-                    outputBuffer[outputPosition++] = (u8)symbol;
+                    output_buffer[output_position++] = (u8)symbol;
                 } else if (symbol == 256) {
                     break;
                 } else {
@@ -355,22 +355,22 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                         return false;
                     }
                     symbol -= 257;
-                    u32 length = deflateLengthBases[symbol] + StreamReadBits(&stream, deflateLengthExtraBits[symbol]);
+                    u32 length = deflate_length_bases[symbol] + stream_read_bits(&stream, deflate_length_extra_bits[symbol]);
 
-                    u32 distanceSymbol = StreamDecodeSymbol(&stream, &distanceTree);
-                    if (distanceSymbol >= 30) {
+                    u32 distance_symbol = stream_decode_symbol(&stream, &distance_tree);
+                    if (distance_symbol >= 30) {
                         return false;
                     }
 
-                    u32 distance = deflateDistanceBases[distanceSymbol] + StreamReadBits(&stream, deflateDistanceExtraBits[distanceSymbol]);
+                    u32 distance = deflate_distance_bases[distance_symbol] + stream_read_bits(&stream, deflate_distance_extra_bits[distance_symbol]);
 
                     for (u32 i = 0; i < length; i++) {
-                        if (outputPosition >= outputCapacity || outputPosition < distance) {
+                        if (output_position >= output_capacity || output_position < distance) {
                             return false;
                         }
 
-                        outputBuffer[outputPosition] = outputBuffer[outputPosition - distance];
-                        outputPosition++;
+                        output_buffer[output_position] = output_buffer[output_position - distance];
+                        output_position++;
                     }
                 }
             }
@@ -379,294 +379,294 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
         }
     }
 
-    return !stream.hasOverflowed;
+    return !stream.has_overflowed;
 }
 
-static inline u8 PaethPredictor(u8 leftByte, u8 upByte, u8 upLeftByte) {
-    const int a = (int)leftByte;
-    const int b = (int)upByte;
-    const int c = (int)upLeftByte;
+static inline u8 paeth_predictor(u8 left_byte, u8 up_byte, u8 up_left_byte) {
+    const int a = (int)left_byte;
+    const int b = (int)up_byte;
+    const int c = (int)up_left_byte;
 
-    const int initialEstimate = a + b - c;
-    const int distanceA = Abs(initialEstimate - a);
-    const int distanceB = Abs(initialEstimate - b);
-    const int distanceC = Abs(initialEstimate - c);
+    const int initial_estimate = a + b - c;
+    const int distance_a = ABS(initial_estimate - a);
+    const int distance_b = ABS(initial_estimate - b);
+    const int distance_c = ABS(initial_estimate - c);
 
-    if (distanceA <= distanceB && distanceA <= distanceC) {
+    if (distance_a <= distance_b && distance_a <= distance_c) {
         return (u8)a;
-    } else if (distanceB <= distanceC) {
+    } else if (distance_b <= distance_c) {
         return (u8)b;
     } else {
         return (u8)c;
     }
 }
 
-Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena, MemoryStream *errorStream, const void *memory, usize length) {
-    Image result = {0};
+image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const void *memory, usize length) {
+    image result = {0};
 
     if (!memory) {
-        MemoryStreamWriteLine(errorStream, "Invalid parameter: memory.");
+        memory_stream_write_line(error_stream, "invalid parameter: memory.");
 
         return result;
     }
 
-    if (length < PNGFileSignatureLength) {
-        MemoryStreamWriteLine(errorStream, "Most likely corrupted PNG file as it is too small to even contain a signature.");
+    if (length < png_file_signature_length) {
+        memory_stream_write_line(error_stream, "most likely corrupted PNG file as it is too small to even contain a signature.");
 
         return result;
     }
 
-    const u8 *imageBufferPointer = (const u8 *)memory;
+    const u8 *image_buffer_pointer = (const u8 *)memory;
 
-    bool hasValidSignature = MemoryEquals(imageBufferPointer, PNGFileSignature, PNGFileSignatureLength);
-    if (!hasValidSignature) {
-        MemoryStreamWriteLine(errorStream, "Corrupted PNG file.");
-
-        return result;
-    }
-
-    MemoryStream stream;
-    MemoryStreamInitializeReadOnly(&stream, memory, length);
-    stream.offset = PNGFileSignatureLength;
-
-    bool hasParsedIHDR = false;
-
-    PNGHeader imageHeader = {0};
-
-    PNGIDATChunk *idatChunks = MemoryArenaPushArray(temporaryArena, PNGIDATChunk, PNGMaxIDATChunks);
-    if (!idatChunks) {
-        MemoryStreamWriteLine(errorStream, "Out of memory.");
+    bool has_valid_signature = memory_equals(image_buffer_pointer, png_file_signature, png_file_signature_length);
+    if (!has_valid_signature) {
+        memory_stream_write_line(error_stream, "corrupted PNG file.");
 
         return result;
     }
 
-    usize idatChunkCount = 0;
-    usize totalIDATDataSize = 0;
+    memory_stream stream;
+    memory_stream_initialize_read_only(&stream, memory, length);
+    stream.offset = png_file_signature_length;
 
-    bool hasSeenIDAT = false;
-    bool isPreviousChunkIDAT = false;
+    bool has_parsed_ihdr = false;
+
+    png_header image_header = {0};
+
+    pngidat_chunk *idat_chunks = MEMORY_ARENA_PUSH_ARRAY(temporary_arena, pngidat_chunk, png_max_idat_chunks);
+    if (!idat_chunks) {
+        memory_stream_write_line(error_stream, "out of memory.");
+
+        return result;
+    }
+
+    usize idat_chunk_count = 0;
+    usize total_idat_data_size = 0;
+
+    bool has_seen_idat = false;
+    bool is_previous_chunk_idat = false;
 
     while (stream.offset < stream.capacity) {
-        if (!MemoryStreamHasSpace(&stream, PNGChunkLengthSize + PNGChunkTypeSize)) {
+        if (!memory_stream_has_space(&stream, png_chunk_length_size + png_chunk_type_size)) {
             break;
         }
 
-        u32 chunkLength = MemoryStreamReadUInt32BigEndian(&stream);
+        u32 chunk_length = memory_stream_read_u_int32_big_endian(&stream);
 
-        const u8 *chunkTypePointer = &stream.memory[stream.offset];
-        stream.offset += PNGChunkTypeSize;
+        const u8 *chunk_type_pointer = &stream.memory[stream.offset];
+        stream.offset += png_chunk_type_size;
 
-        if (!MemoryStreamHasSpace(&stream, chunkLength + PNGChunkCRCSize)) {
+        if (!memory_stream_has_space(&stream, chunk_length + png_chunk_crc_size)) {
             break;
         }
 
-        const u8 *chunkDataPointer = &stream.memory[stream.offset];
-        stream.offset += chunkLength;
+        const u8 *chunk_data_pointer = &stream.memory[stream.offset];
+        stream.offset += chunk_length;
 
-        // NOTE' unused when fuzzing
-        u32 expectedCRC = MemoryStreamReadUInt32BigEndian(&stream);
-        Unused(expectedCRC);
+        // NOTE' UNUSED when fuzzing
+        u32 expected_crc = memory_stream_read_u_int32_big_endian(&stream);
+        UNUSED(expected_crc);
 
-        usize crcDataLength = PNGChunkTypeSize + chunkLength;
-        u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
-        Unused(calculatedCRC);
+        usize crc_data_length = png_chunk_type_size + chunk_length;
+        u32 calculated_crc = crc32_calculate(chunk_type_pointer, crc_data_length);
+        UNUSED(calculated_crc);
 
 #if !defined(FUZZING)
-        if (calculatedCRC != expectedCRC) {
-            MemoryStreamWriteLine(errorStream, "CRC mismatch in PNG chunk.");
+        if (calculated_crc != expected_crc) {
+            memory_stream_write_line(error_stream, "CRC mismatch in PNG chunk.");
 
             break;
         }
 #endif
 
-        if (MemoryEquals(chunkTypePointer, "IHDR", 4)) {
-            if (chunkLength != PNGIHDRChunkLength) {
+        if (memory_equals(chunk_type_pointer, "IHDR", 4)) {
+            if (chunk_length != pngihdr_chunk_length) {
                 break;
             }
 
-            if (hasParsedIHDR) {
+            if (has_parsed_ihdr) {
                 break;
             }
 
-            imageHeader.width = ReadUInt32BigEndian(&chunkDataPointer[0]);
-            imageHeader.height = ReadUInt32BigEndian(&chunkDataPointer[4]);
+            image_header.width = read_u_int32_big_endian(&chunk_data_pointer[0]);
+            image_header.height = read_u_int32_big_endian(&chunk_data_pointer[4]);
 #if defined(FUZZING)
-            if (imageHeader.width > 128 || imageHeader.height > 128) {
+            if (image_header.width > 128 || image_header.height > 128) {
                 break;
             }
 #endif
-            imageHeader.bitDepth = chunkDataPointer[8];
-            imageHeader.colorType = chunkDataPointer[9];
-            imageHeader.compressionMethod = chunkDataPointer[10];
-            imageHeader.filterMethod = chunkDataPointer[11];
-            imageHeader.interlaceMethod = chunkDataPointer[12];
+            image_header.bit_depth = chunk_data_pointer[8];
+            image_header.color_type = chunk_data_pointer[9];
+            image_header.compression_method = chunk_data_pointer[10];
+            image_header.filter_method = chunk_data_pointer[11];
+            image_header.interlace_method = chunk_data_pointer[12];
 
-            if (imageHeader.width == 0 || imageHeader.height == 0) {
+            if (image_header.width == 0 || image_header.height == 0) {
                 break;
             }
 
-            if (imageHeader.compressionMethod != 0 || imageHeader.filterMethod != 0 || imageHeader.bitDepth != 8 || imageHeader.interlaceMethod != 0) {
+            if (image_header.compression_method != 0 || image_header.filter_method != 0 || image_header.bit_depth != 8 || image_header.interlace_method != 0) {
                 break;
             }
 
-            hasParsedIHDR = true;
-            isPreviousChunkIDAT = false;
-        } else if (!hasParsedIHDR) {
+            has_parsed_ihdr = true;
+            is_previous_chunk_idat = false;
+        } else if (!has_parsed_ihdr) {
             break;
-        } else if (MemoryEquals(chunkTypePointer, "IDAT", 4)) {
-            if (hasSeenIDAT && !isPreviousChunkIDAT) {
+        } else if (memory_equals(chunk_type_pointer, "IDAT", 4)) {
+            if (has_seen_idat && !is_previous_chunk_idat) {
                 break;
             }
 
-            if (idatChunkCount >= PNGMaxIDATChunks) {
+            if (idat_chunk_count >= png_max_idat_chunks) {
                 break;
             }
 
-            idatChunks[idatChunkCount].memory = chunkDataPointer;
-            idatChunks[idatChunkCount].length = chunkLength;
+            idat_chunks[idat_chunk_count].memory = chunk_data_pointer;
+            idat_chunks[idat_chunk_count].length = chunk_length;
 
-            idatChunkCount++;
-            totalIDATDataSize += chunkLength;
+            idat_chunk_count++;
+            total_idat_data_size += chunk_length;
 
-            hasSeenIDAT = true;
-            isPreviousChunkIDAT = true;
-        } else if (MemoryEquals(chunkTypePointer, "IEND", 4)) {
-            isPreviousChunkIDAT = false;
+            has_seen_idat = true;
+            is_previous_chunk_idat = true;
+        } else if (memory_equals(chunk_type_pointer, "IEND", 4)) {
+            is_previous_chunk_idat = false;
 
             break;
         } else {
-            bool isCriticalChunk = !IsBitSet(chunkTypePointer[0], 0x20);
-            if (isCriticalChunk) {
+            bool is_critical_chunk = !IS_BIT_SET(chunk_type_pointer[0], 0x20);
+            if (is_critical_chunk) {
                 break;
             }
 
-            isPreviousChunkIDAT = false;
+            is_previous_chunk_idat = false;
         }
     }
 
-    if (!hasParsedIHDR || totalIDATDataSize == 0) {
-        MemoryStreamWriteLine(errorStream, "Missing IHDR or no IDAT data.");
+    if (!has_parsed_ihdr || total_idat_data_size == 0) {
+        memory_stream_write_line(error_stream, "missing IHDR or no IDAT data.");
 
         return result;
     }
 
-    u32 bytesPerPixel = 0;
+    u32 bytes_per_pixel = 0;
 
-    if (imageHeader.colorType == PNGColorType_Grayscale) {
-        bytesPerPixel = 1;
-    } else if (imageHeader.colorType == PNGColorType_TrueColor) {
-        bytesPerPixel = 3;
-    } else if (imageHeader.colorType == PNGColorType_GrayscaleAlpha) {
-        bytesPerPixel = 2;
-    } else if (imageHeader.colorType == PNGColorTypeTrue_ColorAlpha) {
-        bytesPerPixel = 4;
+    if (image_header.color_type == png_color_type_grayscale) {
+        bytes_per_pixel = 1;
+    } else if (image_header.color_type == png_color_type_true_color) {
+        bytes_per_pixel = 3;
+    } else if (image_header.color_type == png_color_type_grayscale_alpha) {
+        bytes_per_pixel = 2;
+    } else if (image_header.color_type == png_color_type_true_color_alpha) {
+        bytes_per_pixel = 4;
     } else {
-        MemoryStreamWriteLine(errorStream, "Unsupported color type.");
+        memory_stream_write_line(error_stream, "unsupported color type.");
 
         return result;
     }
 
-    usize scanlineStride = 1 + (usize)imageHeader.width * bytesPerPixel;
-    usize decompressedCapacity = scanlineStride * imageHeader.height;
+    usize scanline_stride = 1 + (usize)image_header.width * bytes_per_pixel;
+    usize decompressed_capacity = scanline_stride * image_header.height;
 
-    u8 *decompressedBuffer = MemoryArenaPushBytes(temporaryArena, decompressedCapacity);
-    if (!decompressedBuffer) {
-        MemoryStreamWriteLine(errorStream, "Out of memory.");
-
-        return result;
-    }
-
-    bool succesfullyDecompressed = DecompressDeflate(idatChunks, idatChunkCount, decompressedBuffer, decompressedCapacity);
-    if (!succesfullyDecompressed) {
-        MemoryStreamWriteLine(errorStream, "Could not decompress.");
+    u8 *decompressed_buffer = MEMORY_ARENA_PUSH_BYTES(temporary_arena, decompressed_capacity);
+    if (!decompressed_buffer) {
+        memory_stream_write_line(error_stream, "out of memory.");
 
         return result;
     }
 
-    const u32 imageWidth = imageHeader.width;
-    const u32 imageHeight = imageHeader.height;
-
-    const usize rawScanlineByteCount = (usize)imageWidth * bytesPerPixel;
-    if (imageWidth != 0 && rawScanlineByteCount / imageWidth != bytesPerPixel) {
-        MemoryStreamWriteLine(errorStream, "Scanline byte count overflow.");
+    bool succesfully_decompressed = decompress_deflate(idat_chunks, idat_chunk_count, decompressed_buffer, decompressed_capacity);
+    if (!succesfully_decompressed) {
+        memory_stream_write_line(error_stream, "could not decompress.");
 
         return result;
     }
 
-    const usize filteredScanlineByteCount = rawScanlineByteCount + 1;
-    const usize expectedDecompressedByteCount = filteredScanlineByteCount * imageHeight;
+    const u32 image_width = image_header.width;
+    const u32 image_height = image_header.height;
 
-    if (decompressedCapacity < expectedDecompressedByteCount) {
-        MemoryStreamWriteLine(errorStream, "Decompressed PNG data is smaller than expected.");
-
-        return result;
-    }
-
-    const usize totalRawPixelByteCount = rawScanlineByteCount * imageHeight;
-    u8 *rawPixelDataBuffer = MemoryArenaPushBytes(permanentArena, totalRawPixelByteCount);
-    if (!rawPixelDataBuffer) {
-        MemoryStreamWriteLine(errorStream, "Out of memory.");
+    const usize raw_scanline_byte_count = (usize)image_width * bytes_per_pixel;
+    if (image_width != 0 && raw_scanline_byte_count / image_width != bytes_per_pixel) {
+        memory_stream_write_line(error_stream, "scanline byte count overflow.");
 
         return result;
     }
 
-    usize sourceReadOffset = 0;
-    usize destinationWriteOffset = 0;
+    const usize filtered_scanline_byte_count = raw_scanline_byte_count + 1;
+    const usize expected_decompressed_byte_count = filtered_scanline_byte_count * image_height;
 
-    for (u32 currentScanlineIndex = 0; currentScanlineIndex < imageHeight; currentScanlineIndex++) {
-        if (sourceReadOffset + filteredScanlineByteCount > decompressedCapacity) {
-            MemoryStreamWriteLine(errorStream, "Scanline data overruns decompressed buffer.");
+    if (decompressed_capacity < expected_decompressed_byte_count) {
+        memory_stream_write_line(error_stream, "decompressed PNG data is smaller than expected.");
+
+        return result;
+    }
+
+    const usize total_raw_pixel_byte_count = raw_scanline_byte_count * image_height;
+    u8 *raw_pixel_data_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, total_raw_pixel_byte_count);
+    if (!raw_pixel_data_buffer) {
+        memory_stream_write_line(error_stream, "out of memory.");
+
+        return result;
+    }
+
+    usize source_read_offset = 0;
+    usize destination_write_offset = 0;
+
+    for (u32 current_scanline_index = 0; current_scanline_index < image_height; current_scanline_index++) {
+        if (source_read_offset + filtered_scanline_byte_count > decompressed_capacity) {
+            memory_stream_write_line(error_stream, "scanline data overruns decompressed buffer.");
 
             return result;
         }
 
-        const u8 scanlineFilterType = decompressedBuffer[sourceReadOffset++];
-        const u8 *currentFilteredScanlineData = &decompressedBuffer[sourceReadOffset];
-        u8 *currentRawScanlineData = &rawPixelDataBuffer[destinationWriteOffset];
+        const u8 scanline_filter_type = decompressed_buffer[source_read_offset++];
+        const u8 *current_filtered_scanline_data = &decompressed_buffer[source_read_offset];
+        u8 *current_raw_scanline_data = &raw_pixel_data_buffer[destination_write_offset];
 
-        const u8 *previousRawScanlineData = (currentScanlineIndex > 0) ? &rawPixelDataBuffer[destinationWriteOffset - rawScanlineByteCount] : 0;
+        const u8 *previous_raw_scanline_data = (current_scanline_index > 0) ? &raw_pixel_data_buffer[destination_write_offset - raw_scanline_byte_count] : 0;
 
-        if (scanlineFilterType > 4) {
-            MemoryStreamWriteLine(errorStream, "Unknown PNG filter type.");
+        if (scanline_filter_type > 4) {
+            memory_stream_write_line(error_stream, "unknown PNG filter type.");
 
             return result;
         }
 
-        for (usize byteIndex = 0; byteIndex < rawScanlineByteCount; byteIndex++) {
-            u8 rawLeft = (byteIndex >= bytesPerPixel) ? currentRawScanlineData[byteIndex - bytesPerPixel] : 0;
-            u8 rawUp = previousRawScanlineData ? previousRawScanlineData[byteIndex] : 0;
+        for (usize byte_index = 0; byte_index < raw_scanline_byte_count; byte_index++) {
+            u8 raw_left = (byte_index >= bytes_per_pixel) ? current_raw_scanline_data[byte_index - bytes_per_pixel] : 0;
+            u8 raw_up = previous_raw_scanline_data ? previous_raw_scanline_data[byte_index] : 0;
 
             u8 prediction = 0;
-            switch (scanlineFilterType) {
+            switch (scanline_filter_type) {
             case 1: {
-                prediction = rawLeft;
+                prediction = raw_left;
                 break;
             }
             case 2: {
-                prediction = rawUp;
+                prediction = raw_up;
                 break;
             }
             case 3: {
-                prediction = (u8)(((u16)rawLeft + (u16)rawUp) / 2);
+                prediction = (u8)(((u16)raw_left + (u16)raw_up) / 2);
                 break;
             }
             case 4: {
-                u8 rawUpLeft = (previousRawScanlineData && byteIndex >= bytesPerPixel) ? previousRawScanlineData[byteIndex - bytesPerPixel] : 0;
-                prediction = PaethPredictor(rawLeft, rawUp, rawUpLeft);
+                u8 raw_up_left = (previous_raw_scanline_data && byte_index >= bytes_per_pixel) ? previous_raw_scanline_data[byte_index - bytes_per_pixel] : 0;
+                prediction = paeth_predictor(raw_left, raw_up, raw_up_left);
             } break;
             }
 
-            currentRawScanlineData[byteIndex] = currentFilteredScanlineData[byteIndex] + prediction;
+            current_raw_scanline_data[byte_index] = current_filtered_scanline_data[byte_index] + prediction;
         }
 
-        sourceReadOffset += rawScanlineByteCount;
-        destinationWriteOffset += rawScanlineByteCount;
+        source_read_offset += raw_scanline_byte_count;
+        destination_write_offset += raw_scanline_byte_count;
     }
 
-    result.size.width = imageWidth;
-    result.size.height = imageHeight;
-    result.bytesPerPixel = bytesPerPixel;
-    result.pixels = rawPixelDataBuffer;
+    result.size.width = image_width;
+    result.size.height = image_height;
+    result.bytes_per_pixel = bytes_per_pixel;
+    result.pixels = raw_pixel_data_buffer;
 
     return result;
 }

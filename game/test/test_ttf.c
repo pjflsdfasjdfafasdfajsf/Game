@@ -7,20 +7,20 @@
 #if defined(FUZZING)
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    UtilitiesInitialize();
+    utilities_initialize();
 
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(&permanentArena, &errorStream, data, size);
+    true_type_font font = true_type_font_load_from_memory(&permanent_arena, &error_stream, data, size);
 
-    if (font.numberOfTables > 0) {
-        const u32 targetPixelHeight = 32;
-        const u32 atlasWidth = 128;
-        const u32 atlasHeight = 128;
-        const u32 characterCount = 10;
+    if (font.number_of_tables > 0) {
+        const u32 target_pixel_height = 32;
+        const u32 atlas_width = 128;
+        const u32 atlas_height = 128;
+        const u32 character_count = 10;
 
-        TrueTypeBakedGlyph glyphs[10];
+        true_type_baked_glyph glyphs[10];
 
-        Image atlas = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &errorStream, &font, targetPixelHeight, atlasWidth, atlasHeight, ' ', characterCount, glyphs);
-        Unused(atlas);
+        image atlas = true_type_font_bake_atlas(&permanent_arena, &temporary_arena, &error_stream, &font, target_pixel_height, atlas_width, atlas_height, ' ', character_count, glyphs);
+        UNUSED(atlas);
     }
 
     return 0;
@@ -29,41 +29,41 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 #else ///////////////////////////////////////////////////////
 
 int main(void) {
-    UtilitiesInitialize();
+    utilities_initialize();
 
-    usize fileSize = 0;
-    void *fileData = ReadEntireFile("data/font.ttf", &fileSize);
+    usize file_size = 0;
+    void *file_data = read_entire_file("data/font.ttf", &file_size);
 
-    if (!fileData) {
+    if (!file_data) {
         printf("test data missing\n");
 
         return 1;
     }
 
-    TrueTypeFont font = TrueTypeFontLoadFromMemory(&permanentArena, &errorStream, fileData, fileSize);
+    true_type_font font = true_type_font_load_from_memory(&permanent_arena, &error_stream, file_data, file_size);
 
-    if (font.numberOfTables > 0) {
-        u32 atlasWidth = 256;
-        u32 atlasHeight = 256;
-        u32 targetHeight = 32;
+    if (font.number_of_tables > 0) {
+        u32 atlas_width = 256;
+        u32 atlas_height = 256;
+        u32 target_height = 32;
 
-        TrueTypeBakedGlyph glyphs[TRUETYPE_CHARACTER_COUNT_FOR_ASCII];
+        true_type_baked_glyph glyphs[TRUETYPE_CHARACTER_COUNT_FOR_ASCII];
 
-        Image atlas = TrueTypeFontBakeAtlas(&permanentArena, &temporaryArena, &errorStream, &font, targetHeight, atlasWidth, atlasHeight, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
+        image atlas = true_type_font_bake_atlas(&permanent_arena, &temporary_arena, &error_stream, &font, target_height, atlas_width, atlas_height, TRUETYPE_FIRST_CHARACTER_FOR_ASCII, TRUETYPE_CHARACTER_COUNT_FOR_ASCII, glyphs);
 
         if (atlas.pixels) {
-            if (PPMWrite("ttf.ppm", atlas.size.x, atlas.size.y, atlas.bytesPerPixel, atlas.pixels)) {
+            if (ppm_write("ttf.ppm", atlas.size.x, atlas.size.y, atlas.bytes_per_pixel, atlas.pixels)) {
                 printf("wrote ttf.ppm\n");
             } else {
                 printf("could not write ttf.ppm\n");
             }
         } else {
             printf("rasterization failed\n");
-            printf("error steam: %.*s\n", (int)errorStream.offset, errorStream.memory);
+            printf("error steam: %.*s\n", (int)error_stream.offset, error_stream.memory);
         }
     } else {
         printf("table parsing failed\n");
-        printf("error stream: %.*s\n", (int)errorStream.offset, errorStream.memory);
+        printf("error stream: %.*s\n", (int)error_stream.offset, error_stream.memory);
     }
 
     return 0;
