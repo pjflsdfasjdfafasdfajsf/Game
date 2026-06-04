@@ -5,7 +5,7 @@ CFLAGS_FUZZ = $(CFLAGS_TEST) -DFUZZING -fsanitize=fuzzer
 BUILD_DIRECTORY = build
 BIN_DIRECTORY   = $(BUILD_DIRECTORY)/bin
 
-ASSETS_DIRECTORY = ../../assets
+DATA_DIRECTORY = data
 
 CORPUS_PNG = corpus_png
 CORPUS_TTF = corpus_ttf
@@ -19,7 +19,7 @@ TEST_PNG_SOURCE = test_png.c
 GAME_PNG_SOURCE = ../game_png.c
 FUZZER_PNG_EXE  = $(BIN_DIRECTORY)/test_png_fuzzer
 TEST_PNG_EXE    = $(BIN_DIRECTORY)/test_png
-SEED_PNG        = $(ASSETS_DIRECTORY)/images/watermelon.png
+SEED_PNG        = $(DATA_DIRECTORY)/image.png
 
 ###
 
@@ -27,7 +27,7 @@ TEST_TTF_SOURCE = test_ttf.c
 GAME_TTF_SOURCE = ../game_ttf.c ../game_rectangle_pack.c
 FUZZER_TTF_EXE  = $(BIN_DIRECTORY)/test_ttf_fuzzer
 TEST_TTF_EXE    = $(BIN_DIRECTORY)/test_ttf
-SEED_TTF        = $(ASSETS_DIRECTORY)/fonts/arial.ttf
+SEED_TTF        = $(DATA_DIRECTORY)/font.ttf
 
 FUZZING_TIME_IN_SECONDS ?= 900
 

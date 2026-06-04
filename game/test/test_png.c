@@ -19,10 +19,10 @@ int main(void) {
     UtilitiesInitialize();
 
     usize fileSize = 0;
-    void *fileData = ReadEntireFile("../../assets/images/watermelon.png", &fileSize);
+    void *fileData = ReadEntireFile("data/image.png", &fileSize);
 
     if (!fileData) {
-        printf("game assets missing or running from the wrong directory\n");
+        printf("test data missing\n");
 
         return 1;
     }

@@ -26,16 +26,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
 }
 
-#endif ///////////////////////////////////////////////////////
+#else ///////////////////////////////////////////////////////
 
 int main(void) {
     UtilitiesInitialize();
 
     usize fileSize = 0;
-    void *fileData = ReadEntireFile("../../assets/fonts/arial.ttf", &fileSize);
+    void *fileData = ReadEntireFile("data/font.ttf", &fileSize);
 
     if (!fileData) {
-        printf("game assets missing or running from the wrong directory\n");
+        printf("test data missing\n");
 
         return 1;
     }
@@ -68,3 +68,5 @@ int main(void) {
 
     return 0;
 }
+
+#endif
