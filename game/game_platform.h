@@ -1,5 +1,3 @@
-// TODO:
-// * win32 uses popups for displaying error messages. I'm almost fine with win32 (except for the part that I want it also to print to the console besides using popups),
 #pragma once
 
 #include "game_types.h"

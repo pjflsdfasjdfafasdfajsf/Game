@@ -20,7 +20,7 @@ static void absolute_libary_path(const char *library_file_name, char *destinatio
     isize executable_path_length = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
 
     if (executable_path_length == -1) {
-        printf("ERROR: readlink failed.\n");
+        printf("error: readlink failed.\n");
 
         return;
     }

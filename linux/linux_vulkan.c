@@ -1,6 +1,3 @@
-// TODO:
-// * add support for windows. so on windows there must be a choice between direct_x and vulkan, and on linux, well, nothing would change. maybe there will be open_gl later.
-// * I think I noticed that some things between vulkan and direct_x are repeated. maybe we can put them somewhere like game_renderer.c?
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
@@ -35,11 +32,6 @@ static u32 vulkan_memory_type_find(vulkan *vulkan, u32 type_filter, VkMemoryProp
     }
 
     return 0;
-}
-
-// TODO: this will be in linux_vulkan.h once we refactor to use memory_stream
-static void vulkan_result_print(vulkan *vulkan, const char *function_name, VkResult function_result) {
-    memory_stream_write_string_format(vulkan->error_stream, "ERROR: %s: %s\n", function_name, VkResultToString(function_result));
 }
 
 static vulkan_buffer vulkan_buffer_host_visible_create(vulkan *vulkan, VkDeviceSize size, VkBufferUsageFlags flags, void **mapped) {
@@ -136,7 +128,7 @@ static void vulkan_instance_create(vulkan *vulkan, PFN_vkCreateInstance vkCreate
     };
 
     if (vkCreateInstance(&instance_create_info, 0, &vulkan->instance) != VK_SUCCESS) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: failed to create vulkan instance.\n");
+        memory_stream_write_string_format(vulkan->error_stream, "error: failed to create vulkan instance.\n");
 
         return;
     }
@@ -246,19 +238,19 @@ static bool vulkan_physical_device_pick(vulkan *vulkan) {
     }
 
     if (!vulkan->physical_device) {
-        memory_stream_write_string_format(vulkan->error_stream, "WARNING: I did not find a dedicated GPU!\n");
+        memory_stream_write_string_format(vulkan->error_stream, "warning: I did not find a dedicated GPU.\n");
         vulkan->physical_device = devices[0];
     }
 
     if (!vulkan->physical_device) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: your GPU is not supported by vulkan!\n");
+        memory_stream_write_string_format(vulkan->error_stream, "error: your GPU is not supported by vulkan.\n");
 
         return false;
     }
 
     VkPhysicalDeviceProperties properties;
     vulkan->vkGetPhysicalDeviceProperties(vulkan->physical_device, &properties);
-                memory_stream_write_string_format(vulkan->info_stream, "GPU: %s\n", properties.deviceName);
+                memory_stream_write_string_format(vulkan->info_stream, "gpu: %s\n", properties.deviceName);
 
     return true;
 }
@@ -340,7 +332,7 @@ static vulkan_swapchain_support vulkan_swapchain_support_query(vulkan *vulkan) {
         return result;
     };
     if (!result.format_count) {
-            memory_stream_write_string_format(vulkan->error_stream, "ERROR: failed to get vulkan surface formats.\n");
+            memory_stream_write_string_format(vulkan->error_stream, "error: failed to get vulkan surface formats.\n");
 
         return result;
     }
@@ -359,7 +351,7 @@ static vulkan_swapchain_support vulkan_swapchain_support_query(vulkan *vulkan) {
         return result;
     };
     if (!result.presentModeCount) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: failed to get vulkan surface present modes.\n");
+        memory_stream_write_string_format(vulkan->error_stream, "error: failed to get vulkan surface present modes.\n");
 
         return result;
     }
@@ -733,12 +725,12 @@ static bool vulkan_graphics_pipeline_create(vulkan *vulkan) {
     VkShaderModule vertex_module, fragment_module;
 
     if (vulkan->vkCreateShaderModule(vulkan->logical_device, &vertex_shader_create_info, 0, &vertex_module) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan vertex shader module.\n");
+        printf("error: failed to create vulkan vertex shader module.\n");
 
         return false;
     }
     if (vulkan->vkCreateShaderModule(vulkan->logical_device, &fragment_shader_create_info, 0, &fragment_module) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan fragment shader module.\n");
+        printf("error: failed to create vulkan fragment shader module.\n");
 
         return false;
     }
@@ -914,7 +906,7 @@ static bool vulkan_sampler_create(vulkan *vulkan) {
     };
 
     if (vulkan->vkCreateSampler(vulkan->logical_device, &sampler_create_info, 0, &vulkan->texture_sampler) != VK_SUCCESS) {
-        printf("ERROR: failed to create vulkan sampler.\n");
+        printf("error: failed to create vulkan sampler.\n");
 
         return false;
     }
@@ -926,7 +918,7 @@ u32 vulkan_texture_create(vulkan *vulkan, u32 index, vector2_u size, u32 bytes_p
     VkResult vkResult;
 
     if (vulkan->texture_count + 1 > MAX_TEXTURES) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: maximum number of textures reached: %u.\n", vulkan->texture_count);
+        memory_stream_write_string_format(vulkan->error_stream, "error: maximum number of textures reached: %u.\n", vulkan->texture_count);
     }
 
     vulkan_image result = {0};
@@ -1213,7 +1205,7 @@ bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *inf
 
     void *lib_vulkan = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
     if (!lib_vulkan) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: failed to open libvulkan.so.1: %s\n", dlerror());
+        memory_stream_write_string_format(vulkan->error_stream, "error: failed to open libvulkan.so.1: %s\n", dlerror());
 
         return false;
     }
@@ -1233,7 +1225,7 @@ bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *inf
     };
 
     if (vkCreateWaylandSurfaceKHR(vulkan->instance, &surface_create_info, 0, &vulkan->surface) != VK_SUCCESS) {
-        memory_stream_write_string_format(vulkan->error_stream, "ERROR: failed to create wayland vulkan surface.\n");
+        memory_stream_write_string_format(vulkan->error_stream, "error: failed to create wayland vulkan surface.\n");
 
         return false;
     }

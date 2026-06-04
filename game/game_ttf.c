@@ -158,14 +158,14 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     true_type_font result = {0};
 
     if (!memory) {
-        memory_stream_write_string(error_stream, "invalid parameter: memory.");
+        memory_stream_write_string(error_stream, "error: invalid parameter: memory.");
 
         return result;
     }
 
     const usize true_type_offset_subtable_length = 12;
     if (length < true_type_offset_subtable_length) {
-        memory_stream_write_string(error_stream, "font file too small to contain offset subtable.");
+        memory_stream_write_string(error_stream, "error: font file too small to contain offset subtable.");
 
         return result;
     }
@@ -184,7 +184,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     } else if (scaler_type_value == FOURCC('O', 'T', 'T', 'O')) {
         result.scaler_type = true_type_scaler_type_open_type;
     } else {
-        memory_stream_write_string(error_stream, "unrecognized scaler type; not a supported true_type/open_type font.");
+        memory_stream_write_string(error_stream, "error: unrecognized scaler type; not a supported true_type/open_type font.");
 
         return result;
     }
@@ -198,7 +198,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     usize expected_directory_size = true_type_offset_subtable_length + ((usize)result.number_of_tables * true_type_table_directory_entry_length);
 
     if (length < expected_directory_size) {
-        memory_stream_write_string(error_stream, "font file too small to contain full table directory.");
+        memory_stream_write_string(error_stream, "error: font file too small to contain full table directory.");
 
         return result;
     }
@@ -206,7 +206,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     if (result.number_of_tables > 0) {
         result.tables = MEMORY_ARENA_PUSH_ARRAY(arena, true_type_table_directory_entry, result.number_of_tables);
         if (!result.tables) {
-            memory_stream_write_string(error_stream, "out of memory.");
+            memory_stream_write_string(error_stream, "error: out of memory.");
 
             return result;
         }
@@ -221,7 +221,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
             u32 table_length = read_u_int32_big_endian(&entry_pointer[12]);
 
             if (table_offset > length || table_length > (length - table_offset)) {
-                memory_stream_write_string(error_stream, "table offset/length out of bounds.");
+                memory_stream_write_string(error_stream, "error: table offset/length out of bounds.");
                 RETURN_ZEROED(result);
             }
 
@@ -231,7 +231,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
             u32 calculated_checksum = true_type_calculate_table_checksum(table_data_pointer, table_length, is_head_table);
 
             if (calculated_checksum != expected_checksum) {
-                memory_stream_write_string(error_stream, "table checksum mismatch.");
+                memory_stream_write_string(error_stream, "error: table checksum mismatch.");
                 RETURN_ZEROED(result);
             }
 
@@ -577,14 +577,14 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
     true_type_simple_glyph result = {0};
 
     if (!glyf_table_entry || !glyf_table_entry->memory) {
-        memory_stream_write_string(error_stream, "invalid parameter: glyf_table_entry.");
+        memory_stream_write_string(error_stream, "error: invalid parameter: glyf_table_entry.");
 
         return result;
     }
 
     if (glyph_location.offset > glyf_table_entry->length ||
         glyph_location.length > (glyf_table_entry->length - glyph_location.offset)) {
-        memory_stream_write_string(error_stream, "glyph location out of bounds in glyf table.");
+        memory_stream_write_string(error_stream, "error: glyph location out of bounds in glyf table.");
 
         return result;
     }
@@ -599,7 +599,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
     const usize true_type_glyph_header_length = 10;
     if (glyph_location.length < true_type_glyph_header_length) {
-        memory_stream_write_string(error_stream, "glyph data too small to contain header.");
+        memory_stream_write_string(error_stream, "error: glyph data too small to contain header.");
 
         return result;
     }
@@ -624,7 +624,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
     usize end_points_array_byte_length = (usize)result.number_of_contours * 2;
     if (stream.offset + end_points_array_byte_length > glyph_location.length) {
-        memory_stream_write_string(error_stream, "end points array overruns glyph data.");
+        memory_stream_write_string(error_stream, "error: end points array overruns glyph data.");
 
         return result;
     }
@@ -636,7 +636,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
     result.points = MEMORY_ARENA_PUSH_ARRAY(arena, true_type_glyph_point, result.number_of_points);
 
     if (!result.end_points_of_contours || !result.points) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
 
         return result;
     }
@@ -646,14 +646,14 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
     }
 
     if (stream.offset + 2 > glyph_location.length) {
-        memory_stream_write_string(error_stream, "instruction length field overruns glyph data.");
+        memory_stream_write_string(error_stream, "error: instruction length field overruns glyph data.");
         RETURN_ZEROED(result);
     }
 
     result.instruction_length = memory_stream_read_u_int16_big_endian(&stream);
 
     if (stream.offset + result.instruction_length > glyph_location.length) {
-        memory_stream_write_string(error_stream, "instructions overrun glyph data.");
+        memory_stream_write_string(error_stream, "error: instructions overrun glyph data.");
         RETURN_ZEROED(result);
     }
 
@@ -662,14 +662,14 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
     u8 *unpacked_flags = MEMORY_ARENA_PUSH_ARRAY(arena, u8, result.number_of_points);
     if (!unpacked_flags) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
         RETURN_ZEROED(result);
     }
 
     u32 points_processed = 0;
     while (points_processed < result.number_of_points) {
         if (stream.offset + 1 > glyph_location.length) {
-            memory_stream_write_string(error_stream, "flags overrun glyph data.");
+            memory_stream_write_string(error_stream, "error: flags overrun glyph data.");
             RETURN_ZEROED(result);
         }
 
@@ -678,14 +678,14 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
         if (IS_BIT_SET(current_flag, true_type_glyph_flag_repeat)) {
             if (stream.offset + 1 > glyph_location.length) {
-                memory_stream_write_string(error_stream, "flag repeat count overruns glyph data.");
+                memory_stream_write_string(error_stream, "error: flag repeat count overruns glyph data.");
                 RETURN_ZEROED(result);
             }
 
             u8 repeat_count = stream.memory[stream.offset++];
 
             if (points_processed + repeat_count > result.number_of_points) {
-                memory_stream_write_string(error_stream, "flag repeat count exceeds point count.");
+                memory_stream_write_string(error_stream, "error: flag repeat count exceeds point count.");
                 RETURN_ZEROED(result);
             }
 
@@ -702,7 +702,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
         if (IS_BIT_SET(flag, true_type_glyph_flag_x_short_vector)) {
             if (stream.offset + 1 > glyph_location.length) {
-                memory_stream_write_string(error_stream, "X coordinate byte overruns glyph data.");
+                memory_stream_write_string(error_stream, "error: X coordinate byte overruns glyph data.");
                 RETURN_ZEROED(result);
             }
 
@@ -715,7 +715,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
         } else {
             if (!IS_BIT_SET(flag, true_type_glyph_flag_x_is_same_or_positive_x_short)) {
                 if (stream.offset + 2 > glyph_location.length) {
-                    memory_stream_write_string(error_stream, "Y coordinate byte overruns glyph data.");
+                    memory_stream_write_string(error_stream, "error: Y coordinate byte overruns glyph data.");
                     RETURN_ZEROED(result);
                 }
 
@@ -732,7 +732,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
 
         if (IS_BIT_SET(flag, true_type_glyph_flag_y_short_vector)) {
             if (stream.offset + 1 > glyph_location.length) {
-                memory_stream_write_string(error_stream, "Y coordinate byte overruns glyph data.");
+                memory_stream_write_string(error_stream, "error: Y coordinate byte overruns glyph data.");
                 RETURN_ZEROED(result);
             }
 
@@ -745,7 +745,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
         } else {
             if (!IS_BIT_SET(flag, true_type_glyph_flag_y_is_same_or_positive_y_short)) {
                 if (stream.offset + 2 > glyph_location.length) {
-                    memory_stream_write_string(error_stream, "Y coordinate short overruns glyph data.");
+                    memory_stream_write_string(error_stream, "error: Y coordinate short overruns glyph data.");
                     RETURN_ZEROED(result);
                 }
 
@@ -788,7 +788,7 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
     }
 
     if (glyph->y_max <= glyph->y_min || glyph->x_max <= glyph->x_min) {
-        memory_stream_write_string(error_stream, "weird glyph bounds.");
+        memory_stream_write_string(error_stream, "error: weird glyph bounds.");
 
         return result;
     }
@@ -811,7 +811,7 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
     result.pixels = MEMORY_ARENA_PUSH_BYTES(arena, pixels_allocation_size);
 
     if (!result.pixels) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
 
         return result;
     }
@@ -820,14 +820,14 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
 
     vector2 *generated_points = MEMORY_ARENA_PUSH_ARRAY(arena, vector2, max_generated_points);
     if (!generated_points) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
 
         return result;
     }
 
     u32 *contour_end_indices = MEMORY_ARENA_PUSH_ARRAY(arena, u32, glyph->number_of_contours);
     if (!contour_end_indices) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
 
         return result;
     }
@@ -912,7 +912,7 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
 
     u8 *coverage_buffer = MEMORY_ARENA_PUSH_BYTES(arena, result.size.x * result.size.y);
     if (!coverage_buffer) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
         RETURN_ZEROED(result);
     }
 
@@ -1059,7 +1059,7 @@ image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *tem
     const true_type_table_directory_entry *glyf_entry = true_type_font_get_table(font, true_type_table_tag_glyf);
 
     if (!head_entry || !maxp_entry || !cmap_entry || !loca_entry || !glyf_entry) {
-        memory_stream_write_string(error_stream, "could not get one or more tables.");
+        memory_stream_write_string(error_stream, "error: could not get one or more tables.");
 
         return result;
     }
@@ -1070,7 +1070,7 @@ image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *tem
     true_type_index_to_location_table loca = true_type_index_to_location_table_parse(loca_entry, head.index_to_loc_format, maxp.num_glyphs);
 
     if (!cmap.is_valid || !loca.is_valid) {
-        memory_stream_write_string(error_stream, "cmap/loca table is invalid.");
+        memory_stream_write_string(error_stream, "error: cmap/loca table is invalid.");
 
         return result;
     }
@@ -1085,7 +1085,7 @@ image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *tem
     result.pixels = MEMORY_ARENA_PUSH_BYTES(permanent_arena, pixels_allocation_size);
 
     if (!result.pixels) {
-        memory_stream_write_string(error_stream, "out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.");
         RETURN_ZEROED(result);
     }
 

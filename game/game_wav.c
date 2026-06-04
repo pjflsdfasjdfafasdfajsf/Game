@@ -23,12 +23,12 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
     sound_clip result = {0};
 
     if (!memory) {
-        memory_stream_write_line(error_stream, "invalid parameter: memory.");
+        memory_stream_write_line(error_stream, "error: invalid parameter: memory.");
         return result;
     }
 
     if (length < riff_header_length) {
-        memory_stream_write_line(error_stream, "file too small to contain a valid RIFF/WAVE header.");
+        memory_stream_write_line(error_stream, "error: file too small to contain a valid RIFF/WAVE header.");
         return result;
     }
 
@@ -38,7 +38,7 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
     bool is_valid_wave = memory_equals(&file_buffer_pointer[8], wave_format_signature, 4);
 
     if (!is_valid_riff || !is_valid_wave) {
-        memory_stream_write_line(error_stream, "likely an corrupted or unsupported file (missing signatures)");
+        memory_stream_write_line(error_stream, "error: corrupted WAV file");
         return result;
     }
 
@@ -66,7 +66,7 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
         u32 chunk_length = memory_stream_read_u_int32_little_endian(&stream);
 
         if (!memory_stream_has_space(&stream, chunk_length)) {
-            memory_stream_write_line(error_stream, "WAV chunk declares a size that exceeds file bounds.");
+            memory_stream_write_line(error_stream, "error: WAV chunk declares a size that exceeds file bounds.");
             return result;
         }
 
@@ -84,7 +84,7 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
             }
 
             if (chunk_length < 16) {
-                memory_stream_write_line(error_stream, "WAV fmt chunk is smaller than the required 16 bytes.");
+                memory_stream_write_line(error_stream, "error: WAV fmt chunk is smaller than the required 16 bytes.");
                 return result;
             }
 
@@ -114,32 +114,32 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
 
     bool has_required_chunks = (has_parsed_fmt && has_parsed_data);
     if (!has_required_chunks) {
-        memory_stream_write_line(error_stream, "missing required 'fmt ' or 'data' chunks.");
+        memory_stream_write_line(error_stream, "error: missing required 'fmt ' or 'data' chunks.");
         return result;
     }
 
     bool is_pcm_format = (format.audio_format == pcm_audio_format);
     if (!is_pcm_format) {
-        memory_stream_write_line(error_stream, "only uncompressed PCM WAV files are supported.");
+        memory_stream_write_line(error_stream, "error: only uncompressed PCM WAV files are supported.");
         return result;
     }
 
     bool is_sane_channel_count = (format.channel_count == 1 || format.channel_count == 2);
     if (!is_sane_channel_count) {
-        memory_stream_write_line(error_stream, "unsupported channel count (expected 1 or 2).");
+        memory_stream_write_line(error_stream, "error: unsupported channel count (expected 1 or 2).");
         return result;
     }
 
     bool is_valid_bit_depth = (format.bits_per_sample == 8 || format.bits_per_sample == 16 ||
                                format.bits_per_sample == 24 || format.bits_per_sample == 32);
     if (!is_valid_bit_depth) {
-        memory_stream_write_line(error_stream, "unsupported bit depth (expected 8, 16, 24, or 32).");
+        memory_stream_write_line(error_stream, "error: unsupported bit depth (expected 8, 16, 24, or 32).");
         return result;
     }
 
     u32 expected_block_align = (format.channel_count * format.bits_per_sample) / 8;
     if (format.block_align != expected_block_align) {
-        memory_stream_write_line(error_stream, "block align does not match bits per sample and channels.");
+        memory_stream_write_line(error_stream, "error: block align does not match bits per sample and channels.");
         return result;
     }
 
@@ -147,7 +147,7 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
 
     void *raw_sample_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, audio_data_length);
     if (!raw_sample_buffer) {
-        memory_stream_write_line(error_stream, "out of memory.");
+        memory_stream_write_line(error_stream, "error: out of memory.");
         return result;
     }
 

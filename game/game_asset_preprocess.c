@@ -31,14 +31,14 @@ int main(int argument_count, const char *arguments[]) {
 
     FILE *input_file = fopen(input_file_path, "rb");
     if (!input_file) {
-        fprintf(stderr, "ERROR: could not open input file: '%s'\n", input_file_path);
+        fprintf(stderr, "error: could not open input file: '%s'\n", input_file_path);
 
         return EXIT_FAILURE;
     }
 
     FILE *output_file = fopen(output_file_path, "wb");
     if (!output_file) {
-        fprintf(stderr, "ERROR: could not open output file: '%s'\n", output_file_path);
+        fprintf(stderr, "error: could not open output file: '%s'\n", output_file_path);
 
         return EXIT_FAILURE;
     }
@@ -50,7 +50,7 @@ int main(int argument_count, const char *arguments[]) {
     char *write_buffer = malloc((size_t)read_buffer_size * 6 + 64);
 
     if (!read_buffer || !write_buffer) {
-        fprintf(stderr, "ERROR: out of memory.\n");
+        fprintf(stderr, "error: out of memory.\n");
 
         return EXIT_FAILURE;
     }
@@ -86,14 +86,14 @@ int main(int argument_count, const char *arguments[]) {
 
         size_t output_bytes_count = (size_t)(write_cursor - write_buffer);
         if (fwrite(write_buffer, 1, output_bytes_count, output_file) != output_bytes_count) {
-            fprintf(stderr, "ERROR: failed while writing output file: '%s'\n", output_file_path);
+            fprintf(stderr, "error: failed while writing output file: '%s'\n", output_file_path);
 
             return EXIT_FAILURE;
         }
     }
 
     if (ferror(input_file)) {
-        fprintf(stderr, "ERROR: failed while reading input file: '%s'\n", input_file_path);
+        fprintf(stderr, "error: failed while reading input file: '%s'\n", input_file_path);
 
         return EXIT_FAILURE;
     }
@@ -108,7 +108,7 @@ int main(int argument_count, const char *arguments[]) {
     fclose(input_file);
 
     if (fclose(output_file) != 0) {
-        fprintf(stderr, "ERROR: failed while closing output file: '%s'\n", output_file_path);
+        fprintf(stderr, "error: failed while closing output file: '%s'\n", output_file_path);
 
         return EXIT_FAILURE;
     }
