@@ -301,13 +301,21 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                         if (index == 0) {
                             return false;
                         }
-                        u8 repeatValue = lengths[index - 1];
 
+                        if (index + repeatCount > totalCodes) {
+                            return false;
+                        }
+
+                        u8 repeatValue = lengths[index - 1];
                         while (repeatCount--) {
                             lengths[index++] = repeatValue;
                         }
                     } else if (symbol == 17) {
                         u32 repeatCount = StreamReadBits(&stream, 3) + 3;
+
+                        if (index + repeatCount > totalCodes) {
+                            return false;
+                        }
 
                         while (repeatCount--) {
                             lengths[index++] = 0;
@@ -315,9 +323,15 @@ static bool DecompressDeflate(const PNGIDATChunk *chunks, usize chunkCount, u8 *
                     } else if (symbol == 18) {
                         u32 repeatCount = StreamReadBits(&stream, 7) + 11;
 
+                        if (index + repeatCount > totalCodes) {
+                            return false;
+                        }
+
                         while (repeatCount--) {
                             lengths[index++] = 0;
                         }
+                    } else {
+                        return false;
                     }
                 }
 
@@ -449,16 +463,21 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
         const u8 *chunkDataPointer = &stream.memory[stream.offset];
         stream.offset += chunkLength;
 
+        // NOTE' unused when fuzzing
         u32 expectedCRC = MemoryStreamReadUInt32BigEndian(&stream);
+        Unused(expectedCRC);
 
         usize crcDataLength = PNGChunkTypeSize + chunkLength;
         u32 calculatedCRC = CRC32Calculate(chunkTypePointer, crcDataLength);
+        Unused(calculatedCRC);
 
+#if !defined(FUZZING)
         if (calculatedCRC != expectedCRC) {
             MemoryStreamWriteLine(errorStream, "CRC mismatch in PNG chunk.");
 
             break;
         }
+#endif
 
         if (MemoryEquals(chunkTypePointer, "IHDR", 4)) {
             if (chunkLength != PNGIHDRChunkLength) {
@@ -471,6 +490,11 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
             imageHeader.width = ReadUInt32BigEndian(&chunkDataPointer[0]);
             imageHeader.height = ReadUInt32BigEndian(&chunkDataPointer[4]);
+#if defined(FUZZING)
+            if (imageHeader.width > 128 || imageHeader.height > 128) {
+                break;
+            }
+#endif
             imageHeader.bitDepth = chunkDataPointer[8];
             imageHeader.colorType = chunkDataPointer[9];
             imageHeader.compressionMethod = chunkDataPointer[10];
@@ -592,7 +616,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
     for (u32 currentScanlineIndex = 0; currentScanlineIndex < imageHeight; currentScanlineIndex++) {
         if (sourceReadOffset + filteredScanlineByteCount > decompressedCapacity) {
             MemoryStreamWriteLine(errorStream, "Scanline data overruns decompressed buffer.");
-            
+
             return result;
         }
 
@@ -604,7 +628,7 @@ Image ImageLoadFromPNG(MemoryArena *permanentArena, MemoryArena *temporaryArena,
 
         if (scanlineFilterType > 4) {
             MemoryStreamWriteLine(errorStream, "Unknown PNG filter type.");
-            
+
             return result;
         }
 

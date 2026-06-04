@@ -1,0 +1,6 @@
+Single-header library style shared files for regular-style testing.
+
+* ppm.h: The simplest image format so used both for PNG and TTF
+  tests. You can find tools for inspecting these anywhere, even in web, e.g. https://www.cs.rhodes.edu/welshc/COMP141_F16/ppmReader.html
+* file.h: File reading utilities.
+* init.h: Initialization of everything you need.

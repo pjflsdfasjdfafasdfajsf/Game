@@ -632,19 +632,14 @@ TrueTypeSimpleGlyph TrueTypeGlyfTableParseSimpleGlyph(MemoryArena *arena, Memory
     u16 lastPointIndex = ReadUInt16BigEndian(&stream.memory[stream.offset + endPointsArrayByteLength - 2]);
     result.numberOfPoints = (u32)lastPointIndex + 1;
 
-    usize contoursAllocationSize = sizeof(u16) * result.numberOfContours;
-    usize pointsAllocationSize = sizeof(TrueTypeGlyphPoint) * result.numberOfPoints;
-    usize totalAllocationSize = contoursAllocationSize + pointsAllocationSize;
+    result.endPointsOfContours = MemoryArenaPushArray(arena, u16, result.numberOfContours);
+    result.points = MemoryArenaPushArray(arena, TrueTypeGlyphPoint, result.numberOfPoints);
 
-    u8 *allocationBuffer = MemoryArenaPushBytes(arena, totalAllocationSize);
-    if (!allocationBuffer) {
+    if (!result.endPointsOfContours || !result.points) {
         MemoryStreamWriteString(errorStream, "Out of memory.");
 
         return result;
     }
-
-    result.endPointsOfContours = (u16 *)allocationBuffer;
-    result.points = (TrueTypeGlyphPoint *)(allocationBuffer + contoursAllocationSize);
 
     for (i16 contourIndex = 0; contourIndex < result.numberOfContours; contourIndex++) {
         result.endPointsOfContours[contourIndex] = MemoryStreamReadUInt16BigEndian(&stream);

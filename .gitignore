@@ -1,3 +1,8 @@
+# build output
 build
-
+# test output
+*.log
+*.ppm
+crash-*
+# bear stuff
 compile_commands.json
