@@ -173,7 +173,7 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     memory_stream stream;
     memory_stream_initialize_read_only(&stream, memory, length);
 
-    u32 scaler_type_value = memory_stream_read_u_int32_big_endian(&stream);
+    u32 scaler_type_value = memory_stream_read_uint32_big_endian(&stream);
 
     if (scaler_type_value == 0x00010000) {
         result.scaler_type = true_type_scaler_type_windows;
@@ -189,10 +189,10 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
         return result;
     }
 
-    result.number_of_tables = memory_stream_read_u_int16_big_endian(&stream);
-    result.search_range = memory_stream_read_u_int16_big_endian(&stream);
-    result.entry_selector = memory_stream_read_u_int16_big_endian(&stream);
-    result.range_shift = memory_stream_read_u_int16_big_endian(&stream);
+    result.number_of_tables = memory_stream_read_uint16_big_endian(&stream);
+    result.search_range = memory_stream_read_uint16_big_endian(&stream);
+    result.entry_selector = memory_stream_read_uint16_big_endian(&stream);
+    result.range_shift = memory_stream_read_uint16_big_endian(&stream);
 
     const usize true_type_table_directory_entry_length = 16;
     usize expected_directory_size = true_type_offset_subtable_length + ((usize)result.number_of_tables * true_type_table_directory_entry_length);
@@ -215,10 +215,10 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
             const u8 *entry_pointer = &stream.memory[stream.offset];
             stream.offset += true_type_table_directory_entry_length;
 
-            u32 tag = read_u_int32_big_endian(&entry_pointer[0]);
-            u32 expected_checksum = read_u_int32_big_endian(&entry_pointer[4]);
-            u32 table_offset = read_u_int32_big_endian(&entry_pointer[8]);
-            u32 table_length = read_u_int32_big_endian(&entry_pointer[12]);
+            u32 tag = read_uint32_big_endian(&entry_pointer[0]);
+            u32 expected_checksum = read_uint32_big_endian(&entry_pointer[4]);
+            u32 table_offset = read_uint32_big_endian(&entry_pointer[8]);
+            u32 table_length = read_uint32_big_endian(&entry_pointer[12]);
 
             if (table_offset > length || table_length > (length - table_offset)) {
                 memory_stream_write_string(error_stream, "error: table offset/length out of bounds.");
@@ -275,18 +275,18 @@ true_type_head_table true_type_head_table_parse(const true_type_table_directory_
     memory_stream stream;
     memory_stream_initialize_read_only(&stream, head_table_entry->memory, head_table_entry->length);
 
-    result.version = memory_stream_read_u_int32_big_endian(&stream);
-    result.font_revision = memory_stream_read_u_int32_big_endian(&stream);
-    result.check_sum_adjustment = memory_stream_read_u_int32_big_endian(&stream);
-    result.magic_number = memory_stream_read_u_int32_big_endian(&stream);
+    result.version = memory_stream_read_uint32_big_endian(&stream);
+    result.font_revision = memory_stream_read_uint32_big_endian(&stream);
+    result.check_sum_adjustment = memory_stream_read_uint32_big_endian(&stream);
+    result.magic_number = memory_stream_read_uint32_big_endian(&stream);
 
     const u32 true_type_head_table_magic_number = 0x5F0F3CF5;
     if (result.magic_number != true_type_head_table_magic_number) {
         RETURN_ZEROED(result);
     }
 
-    result.flags = memory_stream_read_u_int16_big_endian(&stream);
-    result.units_per_em = memory_stream_read_u_int16_big_endian(&stream);
+    result.flags = memory_stream_read_uint16_big_endian(&stream);
+    result.units_per_em = memory_stream_read_uint16_big_endian(&stream);
 
     if (result.units_per_em < 64 || result.units_per_em > 16384) {
         RETURN_ZEROED(result);
@@ -298,8 +298,8 @@ true_type_head_table true_type_head_table_parse(const true_type_table_directory_
     result.y_min = memory_stream_read_int16_big_endian(&stream);
     result.x_max = memory_stream_read_int16_big_endian(&stream);
     result.y_max = memory_stream_read_int16_big_endian(&stream);
-    result.mac_style = memory_stream_read_u_int16_big_endian(&stream);
-    result.lowest_rec_ppem = memory_stream_read_u_int16_big_endian(&stream);
+    result.mac_style = memory_stream_read_uint16_big_endian(&stream);
+    result.lowest_rec_ppem = memory_stream_read_uint16_big_endian(&stream);
     result.font_direction_hint = memory_stream_read_int16_big_endian(&stream);
     result.index_to_loc_format = memory_stream_read_int16_big_endian(&stream);
     result.glyph_data_format = memory_stream_read_int16_big_endian(&stream);
@@ -324,8 +324,8 @@ true_type_maximum_profile_table true_type_maximum_profile_table_parse(const true
     memory_stream stream;
     memory_stream_initialize_read_only(&stream, maximum_profile_table_entry->memory, maximum_profile_table_entry->length);
 
-    result.version = memory_stream_read_u_int32_big_endian(&stream);
-    result.num_glyphs = memory_stream_read_u_int16_big_endian(&stream);
+    result.version = memory_stream_read_uint32_big_endian(&stream);
+    result.num_glyphs = memory_stream_read_uint16_big_endian(&stream);
 
     const u32 true_type_maximum_profile_version05 = 0x00005000;
     const u32 true_type_maximum_profile_version10 = 0x00010000;
@@ -337,19 +337,19 @@ true_type_maximum_profile_table true_type_maximum_profile_table_parse(const true
             RETURN_ZEROED(result);
         }
 
-        result.max_points = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_contours = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_component_points = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_component_contours = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_zones = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_twilight_points = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_storage = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_function_defs = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_instruction_defs = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_stack_elements = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_size_of_instructions = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_component_elements = memory_stream_read_u_int16_big_endian(&stream);
-        result.max_component_depth = memory_stream_read_u_int16_big_endian(&stream);
+        result.max_points = memory_stream_read_uint16_big_endian(&stream);
+        result.max_contours = memory_stream_read_uint16_big_endian(&stream);
+        result.max_component_points = memory_stream_read_uint16_big_endian(&stream);
+        result.max_component_contours = memory_stream_read_uint16_big_endian(&stream);
+        result.max_zones = memory_stream_read_uint16_big_endian(&stream);
+        result.max_twilight_points = memory_stream_read_uint16_big_endian(&stream);
+        result.max_storage = memory_stream_read_uint16_big_endian(&stream);
+        result.max_function_defs = memory_stream_read_uint16_big_endian(&stream);
+        result.max_instruction_defs = memory_stream_read_uint16_big_endian(&stream);
+        result.max_stack_elements = memory_stream_read_uint16_big_endian(&stream);
+        result.max_size_of_instructions = memory_stream_read_uint16_big_endian(&stream);
+        result.max_component_elements = memory_stream_read_uint16_big_endian(&stream);
+        result.max_component_depth = memory_stream_read_uint16_big_endian(&stream);
     } else {
         RETURN_ZEROED(result);
     }
@@ -372,12 +372,12 @@ true_type_cmap_format4 true_type_cmap_table_parse_format4(const true_type_table_
     memory_stream stream;
     memory_stream_initialize_read_only(&stream, cmap_table_entry->memory, cmap_table_entry->length);
 
-    u16 version = memory_stream_read_u_int16_big_endian(&stream);
+    u16 version = memory_stream_read_uint16_big_endian(&stream);
     if (version != 0) {
         return result;
     }
 
-    u16 number_subtables = memory_stream_read_u_int16_big_endian(&stream);
+    u16 number_subtables = memory_stream_read_uint16_big_endian(&stream);
 
     const usize true_type_cmap_encoding_record_length = 8;
     if (cmap_table_entry->length < true_type_cmap_header_length + (number_subtables * true_type_cmap_encoding_record_length)) {
@@ -387,9 +387,9 @@ true_type_cmap_format4 true_type_cmap_table_parse_format4(const true_type_table_
     u32 selected_subtable_offset = 0;
 
     for (u16 subtable_index = 0; subtable_index < number_subtables; subtable_index++) {
-        u16 platform_id = memory_stream_read_u_int16_big_endian(&stream);
-        u16 platform_specific_id = memory_stream_read_u_int16_big_endian(&stream);
-        u32 subtable_offset = memory_stream_read_u_int32_big_endian(&stream);
+        u16 platform_id = memory_stream_read_uint16_big_endian(&stream);
+        u16 platform_specific_id = memory_stream_read_uint16_big_endian(&stream);
+        u32 subtable_offset = memory_stream_read_uint32_big_endian(&stream);
 
         if (subtable_offset > cmap_table_entry->length || subtable_offset + 2 > cmap_table_entry->length) {
             continue;
@@ -399,7 +399,7 @@ true_type_cmap_format4 true_type_cmap_table_parse_format4(const true_type_table_
         bool is_unicode_bmp = (platform_id == 0 && (platform_specific_id == 3 || platform_specific_id == 4));
 
         if (is_windows_bmp || is_unicode_bmp) {
-            u16 subtable_format = read_u_int16_big_endian(&stream.memory[subtable_offset]);
+            u16 subtable_format = read_uint16_big_endian(&stream.memory[subtable_offset]);
             if (subtable_format == 4) {
                 selected_subtable_offset = subtable_offset;
                 break;
@@ -419,13 +419,13 @@ true_type_cmap_format4 true_type_cmap_table_parse_format4(const true_type_table_
         return result;
     }
 
-    u16 format = read_u_int16_big_endian(&subtable_pointer[0]);
+    u16 format = read_uint16_big_endian(&subtable_pointer[0]);
     if (format != 4) {
         return result;
     }
 
-    u16 length = read_u_int16_big_endian(&subtable_pointer[2]);
-    u16 seg_count_x2 = read_u_int16_big_endian(&subtable_pointer[6]);
+    u16 length = read_uint16_big_endian(&subtable_pointer[2]);
+    u16 seg_count_x2 = read_uint16_big_endian(&subtable_pointer[6]);
 
     u16 seg_count = seg_count_x2 / 2;
 
@@ -460,7 +460,7 @@ u32 true_type_cmap_format4_get_glyph_index(const true_type_cmap_format4 *cmap, u
     bool segment_found = false;
 
     for (u16 current_index = 0; current_index < cmap->seg_count; current_index++) {
-        u16 end_code = read_u_int16_big_endian(&subtable_pointer[cmap->end_code_offset + (current_index * 2)]);
+        u16 end_code = read_uint16_big_endian(&subtable_pointer[cmap->end_code_offset + (current_index * 2)]);
         if (end_code >= target_character_code) {
             segment_index = current_index;
             segment_found = true;
@@ -472,7 +472,7 @@ u32 true_type_cmap_format4_get_glyph_index(const true_type_cmap_format4 *cmap, u
         return 0;
     }
 
-    u16 start_code = read_u_int16_big_endian(&subtable_pointer[cmap->start_code_offset + (segment_index * 2)]);
+    u16 start_code = read_uint16_big_endian(&subtable_pointer[cmap->start_code_offset + (segment_index * 2)]);
     if (start_code > target_character_code) {
         // NOTE: the character code is greater than the previous segment's end_code but
         // less than this segment's start_code, so the poor guy has no mapping :(
@@ -480,7 +480,7 @@ u32 true_type_cmap_format4_get_glyph_index(const true_type_cmap_format4 *cmap, u
     }
 
     i16 id_delta = read_int16_big_endian(&subtable_pointer[cmap->id_delta_offset + (segment_index * 2)]);
-    u16 id_range_offset = read_u_int16_big_endian(&subtable_pointer[cmap->id_range_offset_offset + (segment_index * 2)]);
+    u16 id_range_offset = read_uint16_big_endian(&subtable_pointer[cmap->id_range_offset_offset + (segment_index * 2)]);
 
     if (id_range_offset == 0) {
         // NOTE: if id_range_offset is 0, the mapping adds id_delta to the character code
@@ -496,7 +496,7 @@ u32 true_type_cmap_format4_get_glyph_index(const true_type_cmap_format4 *cmap, u
             return 0;
         }
 
-        u16 glyph_index = read_u_int16_big_endian(&subtable_pointer[offset_to_glyph_index]);
+        u16 glyph_index = read_uint16_big_endian(&subtable_pointer[offset_to_glyph_index]);
         if (glyph_index != 0) {
             return (u32)((glyph_index + id_delta) & 0xFFFF);
         } else {
@@ -553,16 +553,16 @@ true_type_glyph_location true_type_index_to_location_get_glyph_location(const tr
     if (loca->index_to_loc_format == 0) {
         usize byte_offset = (usize)glyph_index * 2;
 
-        u16 raw_current_offset = read_u_int16_big_endian(&loca->memory[byte_offset]);
-        u16 raw_next_offset = read_u_int16_big_endian(&loca->memory[byte_offset + 2]);
+        u16 raw_current_offset = read_uint16_big_endian(&loca->memory[byte_offset]);
+        u16 raw_next_offset = read_uint16_big_endian(&loca->memory[byte_offset + 2]);
 
         current_glyph_offset = (u32)raw_current_offset * 2;
         next_glyph_offset = (u32)raw_next_offset * 2;
     } else {
         usize byte_offset = (usize)glyph_index * 4;
 
-        current_glyph_offset = read_u_int32_big_endian(&loca->memory[byte_offset]);
-        next_glyph_offset = read_u_int32_big_endian(&loca->memory[byte_offset + 4]);
+        current_glyph_offset = read_uint32_big_endian(&loca->memory[byte_offset]);
+        next_glyph_offset = read_uint32_big_endian(&loca->memory[byte_offset + 4]);
     }
 
     if (next_glyph_offset >= current_glyph_offset) {
@@ -629,7 +629,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
         return result;
     }
 
-    u16 last_point_index = read_u_int16_big_endian(&stream.memory[stream.offset + end_points_array_byte_length - 2]);
+    u16 last_point_index = read_uint16_big_endian(&stream.memory[stream.offset + end_points_array_byte_length - 2]);
     result.number_of_points = (u32)last_point_index + 1;
 
     result.end_points_of_contours = MEMORY_ARENA_PUSH_ARRAY(arena, u16, result.number_of_contours);
@@ -642,7 +642,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
     }
 
     for (i16 contour_index = 0; contour_index < result.number_of_contours; contour_index++) {
-        result.end_points_of_contours[contour_index] = memory_stream_read_u_int16_big_endian(&stream);
+        result.end_points_of_contours[contour_index] = memory_stream_read_uint16_big_endian(&stream);
     }
 
     if (stream.offset + 2 > glyph_location.length) {
@@ -650,7 +650,7 @@ true_type_simple_glyph true_type_glyf_table_parse_simple_glyph(memory_arena *are
         RETURN_ZEROED(result);
     }
 
-    result.instruction_length = memory_stream_read_u_int16_big_endian(&stream);
+    result.instruction_length = memory_stream_read_uint16_big_endian(&stream);
 
     if (stream.offset + result.instruction_length > glyph_location.length) {
         memory_stream_write_string(error_stream, "error: instructions overrun glyph data.");
@@ -775,7 +775,7 @@ static void true_type_tessellate_bezier(vector2 *output_points, u32 *output_size
         f32 x = (t1 * t1 * p0.x) + (2.0f * t1 * t * p1.x) + (t2 * p2.x);
         f32 y = (t1 * t1 * p0.y) + (2.0f * t1 * t * p1.y) + (t2 * p2.y);
 
-        output_points[*output_size] = V2(x, y);
+        output_points[*output_size] = v2(x, y);
         (*output_size)++;
     }
 }
@@ -845,11 +845,11 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
         bool last_is_on_curve = glyph->points[contour_end_index].is_on_curve;
 
         if (first_is_on_curve) {
-            start_anchor = V2((f32)glyph->points[contour_start_index].x, (f32)glyph->points[contour_start_index].y);
+            start_anchor = v2((f32)glyph->points[contour_start_index].x, (f32)glyph->points[contour_start_index].y);
         } else if (last_is_on_curve) {
-            start_anchor = V2((f32)glyph->points[contour_end_index].x, (f32)glyph->points[contour_end_index].y);
+            start_anchor = v2((f32)glyph->points[contour_end_index].x, (f32)glyph->points[contour_end_index].y);
         } else {
-            start_anchor = V2(
+            start_anchor = v2(
                 (f32)(glyph->points[contour_start_index].x + glyph->points[contour_end_index].x) / 2.0f,
                 (f32)(glyph->points[contour_start_index].y + glyph->points[contour_end_index].y) / 2.0f);
         }
@@ -863,8 +863,8 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
             bool current_is_on_curve = glyph->points[current_index].is_on_curve;
             bool next_is_on_curve = glyph->points[next_index].is_on_curve;
 
-            vector2 point_current = V2((f32)glyph->points[current_index].x, (f32)glyph->points[current_index].y);
-            vector2 point_next = V2((f32)glyph->points[next_index].x, (f32)glyph->points[next_index].y);
+            vector2 point_current = v2((f32)glyph->points[current_index].x, (f32)glyph->points[current_index].y);
+            vector2 point_next = v2((f32)glyph->points[next_index].x, (f32)glyph->points[next_index].y);
 
             if (current_is_on_curve) {
                 generated_points[generated_point_count++] = point_current;
@@ -876,7 +876,7 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
                 if (next_is_on_curve) {
                     p2 = point_next;
                 } else {
-                    p2 = V2((point_current.x + point_next.x) / 2.0f, (point_current.y + point_next.y) / 2.0f);
+                    p2 = v2((point_current.x + point_next.x) / 2.0f, (point_current.y + point_next.y) / 2.0f);
                 }
 
                 u32 added_points = 0;

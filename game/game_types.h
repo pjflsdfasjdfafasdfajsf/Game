@@ -96,7 +96,7 @@ typedef struct {
     };
 } vector2;
 
-static inline vector2 V2(f32 x, f32 y) {
+static inline vector2 v2(f32 x, f32 y) {
     return (vector2){{{x, y}}};
 }
 
@@ -112,8 +112,8 @@ typedef struct {
             u32 y;
         };
     };
-} vector2_u;
+} vector2u;
 
-static inline vector2_u V2U(u32 x, u32 y) {
-    return (vector2_u){{{x, y}}};
+static inline vector2u v2u(u32 x, u32 y) {
+    return (vector2u){{{x, y}}};
 }

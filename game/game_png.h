@@ -4,7 +4,7 @@
 #include "game_types.h"
 
 typedef struct {
-    vector2_u size;
+    vector2u size;
     u32 bytes_per_pixel;
     u8 *pixels;
 } image;

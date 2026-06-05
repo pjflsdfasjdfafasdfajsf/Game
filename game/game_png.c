@@ -451,7 +451,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
             break;
         }
 
-        u32 chunk_length = memory_stream_read_u_int32_big_endian(&stream);
+        u32 chunk_length = memory_stream_read_uint32_big_endian(&stream);
 
         const u8 *chunk_type_pointer = &stream.memory[stream.offset];
         stream.offset += png_chunk_type_size;
@@ -464,7 +464,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         stream.offset += chunk_length;
 
         // NOTE' UNUSED when fuzzing
-        u32 expected_crc = memory_stream_read_u_int32_big_endian(&stream);
+        u32 expected_crc = memory_stream_read_uint32_big_endian(&stream);
         UNUSED(expected_crc);
 
         usize crc_data_length = png_chunk_type_size + chunk_length;
@@ -488,8 +488,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
                 break;
             }
 
-            image_header.width = read_u_int32_big_endian(&chunk_data_pointer[0]);
-            image_header.height = read_u_int32_big_endian(&chunk_data_pointer[4]);
+            image_header.width = read_uint32_big_endian(&chunk_data_pointer[0]);
+            image_header.height = read_uint32_big_endian(&chunk_data_pointer[4]);
 #if defined(FUZZING)
             if (image_header.width > 128 || image_header.height > 128) {
                 break;

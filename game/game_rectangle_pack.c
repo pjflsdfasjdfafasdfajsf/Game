@@ -18,7 +18,7 @@ pack2d pack2d_create(memory_arena *arena, u32 maximum_width, u32 maximum_height)
 
     usize maximum_skyline_points = (usize)maximum_width * 2;
 
-    result.points = MEMORY_ARENA_PUSH_ARRAY(arena, vector2_u, maximum_skyline_points);
+    result.points = MEMORY_ARENA_PUSH_ARRAY(arena, vector2u, maximum_skyline_points);
 
     return result;
 }
@@ -93,11 +93,11 @@ bool pack2d_add(pack2d *packer, u32 rectangle_width, u32 rectangle_height, u32 *
 
     u32 removed_points_count = best_index_end - best_index_start;
 
-    vector2_u new_top_left_point;
+    vector2u new_top_left_point;
     new_top_left_point.x = best_position_x;
     new_top_left_point.y = best_position_y + rectangle_height;
 
-    vector2_u new_bottom_right_point;
+    vector2u new_bottom_right_point;
     new_bottom_right_point.x = best_position_x + rectangle_width;
     new_bottom_right_point.y = packer->points[best_index_end - 1].y;
 

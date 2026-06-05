@@ -125,23 +125,23 @@ static inline void string_append(char *destination, usize destination_capacity, 
 
 ///
 
-static inline u16 read_u_int16_big_endian(const u8 *memory) {
+static inline u16 read_uint16_big_endian(const u8 *memory) {
     return ((u16)memory[0] << 8) |
            ((u16)memory[1] << 0);
 }
 
 static inline i16 read_int16_big_endian(const u8 *memory) {
-    return (i16)read_u_int16_big_endian(memory);
+    return (i16)read_uint16_big_endian(memory);
 }
 
-static inline u32 read_u_int32_big_endian(const u8 *memory) {
+static inline u32 read_uint32_big_endian(const u8 *memory) {
     return ((u32)memory[0] << 24) |
            ((u32)memory[1] << 16) |
            ((u32)memory[2] << 8) |
            ((u32)memory[3] << 0);
 }
 
-static inline u64 read_u_int64_big_endian(const u8 *memory) {
+static inline u64 read_uint64_big_endian(const u8 *memory) {
     return ((u64)memory[0] << 56) |
            ((u64)memory[1] << 48) |
            ((u64)memory[2] << 40) |
@@ -153,16 +153,16 @@ static inline u64 read_u_int64_big_endian(const u8 *memory) {
 }
 
 static inline i64 read_int64_big_endian(const u8 *memory) {
-    return (i64)read_u_int64_big_endian(memory);
+    return (i64)read_uint64_big_endian(memory);
 }
 
 ///
 
-static inline u16 read_u_int16_little_endian(const u8 *memory) {
+static inline u16 read_uint16_little_endian(const u8 *memory) {
     return (u16)((u16)memory[0] | ((u16)memory[1] << 8));
 }
 
-static inline u32 read_u_int32_little_endian(const u8 *memory) {
+static inline u32 read_uint32_little_endian(const u8 *memory) {
     return (u32)((u32)memory[0] | ((u32)memory[1] << 8) |
                  ((u32)memory[2] << 16) | ((u32)memory[3] << 24));
 }
@@ -290,7 +290,7 @@ static inline bool memory_stream_has_space(memory_stream *stream, usize read_siz
     return true;
 }
 
-static inline u8 memory_stream_read_u_int8(memory_stream *stream) {
+static inline u8 memory_stream_read_uint8(memory_stream *stream) {
     if (!memory_stream_has_space(stream, 1)) {
         return 0;
     }
@@ -300,31 +300,31 @@ static inline u8 memory_stream_read_u_int8(memory_stream *stream) {
     return result;
 }
 
-static inline u32 memory_stream_read_u_int32_little_endian(memory_stream *stream) {
-    u32 result = read_u_int32_little_endian(&stream->memory[stream->offset]);
+static inline u32 memory_stream_read_uint32_little_endian(memory_stream *stream) {
+    u32 result = read_uint32_little_endian(&stream->memory[stream->offset]);
     stream->offset += 4;
     return result;
 }
 
-static inline u16 memory_stream_read_u_int16_big_endian(memory_stream *stream) {
+static inline u16 memory_stream_read_uint16_big_endian(memory_stream *stream) {
     if (!memory_stream_has_space(stream, 2)) {
         return 0;
     }
-    u16 result = read_u_int16_big_endian(&stream->memory[stream->offset]);
+    u16 result = read_uint16_big_endian(&stream->memory[stream->offset]);
     stream->offset += 2;
 
     return result;
 }
 
 static inline i16 memory_stream_read_int16_big_endian(memory_stream *stream) {
-    return (i16)memory_stream_read_u_int16_big_endian(stream);
+    return (i16)memory_stream_read_uint16_big_endian(stream);
 }
 
-static inline u32 memory_stream_read_u_int32_big_endian(memory_stream *stream) {
+static inline u32 memory_stream_read_uint32_big_endian(memory_stream *stream) {
     if (!memory_stream_has_space(stream, 4)) {
         return 0;
     }
-    u32 result = read_u_int32_big_endian(&stream->memory[stream->offset]);
+    u32 result = read_uint32_big_endian(&stream->memory[stream->offset]);
     stream->offset += 4;
 
     return result;
@@ -358,7 +358,7 @@ static inline bool memory_stream_write_bytes(memory_stream *stream, const void *
     return true;
 }
 
-static inline bool memory_stream_write_u_int8(memory_stream *stream, u8 value) {
+static inline bool memory_stream_write_uint8(memory_stream *stream, u8 value) {
     return memory_stream_write_bytes(stream, &value, 1);
 }
 
@@ -371,7 +371,7 @@ static inline bool memory_stream_write_string(memory_stream *stream, const char 
 }
 
 static inline bool memory_stream_write_line(memory_stream *stream, const char *string) {
-    return memory_stream_write_string(stream, string) && memory_stream_write_u_int8(stream, '\n');
+    return memory_stream_write_string(stream, string) && memory_stream_write_uint8(stream, '\n');
 }
 
 static char decimal_characters[] = "0123456789";
@@ -400,7 +400,7 @@ static inline bool memory_stream_write_ascii_from_u64(memory_stream *stream, u64
 
     // write characters into stream
     while (index != 0) {
-        if (!memory_stream_write_u_int8(stream, characters[--index])) {
+        if (!memory_stream_write_uint8(stream, characters[--index])) {
             return false;
         }
     }
@@ -415,7 +415,7 @@ static inline bool memory_stream_write_string_format(memory_stream *stream, cons
     char *at = (char *)format;
     while (*at) {
         if (*at != '%') {
-            if (!memory_stream_write_u_int8(stream, *at)) {
+            if (!memory_stream_write_uint8(stream, *at)) {
                 return false;
             }
             ++at;
@@ -439,7 +439,7 @@ static inline bool memory_stream_write_string_format(memory_stream *stream, cons
             i32 n = va_arg(args, i32);
             if (n < 0) {
                 n = -n;
-                if (!memory_stream_write_u_int8(stream, '-')) {
+                if (!memory_stream_write_uint8(stream, '-')) {
                     return false;
                 }
             }
@@ -504,7 +504,7 @@ typedef struct {
     render_command_header header;
     u32 index;
     u32 bytes_per_pixel;
-    vector2_u size;
+    vector2u size;
     const void *pixels;
 } render_command_allocate_texture;
 
@@ -598,7 +598,7 @@ static inline void render_draw_rectangle(render_command_buffer *command_buffer, 
     }
 }
 
-static inline void render_allocate_texture(render_command_buffer *command_buffer, u32 index, vector2_u size, u32 bytes_per_pixel, const void *pixels) {
+static inline void render_allocate_texture(render_command_buffer *command_buffer, u32 index, vector2u size, u32 bytes_per_pixel, const void *pixels) {
     if (!command_buffer) {
         return;
     }

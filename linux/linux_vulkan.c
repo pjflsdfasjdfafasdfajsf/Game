@@ -914,7 +914,7 @@ static bool vulkan_sampler_create(vulkan *vulkan) {
     return true;
 }
 
-u32 vulkan_texture_create(vulkan *vulkan, u32 index, vector2_u size, u32 bytes_per_pixel, const void *pixels) {
+u32 vulkan_texture_create(vulkan *vulkan, u32 index, vector2u size, u32 bytes_per_pixel, const void *pixels) {
     VkResult vkResult;
 
     if (vulkan->texture_count + 1 > MAX_TEXTURES) {
@@ -1185,7 +1185,7 @@ static bool vulkan_common_initialize(vulkan *vulkan, linux_wayland *window) {
     }
 
     u32 white_pixel = 0xFFFFFFFF;
-    vulkan_texture_create(vulkan, 0, V2U(1, 1), 4, &white_pixel);
+    vulkan_texture_create(vulkan, 0, v2u(1, 1), 4, &white_pixel);
 
     vulkan->vertex_count = 0;
     vulkan->vertex_capacity = 4096;

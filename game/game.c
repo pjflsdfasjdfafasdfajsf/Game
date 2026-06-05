@@ -19,7 +19,7 @@ UPDATE_AND_RENDER(update_and_render) {
     }
 
     render_clear_entire_screen(command_buffer, black);
-    render_draw_rectangle(command_buffer, V2(10, 10), V2(200, 200), red, UNTEXTURED);
+    render_draw_rectangle(command_buffer, v2(10, 10), v2(200, 200), red, UNTEXTURED);
 }
 
 GET_SOUND_SAMPLES(get_sound_samples) {

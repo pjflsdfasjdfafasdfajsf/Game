@@ -4,7 +4,7 @@
 #include "game_types.h"
 
 typedef struct {
-    vector2_u *points;
+    vector2u *points;
     u32 maximum_width;
     u32 maximum_height;
     u32 point_count;

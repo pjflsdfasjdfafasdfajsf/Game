@@ -63,7 +63,7 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
         const u8 *chunk_id_pointer = &stream.memory[stream.offset];
         stream.offset += 4;
 
-        u32 chunk_length = memory_stream_read_u_int32_little_endian(&stream);
+        u32 chunk_length = memory_stream_read_uint32_little_endian(&stream);
 
         if (!memory_stream_has_space(&stream, chunk_length)) {
             memory_stream_write_line(error_stream, "error: WAV chunk declares a size that exceeds file bounds.");
@@ -88,12 +88,12 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
                 return result;
             }
 
-            format.audio_format = read_u_int16_little_endian(&chunk_data_pointer[0]);
-            format.channel_count = read_u_int16_little_endian(&chunk_data_pointer[2]);
-            format.sample_rate = read_u_int32_little_endian(&chunk_data_pointer[4]);
-            format.byte_rate = read_u_int32_little_endian(&chunk_data_pointer[8]);
-            format.block_align = read_u_int16_little_endian(&chunk_data_pointer[12]);
-            format.bits_per_sample = read_u_int16_little_endian(&chunk_data_pointer[14]);
+            format.audio_format = read_uint16_little_endian(&chunk_data_pointer[0]);
+            format.channel_count = read_uint16_little_endian(&chunk_data_pointer[2]);
+            format.sample_rate = read_uint32_little_endian(&chunk_data_pointer[4]);
+            format.byte_rate = read_uint32_little_endian(&chunk_data_pointer[8]);
+            format.block_align = read_uint16_little_endian(&chunk_data_pointer[12]);
+            format.bits_per_sample = read_uint16_little_endian(&chunk_data_pointer[14]);
 
             has_parsed_fmt = true;
         } else if (memory_equals(chunk_id_pointer, "data", 4)) {
