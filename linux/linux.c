@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <limits.h>
 #include <dlfcn.h>
+#include <linux/input-event-codes.h>
 
 #include "linux.h"
 #include "linux_vulkan.h"
@@ -175,16 +176,35 @@ static void keyboard_leave(void *data, struct wl_keyboard *keyboard, u32 serial,
 }
 
 static void keyboard_key(void *data, struct wl_keyboard *keyboard, u32 serial, u32 time, u32 key, u32 state) {
-    UNUSED(state);
-    UNUSED(key);
-    UNUSED(data);
     UNUSED(keyboard);
     UNUSED(serial);
     UNUSED(time);
+    
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
 
-    // ASSERT(key < KEY_CNT)
+    game_input *game_input = &wayland->game_input;
 
-    // global_buttons_down[key] = (state_enum == WL_KEYBOARD_KEY_STATE_PRESSED);
+    // just to make the compiler happy it is used in the switch
+    UNUSED(game_input);
+    
+    game_button *button = 0;
+
+    switch (key) {
+#define KEY(lower, upper) \
+    case KEY_##upper: \
+    { \
+        button = &game_input->lower; \
+    } break;
+    KEYS
+#undef KEY
+    }
+
+    bool ended_down = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    if (button && button->ended_down != ended_down) {
+        button->ended_down = ended_down;
+        button->half_transition_count++;
+    }
 }
 
 static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, u32 serial, u32 mods_depressed, u32 mods_latched, u32 mods_locked, u32 group) {
@@ -210,7 +230,8 @@ static const struct wl_keyboard_listener keyboard_listener = {
     keyboard_leave,
     keyboard_key,
     keyboard_modifiers,
-    keyboard_repeat_info};
+    keyboard_repeat_info
+};
 
 ///
 
@@ -737,6 +758,9 @@ static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_
     linux_absolute_libary_path("game.temp.so", temporary_path, sizeof(temporary_path));
 
     while (wayland->is_running) {
+        for (u32 i = 0; i < ARRAY_COUNT(wayland->game_input.buttons); i++) {
+            wayland->game_input.buttons[i].half_transition_count = 0;
+        }
 
 #if defined(DEBUG)
         if (linux_get_last_write_time(source_path) != game_code->last_write_time) {
@@ -760,7 +784,7 @@ static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_
         render_command_buffer_reset(command_buffer);
 
         if (game_code->update_and_render) {
-            game_code->update_and_render(game_memory, command_buffer);
+            game_code->update_and_render(game_memory, &wayland->game_input, command_buffer);
         }
 
         if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {

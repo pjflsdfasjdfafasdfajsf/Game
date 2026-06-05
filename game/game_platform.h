@@ -622,7 +622,41 @@ typedef struct {
     bool is_initialized;
 } game_memory;
 
-#define UPDATE_AND_RENDER(name) void name(game_memory *memory, render_command_buffer *command_buffer)
+typedef struct {
+    i32 half_transition_count;
+    bool ended_down;
+} game_button;
+
+// NOTE: when adding a key you MUST do a clean rebuild
+// make wont recognize which files to rebuild and you also
+// wont get compile errors but the input will be messed up.
+#define KEYS \
+    KEY(w, W) \
+    KEY(s, S) \
+    KEY(a, A) \
+    KEY(d, D) \
+    
+typedef struct {
+    union {
+#define KEY(...) +1
+        game_button buttons[0 KEYS];
+#undef KEY
+
+        struct {
+#define KEY(lower, upper) game_button lower;
+            KEYS
+#undef KEY
+        };
+    };
+} game_input;
+
+// went down at least once and is currently down
+#define was_pressed(button) ((button).ended_down && (button).half_transition_count > 0)
+// released this frame
+#define was_released(button) (!(button).ended_down && (button).half_transition_count > 0)
+#define is_down(button) ((button).ended_down)
+
+#define UPDATE_AND_RENDER(name) void name(game_memory *memory, game_input *input, render_command_buffer *command_buffer)
 typedef UPDATE_AND_RENDER(update_and_render_function);
 
 typedef struct {

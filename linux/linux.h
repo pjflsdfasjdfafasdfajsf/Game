@@ -26,6 +26,8 @@ typedef struct {
     struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
     struct wp_cursor_shape_device_v1 *cursor_shape_device;
 
+    game_input game_input;
+
     u32 width;
     u32 height;
 } linux_wayland;
