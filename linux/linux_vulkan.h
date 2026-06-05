@@ -195,89 +195,84 @@ bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *inf
 bool vulkan_frame_begin(vulkan *vulkan, linux_wayland *wayland, render_command_buffer *command_buffer);
 bool vulkan_frame_end(vulkan *vulkan, render_command_buffer *command_buffer);
 
-// NOTE: borrowed from 
+// NOTE: borrowed from
 // https://github.com/khronos_group/vulkan-utility-libraries/blob/main/include/vulkan/vk_enum_string_helper.h
 
-static inline const char* result_to_string(VkResult input_value)
-{
-    switch ((VkResult)input_value)
-    {
-        case VK_ERROR_DEVICE_LOST:
-            return "VK_ERROR_DEVICE_LOST";
-        case VK_ERROR_EXTENSION_NOT_PRESENT:
-            return "VK_ERROR_EXTENSION_NOT_PRESENT";
-        case VK_ERROR_FEATURE_NOT_PRESENT:
-            return "VK_ERROR_FEATURE_NOT_PRESENT";
-        case VK_ERROR_FORMAT_NOT_SUPPORTED:
-            return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-        case VK_ERROR_FRAGMENTATION_EXT:
-            return "VK_ERROR_FRAGMENTATION_EXT";
-        case VK_ERROR_FRAGMENTED_POOL:
-            return "VK_ERROR_FRAGMENTED_POOL";
-        case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-            return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
-        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-            return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
-        case VK_ERROR_INCOMPATIBLE_DRIVER:
-            return "VK_ERROR_INCOMPATIBLE_DRIVER";
-        case VK_ERROR_INITIALIZATION_FAILED:
-            return "VK_ERROR_INITIALIZATION_FAILED";
-        case VK_ERROR_INVALID_DEVICE_ADDRESS_EXT:
-            return "VK_ERROR_INVALID_DEVICE_ADDRESS_EXT";
-        case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
-            return "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
-        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-            return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
-        case VK_ERROR_INVALID_SHADER_NV:
-            return "VK_ERROR_INVALID_SHADER_NV";
-        case VK_ERROR_LAYER_NOT_PRESENT:
-            return "VK_ERROR_LAYER_NOT_PRESENT";
-        case VK_ERROR_MEMORY_MAP_FAILED:
-            return "VK_ERROR_MEMORY_MAP_FAILED";
-        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-            return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
-        case VK_ERROR_NOT_PERMITTED_EXT:
-            return "VK_ERROR_NOT_PERMITTED_EXT";
-        case VK_ERROR_OUT_OF_DATE_KHR:
-            return "VK_ERROR_OUT_OF_DATE_KHR";
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return "VK_ERROR_OUT_OF_HOST_MEMORY";
-        case VK_ERROR_OUT_OF_POOL_MEMORY:
-            return "VK_ERROR_OUT_OF_POOL_MEMORY";
-        case VK_ERROR_SURFACE_LOST_KHR:
-            return "VK_ERROR_SURFACE_LOST_KHR";
-        case VK_ERROR_TOO_MANY_OBJECTS:
-            return "VK_ERROR_TOO_MANY_OBJECTS";
-        case VK_ERROR_VALIDATION_FAILED_EXT:
-            return "VK_ERROR_VALIDATION_FAILED_EXT";
-        case VK_EVENT_RESET:
-            return "VK_EVENT_RESET";
-        case VK_EVENT_SET:
-            return "VK_EVENT_SET";
-        case VK_INCOMPLETE:
-            return "VK_INCOMPLETE";
-        case VK_NOT_READY:
-            return "VK_NOT_READY";
-        case VK_SUBOPTIMAL_KHR:
-            return "VK_SUBOPTIMAL_KHR";
-        case VK_SUCCESS:
-            return "VK_SUCCESS";
-        case VK_TIMEOUT:
-            return "VK_TIMEOUT";
-        default:
-            return "unhandled VkResult";
+static inline const char *result_to_string(VkResult input_value) {
+    switch ((VkResult)input_value) {
+    case VK_ERROR_DEVICE_LOST:
+        return "VK_ERROR_DEVICE_LOST";
+    case VK_ERROR_EXTENSION_NOT_PRESENT:
+        return "VK_ERROR_EXTENSION_NOT_PRESENT";
+    case VK_ERROR_FEATURE_NOT_PRESENT:
+        return "VK_ERROR_FEATURE_NOT_PRESENT";
+    case VK_ERROR_FORMAT_NOT_SUPPORTED:
+        return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+    case VK_ERROR_FRAGMENTATION_EXT:
+        return "VK_ERROR_FRAGMENTATION_EXT";
+    case VK_ERROR_FRAGMENTED_POOL:
+        return "VK_ERROR_FRAGMENTED_POOL";
+    case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
+        return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
+    case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
+        return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+    case VK_ERROR_INCOMPATIBLE_DRIVER:
+        return "VK_ERROR_INCOMPATIBLE_DRIVER";
+    case VK_ERROR_INITIALIZATION_FAILED:
+        return "VK_ERROR_INITIALIZATION_FAILED";
+    case VK_ERROR_INVALID_DEVICE_ADDRESS_EXT:
+        return "VK_ERROR_INVALID_DEVICE_ADDRESS_EXT";
+    case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
+        return "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE:
+        return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
+    case VK_ERROR_INVALID_SHADER_NV:
+        return "VK_ERROR_INVALID_SHADER_NV";
+    case VK_ERROR_LAYER_NOT_PRESENT:
+        return "VK_ERROR_LAYER_NOT_PRESENT";
+    case VK_ERROR_MEMORY_MAP_FAILED:
+        return "VK_ERROR_MEMORY_MAP_FAILED";
+    case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
+        return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+    case VK_ERROR_NOT_PERMITTED_EXT:
+        return "VK_ERROR_NOT_PERMITTED_EXT";
+    case VK_ERROR_OUT_OF_DATE_KHR:
+        return "VK_ERROR_OUT_OF_DATE_KHR";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+        return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    case VK_ERROR_OUT_OF_HOST_MEMORY:
+        return "VK_ERROR_OUT_OF_HOST_MEMORY";
+    case VK_ERROR_OUT_OF_POOL_MEMORY:
+        return "VK_ERROR_OUT_OF_POOL_MEMORY";
+    case VK_ERROR_SURFACE_LOST_KHR:
+        return "VK_ERROR_SURFACE_LOST_KHR";
+    case VK_ERROR_TOO_MANY_OBJECTS:
+        return "VK_ERROR_TOO_MANY_OBJECTS";
+    case VK_ERROR_VALIDATION_FAILED_EXT:
+        return "VK_ERROR_VALIDATION_FAILED_EXT";
+    case VK_EVENT_RESET:
+        return "VK_EVENT_RESET";
+    case VK_EVENT_SET:
+        return "VK_EVENT_SET";
+    case VK_INCOMPLETE:
+        return "VK_INCOMPLETE";
+    case VK_NOT_READY:
+        return "VK_NOT_READY";
+    case VK_SUBOPTIMAL_KHR:
+        return "VK_SUBOPTIMAL_KHR";
+    case VK_SUCCESS:
+        return "VK_SUCCESS";
+    case VK_TIMEOUT:
+        return "VK_TIMEOUT";
+    default:
+        return "unhandled VkResult";
     }
 }
 
-// TODO: why do we need two functions and a whole member in the vulkan struct for that? Im a dumbass. replace this with one
-// VULKAN_CHECK macro.
-
-static inline void vulkan_result_print(vulkan *vulkan, const char *function_name) {
-    memory_stream_write_string_format(vulkan->error_stream, "error: %s: %s\n", function_name, result_to_string(vulkan->result));
-}
-
-static inline bool vulkan_result_failed(vulkan *vulkan) {
-    return vulkan->result < 0;
-}
+#define THIS_MUST_SUCCEED(vulkan, call)                                                                                           \
+    do {                                                                                                                          \
+        VkResult vulkan_result = (call);                                                                                          \
+        if (vulkan_result < 0) {                                                                                                  \
+            memory_stream_write_string_format((vulkan)->error_stream, "error: %s: %s\n", #call, result_to_string(vulkan_result)); \
+        }                                                                                                                         \
+    } while (0)

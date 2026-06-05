@@ -6,3 +6,4 @@ build
 crash-*
 # bear stuff
 compile_commands.json
+.cache
