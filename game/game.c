@@ -6,8 +6,6 @@
 
 UPDATE_AND_RENDER(update_and_render) {
     if (!memory->is_initialized) {
-        memory_stream_write_string(memory->standard_info_stream, "game says hi!");
-
         static const char watermelon[] = {
 #include "watermelon.png.h"
         };

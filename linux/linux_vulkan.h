@@ -2,6 +2,7 @@
 
 #include "game_platform.h"
 #include "linux.h"
+#include <vulkan/vulkan_core.h>
 
 #define VK_USE_PLATFORM_WAYLAND_KHR
 #include <vulkan/vulkan.h>
@@ -132,6 +133,8 @@ typedef struct {
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkSurfaceKHR surface;
+    // NOTE: last VkResult
+    VkResult result;
 
     vulkan_queue_families queue_families;
     VkQueue graphics_queue;
@@ -189,13 +192,13 @@ typedef struct {
 
 bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *info_stream, memory_stream *error_stream);
 
-bool vulkan_frame_begin(vulkan *vulkan, linux_wayland *window, render_command_buffer *command_buffer);
+bool vulkan_frame_begin(vulkan *vulkan, linux_wayland *wayland, render_command_buffer *command_buffer);
 bool vulkan_frame_end(vulkan *vulkan, render_command_buffer *command_buffer);
 
 // NOTE: borrowed from 
 // https://github.com/khronos_group/vulkan-utility-libraries/blob/main/include/vulkan/vk_enum_string_helper.h
 
-static inline const char* vk_result_to_string(VkResult input_value)
+static inline const char* result_to_string(VkResult input_value)
 {
     switch ((VkResult)input_value)
     {
@@ -268,7 +271,13 @@ static inline const char* vk_result_to_string(VkResult input_value)
     }
 }
 
-static inline void vulkan_result_print(vulkan *vulkan, const char *function_name, VkResult function_result) {
-    memory_stream_write_string_format(vulkan->error_stream, "error: %s: %s\n", function_name, vk_result_to_string(function_result));
+// TODO: why do we need two functions and a whole member in the vulkan struct for that? Im a dumbass. replace this with one
+// VULKAN_CHECK macro.
+
+static inline void vulkan_result_print(vulkan *vulkan, const char *function_name) {
+    memory_stream_write_string_format(vulkan->error_stream, "error: %s: %s\n", function_name, result_to_string(vulkan->result));
 }
 
+static inline bool vulkan_result_failed(vulkan *vulkan) {
+    return vulkan->result < 0;
+}

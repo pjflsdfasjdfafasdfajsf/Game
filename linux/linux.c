@@ -9,6 +9,11 @@
 #include "game_types.h"
 #include "game.h"
 
+static const char *application_name = "Game";
+static const char *application_id = "cheesecake.game";
+
+////////////////////////////////////////////
+
 #if defined(DEBUG)
 static void *game_so = 0;
 static update_and_render_function *GAME_UPDATE_AND_RENDER = 0;
@@ -123,142 +128,383 @@ static void game_code_load(void) {
 #define GAME_GET_SOUND_SAMPLES get_sound_samples
 #endif
 
-static void xdg_toplevel_configure_handler(void *user_data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states) {
-    UNUSED(xdg_toplevel), UNUSED(width), UNUSED(height);
+////////////////////////////////////////////
+// NOTE: xdg window listener
+////////////////////////////////////////////
 
-    linux_wayland *wayland = (linux_wayland *)user_data;
-
-    if (!wayland) {
-        return;
-    }
-
-    bool is_activated = false;
-    uint32_t *state;
-    wl_array_for_each(state, states) {
-        if (*state == XDG_TOPLEVEL_STATE_ACTIVATED) {
-            is_activated = true;
-        }
-    }
-
-    if (width > 0) {
-        wayland->width = width;
-    }
-    if (height > 0) {
-        wayland->height = height;
-    }
-
-    wayland->is_focused = is_activated;
-}
-
-static void xdg_toplevel_close_handler(void *user_data, struct xdg_toplevel *xdg_toplevel) {
-    UNUSED(xdg_toplevel);
-
-    linux_wayland *wayland = (linux_wayland *)user_data;
-
-    if (wayland) {
-        wayland->is_running = false;
-    }
-}
-
-static const struct xdg_toplevel_listener xdg_toplevel_listener = {
-    .configure = xdg_toplevel_configure_handler,
-    .close = xdg_toplevel_close_handler,
-};
-
-static void xdg_surface_configure_handler(void *user_data, struct xdg_surface *xdg_surface, uint32_t serial) {
-    linux_wayland *wayland = (linux_wayland *)user_data;
-
-    xdg_surface_ack_configure(xdg_surface, serial);
-
-    if (wayland) {
-        wayland->is_configured = true;
-    }
-}
-
-static const struct xdg_surface_listener xdg_surface_listener = {
-    .configure = xdg_surface_configure_handler,
-};
-
-static void xdg_window_manager_base_ping_handler(void *user_data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
-    UNUSED(user_data);
+static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, u32 serial) {
+    UNUSED(data);
 
     xdg_wm_base_pong(xdg_wm_base, serial);
 }
 
 static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-    .ping = xdg_window_manager_base_ping_handler,
+    xdg_wm_base_ping};
+
+///
+
+static void xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, u32 serial) {
+    UNUSED(data);
+    xdg_surface_ack_configure(xdg_surface, serial);
+}
+
+static const struct xdg_surface_listener xdg_surface_listener = {
+    xdg_surface_configure};
+
+///
+
+static void xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, i32 width, i32 height, struct wl_array *states) {
+    UNUSED(xdg_toplevel);
+    UNUSED(states);
+
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
+
+    if (width > 0 && height > 0) {
+        wayland->width = width;
+        wayland->height = height;
+    }
+}
+
+static void xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
+    UNUSED(xdg_toplevel);
+
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
+
+    wayland->is_running = false;
+}
+
+static void xdg_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, i32 width, i32 height) {
+    UNUSED(data);
+    UNUSED(xdg_toplevel);
+    UNUSED(width);
+    UNUSED(height);
+}
+
+static void xdg_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities) {
+    UNUSED(data);
+    UNUSED(xdg_toplevel);
+    UNUSED(capabilities);
+}
+
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+    xdg_toplevel_configure,
+    xdg_toplevel_close,
+    xdg_toplevel_configure_bounds,
+    xdg_toplevel_wm_capabilities,
 };
 
-static void registry_global_handler(void *user_data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
-    UNUSED(version);
+////////////////////////////////////////////
+// NOTE: input listeners
+////////////////////////////////////////////
 
-    linux_wayland *wayland = (linux_wayland *)user_data;
+static void pointer_enter(void *data, struct wl_pointer *pointer, u32 serial, struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
+    UNUSED(pointer);
+    UNUSED(surface);
+    UNUSED(surface_x);
+    UNUSED(surface_y);
 
-    usize compositor_name_length = string_get_length(wl_compositor_interface.name);
-    usize xdg_wm_base_name_length = string_get_length(xdg_wm_base_interface.name);
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
 
-    bool is_compositor = memory_equals(interface, wl_compositor_interface.name, compositor_name_length + 1);
-    bool is_xdg_wm_base = memory_equals(interface, xdg_wm_base_interface.name, xdg_wm_base_name_length + 1);
-
-    if (is_compositor) {
-        wayland->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
-    } else if (is_xdg_wm_base) {
-        wayland->xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
-        xdg_wm_base_add_listener(wayland->xdg_wm_base, &xdg_wm_base_listener, wayland);
+    if (wayland->cursor_shape_device) {
+        wp_cursor_shape_device_v1_set_shape(wayland->cursor_shape_device, serial, WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT);
     }
 }
 
-static void registry_global_remove_handler(void *user_data, struct wl_registry *registry, uint32_t name) {
-    UNUSED(user_data), UNUSED(registry), UNUSED(name);
+static void pointer_leave(void *data, struct wl_pointer *pointer, u32 serial, struct wl_surface *surface) {
+    UNUSED(data);
+    UNUSED(pointer);
+    UNUSED(serial);
+    UNUSED(surface);
 }
 
-static const struct wl_registry_listener registry_listener = {
-    .global = registry_global_handler,
-    .global_remove = registry_global_remove_handler,
+static void pointer_motion(void *data, struct wl_pointer *pointer, u32 time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
+    UNUSED(data);
+    UNUSED(pointer);
+    UNUSED(time);
+    UNUSED(surface_x);
+    UNUSED(surface_y);
+}
+
+static void pointer_button(void *data, struct wl_pointer *pointer, u32 serial, u32 time, u32 button, u32 state) {
+    UNUSED(state);
+    UNUSED(button);
+    UNUSED(data);
+    UNUSED(pointer);
+    UNUSED(serial);
+    UNUSED(time);
+
+    // ASSERT(button < KEY_CNT)
+
+    // global_buttons_down[button] = (state == WL_POINTER_BUTTON_STATE_PRESSED);
+}
+
+static void pointer_axis(void *data, struct wl_pointer *pointer, u32 time, u32 axis, wl_fixed_t value) {
+    UNUSED(data);
+    UNUSED(pointer);
+    UNUSED(time);
+    UNUSED(axis);
+    UNUSED(value);
+}
+
+static const struct wl_pointer_listener pointer_listener = {
+    pointer_enter,
+    pointer_leave,
+    pointer_motion,
+    pointer_button,
+    pointer_axis,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
 
-linux_wayland window_create(const char *title) {
-    linux_wayland wayland = {0};
+////////////////////////////////////////////
+// NOTE: keyboard listener
+////////////////////////////////////////////
 
-    wayland.width = DEFAULT_WINDOW_WIDTH;
-    wayland.height = DEFAULT_WINDOW_HEIGHT;
-
-    wayland.display = wl_display_connect(0);
-    if (!wayland.display) {
-        fprintf(stderr, "error: could not connect to wayland display.\n");
-        return wayland;
-    }
-
-    wayland.registry = wl_display_get_registry(wayland.display);
-    wl_registry_add_listener(wayland.registry, &registry_listener, &wayland);
-
-    wl_display_roundtrip(wayland.display);
-
-    if (!wayland.compositor || !wayland.xdg_wm_base) {
-        fprintf(stderr, "error: failed to bind wayland compositor or xdg_wm_base.\n");
-        return wayland;
-    }
-
-    wayland.surface = wl_compositor_create_surface(wayland.compositor);
-    wayland.xdg_surface = xdg_wm_base_get_xdg_surface(wayland.xdg_wm_base, wayland.surface);
-    xdg_surface_add_listener(wayland.xdg_surface, &xdg_surface_listener, &wayland);
-
-    wayland.xdg_toplevel = xdg_surface_get_toplevel(wayland.xdg_surface);
-    xdg_toplevel_add_listener(wayland.xdg_toplevel, &xdg_toplevel_listener, &wayland);
-
-    xdg_toplevel_set_title(wayland.xdg_toplevel, title);
-    xdg_toplevel_set_app_id(wayland.xdg_toplevel, "wayland-game-linux");
-
-    wl_surface_commit(wayland.surface);
-    wl_display_roundtrip(wayland.display);
-
-    wayland.is_running = true;
-    wayland.is_focused = true;
-
-    return wayland;
+static void keyboard_keymap(void *data, struct wl_keyboard *keyboard, u32 format, i32 fd, u32 size) {
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(format);
+    UNUSED(size);
+    close(fd);
 }
 
+static void keyboard_enter(void *data, struct wl_keyboard *keyboard, u32 serial, struct wl_surface *surface, struct wl_array *keys) {
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(serial);
+    UNUSED(surface);
+    UNUSED(keys);
+}
+
+static void keyboard_leave(void *data, struct wl_keyboard *keyboard, u32 serial, struct wl_surface *surface) {
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(serial);
+    UNUSED(surface);
+}
+
+static void keyboard_key(void *data, struct wl_keyboard *keyboard, u32 serial, u32 time, u32 key, u32 state) {
+    UNUSED(state);
+    UNUSED(key);
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(serial);
+    UNUSED(time);
+
+    // ASSERT(key < KEY_CNT)
+
+    // global_buttons_down[key] = (state_enum == WL_KEYBOARD_KEY_STATE_PRESSED);
+}
+
+static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, u32 serial, u32 mods_depressed, u32 mods_latched, u32 mods_locked, u32 group) {
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(serial);
+    UNUSED(mods_depressed);
+    UNUSED(mods_latched);
+    UNUSED(mods_locked);
+    UNUSED(group);
+}
+
+static void keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, i32 rate, i32 delay) {
+    UNUSED(data);
+    UNUSED(keyboard);
+    UNUSED(rate);
+    UNUSED(delay);
+}
+
+static const struct wl_keyboard_listener keyboard_listener = {
+    keyboard_keymap,
+    keyboard_enter,
+    keyboard_leave,
+    keyboard_key,
+    keyboard_modifiers,
+    keyboard_repeat_info};
+
+///
+
+static void seat_capabilities(void *data, struct wl_seat *seat, u32 capabilities) {
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
+
+    bool has_pointer = capabilities & WL_SEAT_CAPABILITY_POINTER;
+    if (has_pointer && !wayland->pointer) {
+        wayland->pointer = wl_seat_get_pointer(seat);
+        wl_pointer_add_listener(wayland->pointer, &pointer_listener, wayland);
+
+        if (wayland->cursor_shape_manager) {
+            wayland->cursor_shape_device = wp_cursor_shape_manager_v1_get_pointer(wayland->cursor_shape_manager, wayland->pointer);
+        }
+    }
+
+    bool has_keyboard = capabilities & WL_SEAT_CAPABILITY_KEYBOARD;
+    if (has_keyboard && !wayland->keyboard) {
+        wayland->keyboard = wl_seat_get_keyboard(seat);
+        wl_keyboard_add_listener(wayland->keyboard, &keyboard_listener, wayland);
+    }
+}
+
+static void seat_name(void *data, struct wl_seat *seat, const char *name) {
+    UNUSED(data);
+    UNUSED(seat);
+    UNUSED(name);
+}
+
+static const struct wl_seat_listener seat_listener = {
+    seat_capabilities,
+    seat_name,
+};
+
+////////////////////////////////////////////
+// NOTE: global listener
+////////////////////////////////////////////
+
+static void registry_handle_global(void *data, struct wl_registry *registry, u32 name, const char *interface, u32 version) {
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
+
+#define BIND(member, struct_type, wayland_interface, maximum_supported_version)                              \
+    if (strcmp(interface, wayland_interface.name) == 0) {                                                    \
+        u32 bind_version = MIN(version, maximum_supported_version);                                          \
+        wayland->member = (struct_type *)wl_registry_bind(registry, name, &wayland_interface, bind_version); \
+        printf("using version %u of %s\n", bind_version, wayland_interface.name);                            \
+    }
+
+    BIND(compositor, struct wl_compositor, wl_compositor_interface, 4);
+    BIND(xdg_wm_base, struct xdg_wm_base, xdg_wm_base_interface, 6);
+    BIND(decoration_manager, struct zxdg_decoration_manager_v1, zxdg_decoration_manager_v1_interface, 1);
+    BIND(seat, struct wl_seat, wl_seat_interface, 1);
+    BIND(cursor_shape_manager, struct wp_cursor_shape_manager_v1, wp_cursor_shape_manager_v1_interface, 1);
+
+#undef BIND
+}
+
+static void registry_handle_global_removal(void *data, struct wl_registry *registry, u32 name) {
+    UNUSED(data);
+    UNUSED(registry);
+    UNUSED(name);
+}
+
+static const struct wl_registry_listener wayland_registry_listener = {
+    registry_handle_global,
+    registry_handle_global_removal,
+};
+
+////////////////////////////////////////////
+// NOTE: windowing
+////////////////////////////////////////////
+
+static void wayland_display_error(struct wl_display *display) {
+    int error = wl_display_get_error(display);
+
+    if (error == EPROTO) {
+        u32 code = 0;
+        const struct wl_interface *interface = 0;
+        u32 id = wl_display_get_protocol_error(display, &interface, &code);
+
+        fprintf(stderr, "wayland protocol error!\n");
+        fprintf(stderr, "    interface: %s\n", interface ? interface->name : "unknown");
+        fprintf(stderr, "    object ID: %u\n", id);
+        fprintf(stderr, "    error code: %u\n", code);
+    } else {
+        fprintf(stderr, "error: wayland protocol communication error: %s\n", strerror(error));
+    }
+}
+
+static bool wayland_initialize(linux_wayland *wayland) {
+    ASSERT(wayland);
+
+    wayland->is_running = true;
+    wayland->width = 1280;
+    wayland->height = 720;
+
+    wayland->display = wl_display_connect(0);
+    if (!wayland->display) {
+        fprintf(stderr, "error: could not connect to wayland display: %s\n", strerror(errno));
+
+        return false;
+    }
+
+    struct wl_registry *registry = wl_display_get_registry(wayland->display);
+    if (!registry) {
+        // NOTE: this is very rare to fail unless its oom, hence the error message
+        fprintf(stderr, "error: out of memory? (wl_display_get_registry)\n");
+
+        return false;
+    }
+
+    wl_registry_add_listener(registry, &wayland_registry_listener, wayland);
+
+    if (wl_display_roundtrip(wayland->display) == -1) {
+        wayland_display_error(wayland->display);
+
+        return false;
+    }
+
+    if (!wayland->compositor || !wayland->xdg_wm_base) {
+        fprintf(stderr, "error: wayland compositor is missing required extensions\n");
+
+        return false;
+    }
+
+    xdg_wm_base_add_listener(wayland->xdg_wm_base, &xdg_wm_base_listener, wayland);
+
+    wayland->surface = wl_compositor_create_surface(wayland->compositor);
+    if (!wayland->surface) {
+        fprintf(stderr, "error: could not create surface");
+
+        return false;
+    }
+
+    struct xdg_surface *xdg_surface = xdg_wm_base_get_xdg_surface(wayland->xdg_wm_base, wayland->surface);
+    if (!xdg_surface) {
+        fprintf(stderr, "error: could not create xdg surface");
+
+        return false;
+    }
+    xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, wayland);
+
+    struct xdg_toplevel *xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
+    if (!xdg_toplevel) {
+        fprintf(stderr, "error: could not get xdg toplevel");
+
+        return false;
+    }
+
+    xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, wayland);
+    // NOTE: this is needed for some (?) DEs like KDE, where if the app ID is not set you
+    // will not be able to resize the window
+    xdg_toplevel_set_app_id(xdg_toplevel, application_id);
+    xdg_toplevel_set_title(xdg_toplevel, application_name);
+
+    if (wayland->decoration_manager) {
+        struct zxdg_toplevel_decoration_v1 *decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(wayland->decoration_manager, xdg_toplevel);
+        zxdg_toplevel_decoration_v1_set_mode(decoration, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    } else {
+        fprintf(stderr, "warning: compositor does not support server-side decorations\n");
+    }
+
+    if (wayland->seat) {
+        wl_seat_add_listener(wayland->seat, &seat_listener, wayland);
+    }
+
+    wl_surface_commit(wayland->surface);
+    wl_display_roundtrip(wayland->display);
+
+    return true;
+}
+
+////////////////////////////////////////////
 // NOTE: sound
+////////////////////////////////////////////
+
 // how it comes that alsa does not need to be ran on separate thread and the sound works perfectly
 // fine when resizing/moving the window?
 // it still will be on separate thread though. just in case.
@@ -342,7 +588,7 @@ void *sound_thread_routine(void *thread_parameter) {
     return 0;
 }
 
-bool sound_initialize(linux_sound *sound, memory_arena permanent_arena) {
+bool sound_initialize(linux_sound *sound, memory_arena *permanent_arena) {
     if (!sound) {
         return false;
     }
@@ -380,7 +626,7 @@ bool sound_initialize(linux_sound *sound, memory_arena permanent_arena) {
     u32 bytes_per_frame = sound->channels * sizeof(u32);
     usize total_buffer_size = sound->buffer_frame_count * bytes_per_frame;
 
-    sound->sample_buffer = (f32 *)MEMORY_ARENA_PUSH_BYTES(&permanent_arena, total_buffer_size);
+    sound->sample_buffer = (f32 *)MEMORY_ARENA_PUSH_BYTES(permanent_arena, total_buffer_size);
     if (!sound->sample_buffer) {
         fprintf(stderr, "error: out of memory\n");
 
@@ -398,6 +644,8 @@ bool sound_initialize(linux_sound *sound, memory_arena permanent_arena) {
 
     return true;
 }
+
+////////////////////////////////////////////
 
 void memory_dump_standard_streams(game_memory *game_memory) {
     if (!game_memory) {
@@ -419,20 +667,60 @@ void memory_dump_standard_streams(game_memory *game_memory) {
     }
 }
 
-void run_update(linux_wayland *wayland, linux_sound *sound, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
-    if (!wayland || !wayland->display) {
-        return;
-    }
+// void run_update(linux_wayland *wayland, linux_sound *sound, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
+//     if (!wayland || !wayland->display) {
+//         return;
+//     }
 
-    bool was_focused = wayland->is_focused;
+//     bool was_focused = wayland->is_focused;
 
+//     struct pollfd pollfd;
+//     pollfd.fd = wl_display_get_fd(wayland->display);
+//     pollfd.events = POLLIN;
+
+//     while (wayland->is_running) {
+//         memory_dump_standard_streams(game_memory);
+
+//         wl_display_dispatch_pending(wayland->display);
+//         wl_display_flush(wayland->display);
+
+//         if (poll(&pollfd, 1, 0) > 0) {
+//             wl_display_dispatch(wayland->display);
+//         }
+
+//         if (!wayland->is_focused && was_focused) {
+//             sound_pause(sound);
+//         } else if (wayland->is_focused && !was_focused) {
+//             sound_resume(sound);
+//         }
+
+//         was_focused = wayland->is_focused;
+
+//         if (wayland->is_focused) {
+//             render_command_buffer_reset(command_buffer);
+
+//             if (GAME_UPDATE_AND_RENDER) {
+//                 GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
+//             }
+
+//             if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
+//                 continue;
+//             }
+//             if (!vulkan_frame_end(vulkan, command_buffer)) {
+//                 exit(1);
+//             }
+//         } else {
+//             usleep(100000);
+//         }
+//     }
+// }
+
+static void update(linux_wayland *wayland, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
     struct pollfd pollfd;
     pollfd.fd = wl_display_get_fd(wayland->display);
     pollfd.events = POLLIN;
 
     while (wayland->is_running) {
-        memory_dump_standard_streams(game_memory);
-
         wl_display_dispatch_pending(wayland->display);
         wl_display_flush(wayland->display);
 
@@ -440,38 +728,27 @@ void run_update(linux_wayland *wayland, linux_sound *sound, vulkan *vulkan, game
             wl_display_dispatch(wayland->display);
         }
 
-        if (!wayland->is_focused && was_focused) {
-            sound_pause(sound);
-        } else if (wayland->is_focused && !was_focused) {
-            sound_resume(sound);
+        memory_dump_standard_streams(game_memory);
+        render_command_buffer_reset(command_buffer);
+
+        if (GAME_UPDATE_AND_RENDER) {
+            GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
         }
 
-        was_focused = wayland->is_focused;
+        if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
+            continue;
+        }
 
-        if (wayland->is_focused) {
-            render_command_buffer_reset(command_buffer);
-
-            if (GAME_UPDATE_AND_RENDER) {
-                GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
-            }
-
-            if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
-                continue;
-            }
-            if (!vulkan_frame_end(vulkan, command_buffer)) {
-                exit(1);
-            }
-        } else {
-            usleep(100000);
+        if (!vulkan_frame_end(vulkan, command_buffer)) {
+            exit(EXIT_FAILURE);
         }
     }
 }
 
 int main(void) {
-    linux_wayland wayland = window_create("linux wayland");
-
-    if (!wayland.display) {
-        return 1;
+    linux_wayland wayland = {0};
+    if (!wayland_initialize(&wayland)) {
+        return EXIT_FAILURE;
     }
 
     usize permanent_arena_size = MEGABYTES(64);
@@ -496,13 +773,13 @@ int main(void) {
     memory_stream_initialize_writable(info_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, info_stream_size), info_stream_size);
 
     linux_sound sound;
-    if (!sound_initialize(&sound, permanent_arena)) {
-        return 1;
+    if (!sound_initialize(&sound, &permanent_arena)) {
+        return EXIT_FAILURE;
     }
 
     vulkan vulkan;
     if (!vulkan_initialize(&vulkan, &wayland, info_stream, error_stream)) {
-        return 1;
+        return EXIT_FAILURE;
     }
 
     render_command_buffer *command_buffer = MEMORY_ARENA_PUSH_ARRAY(&permanent_arena, render_command_buffer, 1);
@@ -521,8 +798,7 @@ int main(void) {
 #if defined(DEBUG)
     game_code_load();
 #endif
+    update(&wayland, &vulkan, &game_memory, command_buffer);
 
-    run_update(&wayland, &sound, &vulkan, &game_memory, command_buffer);
-
-    return 0;
+    return EXIT_SUCCESS;
 }

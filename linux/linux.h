@@ -3,27 +3,30 @@
 #include <alsa/asoundlib.h>
 
 #include <wayland-client.h>
-#include <xdg-shell-client-protocol.h>
 
-#include "game_platform.h"
+#include "cursor-shape-v1-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
+#include "xdg-shell-client-protocol.h"
+
 #include "game_types.h"
 
 typedef struct {
-    struct wl_display *display;
-    struct wl_registry *registry;
-    struct wl_compositor *compositor;
-    struct xdg_wm_base *xdg_wm_base;
+    bool is_running;
 
-    struct wl_surface *surface;
-    struct xdg_surface *xdg_surface;
-    struct xdg_toplevel *xdg_toplevel;
+    struct wl_display* display;
+    struct wl_surface* surface;
+    struct wl_keyboard *keyboard;
+
+    struct wl_compositor* compositor;
+    struct xdg_wm_base* xdg_wm_base;
+    struct zxdg_decoration_manager_v1* decoration_manager;
+    struct wl_seat* seat;
+    struct wl_pointer* pointer;
+    struct wp_cursor_shape_manager_v1* cursor_shape_manager;
+    struct wp_cursor_shape_device_v1* cursor_shape_device;
 
     u32 width;
     u32 height;
-
-    bool is_running;
-    bool is_focused;
-    bool is_configured;
 } linux_wayland;
 
 typedef struct {
