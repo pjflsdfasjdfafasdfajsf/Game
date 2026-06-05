@@ -1,5 +1,3 @@
-// TODO:
-// * fix hot-reloading
 #include "game_platform.h"
 #include "game_png.h"
 #include "game_types.h"
