@@ -8,6 +8,7 @@
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
+#include "game.h"
 
 static const char *global_application_name = "Game";
 static const char *global_application_id = "cheesecake.game";
@@ -551,58 +552,6 @@ void linux_dump_standard_streams(game_memory *game_memory) {
     }
 }
 
-// void run_update(linux_wayland *wayland, linux_sound *sound, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
-//     if (!wayland || !wayland->display) {
-//         return;
-//     }
-
-//     bool was_focused = wayland->is_focused;
-
-//     struct pollfd pollfd;
-//     pollfd.fd = wl_display_get_fd(wayland->display);
-//     pollfd.events = POLLIN;
-
-//     while (wayland->is_running) {
-//         memory_dump_standard_streams(game_memory);
-
-//         wl_display_dispatch_pending(wayland->display);
-//         wl_display_flush(wayland->display);
-
-//         if (poll(&pollfd, 1, 0) > 0) {
-//             wl_display_dispatch(wayland->display);
-//         }
-
-//         if (!wayland->is_focused && was_focused) {
-//             sound_pause(sound);
-//         } else if (wayland->is_focused && !was_focused) {
-//             sound_resume(sound);
-//         }
-
-//         was_focused = wayland->is_focused;
-
-//         if (wayland->is_focused) {
-//             render_command_buffer_reset(command_buffer);
-
-//             if (GAME_UPDATE_AND_RENDER) {
-//                 GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
-//             }
-
-//             if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
-//                 continue;
-//             }
-//             if (!vulkan_frame_end(vulkan, command_buffer)) {
-//                 exit(1);
-//             }
-//         } else {
-//             usleep(100000);
-//         }
-//     }
-// }
-
-////////////////////////////////////////////
-
-#if defined(DEBUG)
-
 static void linux_absolute_libary_path(const char *library_file_name, char *destination_buffer, usize destination_capacity) {
     memory_zero(destination_buffer, destination_capacity);
 
@@ -626,6 +575,10 @@ static void linux_absolute_libary_path(const char *library_file_name, char *dest
     string_copy(destination_buffer, destination_capacity, executable_path);
     string_append(destination_buffer, destination_capacity, library_file_name);
 }
+
+////////////////////////////////////////////
+
+#if defined(DEBUG)
 
 static bool linux_copy_file(const char *source_path, const char *destination_path) {
     int source_file = open(source_path, O_RDONLY);
@@ -727,6 +680,8 @@ static linux_game_code linux_load_game_code(const char *source_so_name, const ch
 ////////////////////////////////////////////
 
 static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_code *game_code, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
+    UNUSED(sound); // NOTE: used in the debug build
+
     struct pollfd pollfd;
     pollfd.fd = wl_display_get_fd(wayland->display);
     pollfd.events = POLLIN;
@@ -806,7 +761,7 @@ int main(void) {
     char temporary_path[PATH_MAX];
     linux_absolute_libary_path("game.so", source_path, sizeof(source_path));
     linux_absolute_libary_path("game.temp.so", temporary_path, sizeof(temporary_path));
-    
+
     game_code = linux_load_game_code(source_path, temporary_path);
 #else
     game_code.update_and_render = update_and_render;
