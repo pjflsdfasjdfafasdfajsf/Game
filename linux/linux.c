@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <limits.h>
 #include <dlfcn.h>
+#include <time.h>
 #include <linux/input-event-codes.h>
 
 #include "linux.h"
@@ -106,24 +107,48 @@ static void pointer_leave(void *data, struct wl_pointer *pointer, u32 serial, st
 }
 
 static void pointer_motion(void *data, struct wl_pointer *pointer, u32 time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
-    UNUSED(data);
-    UNUSED(pointer);
     UNUSED(time);
-    UNUSED(surface_x);
-    UNUSED(surface_y);
+    UNUSED(pointer);
+    
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
+
+    game_input *game_input = &wayland->game_input;
+
+    game_input->mouse_position.x = surface_x;
+    game_input->mouse_position.y = surface_y;
 }
 
-static void pointer_button(void *data, struct wl_pointer *pointer, u32 serial, u32 time, u32 button, u32 state) {
-    UNUSED(state);
-    UNUSED(button);
-    UNUSED(data);
+static void pointer_button(void *data, struct wl_pointer *pointer, u32 serial, u32 time, u32 button_code, u32 state) {
     UNUSED(pointer);
     UNUSED(serial);
     UNUSED(time);
+    
+    linux_wayland *wayland = (linux_wayland *)data;
+    ASSERT(wayland);
 
-    // ASSERT(button < KEY_CNT)
+    game_input *game_input = &wayland->game_input;
 
-    // global_buttons_down[button] = (state == WL_POINTER_BUTTON_STATE_PRESSED);
+    // just to make the compiler happy it is used in the switch
+    UNUSED(game_input);
+
+    game_button *button = 0;
+
+    switch (button_code) {
+#define BUTTON(name, linux_name) \
+    case BTN_##linux_name: \
+    { \
+        button = &game_input->name; \
+    } break;
+    BUTTONS
+#undef BUTTON
+    }
+
+    bool ended_down = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    if (button && button->ended_down != ended_down) {
+        button->ended_down = ended_down;
+        button->half_transition_count++;
+    }
 }
 
 static void pointer_axis(void *data, struct wl_pointer *pointer, u32 time, u32 axis, wl_fixed_t value) {
@@ -757,7 +782,15 @@ static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_
     linux_absolute_libary_path("game.so", source_path, sizeof(source_path));
     linux_absolute_libary_path("game.temp.so", temporary_path, sizeof(temporary_path));
 
+    struct timespec last_timespec;
+    timespec_get(&last_timespec, TIME_UTC);
+    struct timespec current_timespec;
+
     while (wayland->is_running) {
+        timespec_get(&current_timespec, TIME_UTC);
+        wayland->game_input.delta_time = MILLISECONDS(current_timespec.tv_nsec) - MILLISECONDS(last_timespec.tv_nsec);
+        last_timespec = current_timespec;
+        
         for (u32 i = 0; i < ARRAY_COUNT(wayland->game_input.buttons); i++) {
             wayland->game_input.buttons[i].half_transition_count = 0;
         }

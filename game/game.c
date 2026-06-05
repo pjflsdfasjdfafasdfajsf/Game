@@ -14,8 +14,8 @@ UPDATE_AND_RENDER(update_and_render) {
         memory->is_initialized = true;
     }
 
-    if (was_pressed(input->w)) {
-        memory_stream_write_string(memory->standard_info_stream, "PRESSED W\n");
+    if (was_pressed(input->lmb)) {
+        memory_stream_write_string(memory->standard_info_stream, "PRESSED LMB\n");
     }
 
     render_clear_entire_screen(command_buffer, black);

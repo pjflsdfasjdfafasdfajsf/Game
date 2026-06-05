@@ -47,6 +47,8 @@ typedef float f32;
 #define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
 #define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
 
+#define MILLISECONDS(value) ((value) * 1000.0f)
+
 #define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
 // NOTE: math types.

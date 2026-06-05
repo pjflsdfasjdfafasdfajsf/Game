@@ -630,24 +630,39 @@ typedef struct {
 // NOTE: when adding a key you MUST do a clean rebuild
 // make wont recognize which files to rebuild and you also
 // wont get compile errors but the input will be messed up.
+
+// Parameters: (struct field name, upper case version)
 #define KEYS \
     KEY(w, W) \
     KEY(s, S) \
     KEY(a, A) \
     KEY(d, D) \
+
+// Parameters: (struct field name, linux enum name from linux/input-event-codes.h)
+#define BUTTONS \
+    BUTTON(lmb, LEFT) \
+    BUTTON(rmb, RIGHT) \
     
 typedef struct {
     union {
 #define KEY(...) +1
-        game_button buttons[0 KEYS];
+#define BUTTON(...) +1
+        game_button buttons[0 KEYS BUTTONS];
+#undef BUTTON
 #undef KEY
 
         struct {
 #define KEY(lower, upper) game_button lower;
+#define BUTTON(name, linux_name) game_button name;
             KEYS
+            BUTTONS
+#undef BUTTON
 #undef KEY
         };
     };
+
+    vector2 mouse_position;
+    f32 delta_time;
 } game_input;
 
 // went down at least once and is currently down
