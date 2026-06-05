@@ -274,5 +274,6 @@ static inline const char *result_to_string(VkResult input_value) {
         VkResult vulkan_result = (call);                                                                                          \
         if (vulkan_result < 0) {                                                                                                  \
             memory_stream_write_string_format((vulkan)->error_stream, "error: %s: %s\n", #call, result_to_string(vulkan_result)); \
+            ASSERT(0)                                                                                                             \
         }                                                                                                                         \
     } while (0)
