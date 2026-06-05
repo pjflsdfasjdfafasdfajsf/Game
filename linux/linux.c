@@ -1,4 +1,5 @@
 #include <alsa/asoundlib.h>
+#include <sys/stat.h>
 #include <pthread.h>
 #include <limits.h>
 #include <dlfcn.h>
@@ -7,126 +8,9 @@
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
-#include "game.h"
 
-static const char *application_name = "Game";
-static const char *application_id = "cheesecake.game";
-
-////////////////////////////////////////////
-
-#if defined(DEBUG)
-static void *game_so = 0;
-static update_and_render_function *GAME_UPDATE_AND_RENDER = 0;
-static get_sound_samples_function *GAME_GET_SOUND_SAMPLES = 0;
-
-static void absolute_libary_path(const char *library_file_name, char *destination_buffer, usize destination_capacity) {
-    memory_zero(destination_buffer, destination_capacity);
-
-    char executable_path[PATH_MAX];
-    isize executable_path_length = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
-
-    if (executable_path_length == -1) {
-        printf("error: readlink failed.\n");
-
-        return;
-    }
-
-    executable_path[executable_path_length] = '\0';
-
-    isize final_slash_index = string_find_last_occurrence_of_character(executable_path, '/');
-
-    if (final_slash_index != -1) {
-        executable_path[final_slash_index + 1] = '\0';
-    }
-
-    string_copy(destination_buffer, destination_capacity, executable_path);
-    string_append(destination_buffer, destination_capacity, library_file_name);
-}
-
-static bool copy_file(const char *source_path, const char *destination_path) {
-    int source_file = open(source_path, O_RDONLY);
-    if (source_file < 0) {
-        return false;
-    }
-
-    int destination_file = open(destination_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (destination_file < 0) {
-        close(source_file);
-        return false;
-    }
-
-    char buffer[4096];
-
-    while (true) {
-        isize bytes_read = read(source_file, buffer, sizeof(buffer));
-
-        if (bytes_read == 0) {
-            break;
-        }
-
-        if (bytes_read < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return false;
-        }
-
-        char *write_pointer = buffer;
-        isize bytes_remaining = bytes_read;
-
-        while (bytes_remaining > 0) {
-            isize bytes_written = write(destination_file, write_pointer, bytes_remaining);
-
-            if (bytes_written >= 0) {
-                bytes_remaining -= bytes_written;
-                write_pointer += bytes_written;
-            } else if (errno != EINTR) {
-                return false;
-            }
-        }
-    }
-
-    close(source_file);
-
-    if (close(destination_file) < 0) {
-        return false;
-    }
-
-    return true;
-}
-
-static void game_code_load(void) {
-    if (game_so) {
-        dlclose(game_so);
-
-        game_so = 0;
-        GAME_UPDATE_AND_RENDER = 0;
-        GAME_GET_SOUND_SAMPLES = 0;
-    }
-
-    char source_library_path[PATH_MAX];
-    char temporary_library_path[PATH_MAX];
-
-    absolute_libary_path("../lib/Game.so", source_library_path, sizeof(source_library_path));
-    absolute_libary_path("libgame.temp.so", temporary_library_path, sizeof(temporary_library_path));
-
-    if (!copy_file(source_library_path, temporary_library_path)) {
-        fprintf(stderr, "error: could not copy Game.so.\n");
-    }
-
-    game_so = dlopen(temporary_library_path, RTLD_NOW);
-    if (!game_so) {
-        fprintf(stderr, "error: %s\n", dlerror());
-    }
-
-    GAME_UPDATE_AND_RENDER = (update_and_render_function *)dlsym(game_so, "update_and_render");
-    GAME_GET_SOUND_SAMPLES = (get_sound_samples_function *)dlsym(game_so, "get_sound_samples");
-}
-
-#else
-#define GAME_UPDATE_AND_RENDER update_and_render
-#define GAME_GET_SOUND_SAMPLES get_sound_samples
-#endif
+static const char *global_application_name = "Game";
+static const char *global_application_id = "cheesecake.game";
 
 ////////////////////////////////////////////
 // NOTE: xdg window listener
@@ -401,7 +285,7 @@ static const struct wl_registry_listener wayland_registry_listener = {
 // NOTE: windowing
 ////////////////////////////////////////////
 
-static void wayland_display_error(struct wl_display *display) {
+static void linux_wayland_display_error(struct wl_display *display) {
     int error = wl_display_get_error(display);
 
     if (error == EPROTO) {
@@ -418,7 +302,7 @@ static void wayland_display_error(struct wl_display *display) {
     }
 }
 
-static bool wayland_initialize(linux_wayland *wayland) {
+static bool linux_wayland_initialize(linux_wayland *wayland) {
     ASSERT(wayland);
 
     wayland->is_running = true;
@@ -443,7 +327,7 @@ static bool wayland_initialize(linux_wayland *wayland) {
     wl_registry_add_listener(registry, &wayland_registry_listener, wayland);
 
     if (wl_display_roundtrip(wayland->display) == -1) {
-        wayland_display_error(wayland->display);
+        linux_wayland_display_error(wayland->display);
 
         return false;
     }
@@ -481,8 +365,8 @@ static bool wayland_initialize(linux_wayland *wayland) {
     xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, wayland);
     // NOTE: this is needed for some (?) DEs like KDE, where if the app ID is not set you
     // will not be able to resize the window
-    xdg_toplevel_set_app_id(xdg_toplevel, application_id);
-    xdg_toplevel_set_title(xdg_toplevel, application_name);
+    xdg_toplevel_set_app_id(xdg_toplevel, global_application_id);
+    xdg_toplevel_set_title(xdg_toplevel, global_application_name);
 
     if (wayland->decoration_manager) {
         struct zxdg_toplevel_decoration_v1 *decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(wayland->decoration_manager, xdg_toplevel);
@@ -509,7 +393,7 @@ static bool wayland_initialize(linux_wayland *wayland) {
 // fine when resizing/moving the window?
 // it still will be on separate thread though. just in case.
 
-void sound_pause(linux_sound *sound) {
+void linux_sound_pause(linux_sound *sound) {
     if (!sound || !sound->pcm_handle) {
         return;
     }
@@ -519,7 +403,7 @@ void sound_pause(linux_sound *sound) {
     snd_pcm_drop(sound->pcm_handle);
 }
 
-void sound_resume(linux_sound *sound) {
+void linux_sound_resume(linux_sound *sound) {
     if (!sound || !sound->pcm_handle) {
         return;
     }
@@ -529,7 +413,7 @@ void sound_resume(linux_sound *sound) {
     sound->is_paused = false;
 }
 
-void sound_update(linux_sound *sound) {
+void linux_sound_update(linux_sound *sound) {
     if (!sound || !sound->pcm_handle) {
         return;
     }
@@ -554,16 +438,15 @@ void sound_update(linux_sound *sound) {
 
     f32 *sound_data = sound->sample_buffer;
 
-    if (GAME_GET_SOUND_SAMPLES) {
+    if (sound->game_code->get_sound_samples) {
         sound_buffer buffer = {0};
         buffer.samples_per_second = sound->samples_per_second;
         buffer.channel_count = sound->channels;
         buffer.frame_count = available_frames;
         buffer.samples = sound_data;
 
-        GAME_GET_SOUND_SAMPLES(&buffer);
+        sound->game_code->get_sound_samples(&buffer);
     } else {
-
         u32 bytes_to_clear = available_frames * sound->channels * sizeof(f32);
         memory_zero(sound_data, bytes_to_clear);
     }
@@ -574,12 +457,12 @@ void sound_update(linux_sound *sound) {
     }
 }
 
-void *sound_thread_routine(void *thread_parameter) {
+void *liux_sound_thread(void *thread_parameter) {
     linux_sound *sound = (linux_sound *)thread_parameter;
 
     while (sound->is_running) {
         if (!sound->is_paused) {
-            sound_update(sound);
+            linux_sound_update(sound);
         }
 
         usleep(10000);
@@ -588,7 +471,7 @@ void *sound_thread_routine(void *thread_parameter) {
     return 0;
 }
 
-bool sound_initialize(linux_sound *sound, memory_arena *permanent_arena) {
+bool linux_sound_initialize(linux_sound *sound, linux_game_code *game_code, memory_arena *permanent_arena) {
     if (!sound) {
         return false;
     }
@@ -597,6 +480,7 @@ bool sound_initialize(linux_sound *sound, memory_arena *permanent_arena) {
 
     sound->samples_per_second = 48000;
     sound->channels = 2;
+    sound->game_code = game_code;
 
     int error_code = snd_pcm_open(&sound->pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (error_code < 0) {
@@ -638,7 +522,7 @@ bool sound_initialize(linux_sound *sound, memory_arena *permanent_arena) {
     sound->is_running = true;
     sound->is_paused = false;
 
-    if (pthread_create(&sound->thread_handle, 0, sound_thread_routine, sound) != 0) {
+    if (pthread_create(&sound->thread_handle, 0, liux_sound_thread, sound) != 0) {
         fprintf(stderr, "error: could not start sound thread.\n");
     }
 
@@ -647,7 +531,7 @@ bool sound_initialize(linux_sound *sound, memory_arena *permanent_arena) {
 
 ////////////////////////////////////////////
 
-void memory_dump_standard_streams(game_memory *game_memory) {
+void linux_dump_standard_streams(game_memory *game_memory) {
     if (!game_memory) {
         return;
     }
@@ -715,12 +599,156 @@ void memory_dump_standard_streams(game_memory *game_memory) {
 //     }
 // }
 
-static void update(linux_wayland *wayland, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
+////////////////////////////////////////////
+
+#if defined(DEBUG)
+
+static void linux_absolute_libary_path(const char *library_file_name, char *destination_buffer, usize destination_capacity) {
+    memory_zero(destination_buffer, destination_capacity);
+
+    char executable_path[PATH_MAX];
+    isize executable_path_length = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
+
+    if (executable_path_length == -1) {
+        printf("error: readlink failed.\n");
+
+        return;
+    }
+
+    executable_path[executable_path_length] = '\0';
+
+    isize final_slash_index = string_find_last_occurrence_of_character(executable_path, '/');
+
+    if (final_slash_index != -1) {
+        executable_path[final_slash_index + 1] = '\0';
+    }
+
+    string_copy(destination_buffer, destination_capacity, executable_path);
+    string_append(destination_buffer, destination_capacity, library_file_name);
+}
+
+static bool linux_copy_file(const char *source_path, const char *destination_path) {
+    int source_file = open(source_path, O_RDONLY);
+    if (source_file < 0) {
+        return false;
+    }
+
+    int destination_file = open(destination_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (destination_file < 0) {
+        close(source_file);
+        return false;
+    }
+
+    char buffer[4096];
+
+    while (true) {
+        isize bytes_read = read(source_file, buffer, sizeof(buffer));
+
+        if (bytes_read == 0) {
+            break;
+        }
+
+        if (bytes_read < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
+
+        char *write_pointer = buffer;
+        isize bytes_remaining = bytes_read;
+
+        while (bytes_remaining > 0) {
+            isize bytes_written = write(destination_file, write_pointer, bytes_remaining);
+
+            if (bytes_written >= 0) {
+                bytes_remaining -= bytes_written;
+                write_pointer += bytes_written;
+            } else if (errno != EINTR) {
+                return false;
+            }
+        }
+    }
+
+    close(source_file);
+
+    if (close(destination_file) < 0) {
+        return false;
+    }
+
+    return true;
+}
+
+static time_t linux_get_last_write_time(const char *filename) {
+    struct stat file_status;
+    if (stat(filename, &file_status) == 0) {
+        return file_status.st_mtime;
+    }
+    return 0;
+}
+
+static void linux_unload_game_code(linux_game_code *game_code) {
+    if (game_code->handle) {
+        dlclose(game_code->handle);
+        game_code->handle = 0;
+    }
+
+    game_code->is_valid = false;
+
+    game_code->update_and_render = 0;
+    game_code->get_sound_samples = 0;
+}
+
+static linux_game_code linux_load_game_code(const char *source_so_name, const char *temp_so_name) {
+    linux_game_code result = {0};
+
+    result.last_write_time = linux_get_last_write_time(source_so_name);
+
+    linux_copy_file(source_so_name, temp_so_name);
+    result.handle = dlopen(temp_so_name, RTLD_NOW);
+
+    if (result.handle) {
+        result.update_and_render = (update_and_render_function *)dlsym(result.handle, "update_and_render");
+        result.get_sound_samples = (get_sound_samples_function *)dlsym(result.handle, "get_sound_samples");
+
+        result.is_valid = (result.update_and_render && result.get_sound_samples);
+    }
+
+    if (!result.is_valid) {
+        result.update_and_render = 0;
+        result.get_sound_samples = 0;
+    }
+
+    return result;
+}
+
+#endif
+
+////////////////////////////////////////////
+
+static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_code *game_code, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
     struct pollfd pollfd;
     pollfd.fd = wl_display_get_fd(wayland->display);
     pollfd.events = POLLIN;
 
+    char source_path[PATH_MAX];
+    char temporary_path[PATH_MAX];
+    linux_absolute_libary_path("game.so", source_path, sizeof(source_path));
+    linux_absolute_libary_path("game.temp.so", temporary_path, sizeof(temporary_path));
+
     while (wayland->is_running) {
+
+#if defined(DEBUG)
+        if (linux_get_last_write_time(source_path) != game_code->last_write_time) {
+            sound->is_paused = true;
+
+            linux_unload_game_code(game_code);
+            *game_code = linux_load_game_code(source_path, temporary_path);
+
+            sound->is_paused = false;
+        }
+#endif
+
         wl_display_dispatch_pending(wayland->display);
         wl_display_flush(wayland->display);
 
@@ -728,11 +756,11 @@ static void update(linux_wayland *wayland, vulkan *vulkan, game_memory *game_mem
             wl_display_dispatch(wayland->display);
         }
 
-        memory_dump_standard_streams(game_memory);
+        linux_dump_standard_streams(game_memory);
         render_command_buffer_reset(command_buffer);
 
-        if (GAME_UPDATE_AND_RENDER) {
-            GAME_UPDATE_AND_RENDER(game_memory, command_buffer);
+        if (game_code->update_and_render) {
+            game_code->update_and_render(game_memory, command_buffer);
         }
 
         if (!vulkan_frame_begin(vulkan, wayland, command_buffer)) {
@@ -744,10 +772,9 @@ static void update(linux_wayland *wayland, vulkan *vulkan, game_memory *game_mem
         }
     }
 }
-
 int main(void) {
     linux_wayland wayland = {0};
-    if (!wayland_initialize(&wayland)) {
+    if (!linux_wayland_initialize(&wayland)) {
         return EXIT_FAILURE;
     }
 
@@ -772,8 +799,23 @@ int main(void) {
     memory_stream_initialize_writable(error_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, error_stream_size), error_stream_size);
     memory_stream_initialize_writable(info_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, info_stream_size), info_stream_size);
 
+    linux_game_code game_code = {0};
+
+#if defined(DEBUG)
+    char source_path[PATH_MAX];
+    char temporary_path[PATH_MAX];
+    linux_absolute_libary_path("game.so", source_path, sizeof(source_path));
+    linux_absolute_libary_path("game.temp.so", temporary_path, sizeof(temporary_path));
+    
+    game_code = linux_load_game_code(source_path, temporary_path);
+#else
+    game_code.update_and_render = update_and_render;
+    game_code.get_sound_samples = get_sound_samples;
+    game_code.is_valid = true;
+#endif
+
     linux_sound sound;
-    if (!sound_initialize(&sound, &permanent_arena)) {
+    if (!linux_sound_initialize(&sound, &game_code, &permanent_arena)) {
         return EXIT_FAILURE;
     }
 
@@ -795,10 +837,7 @@ int main(void) {
     game_memory.temporary_arena = temporary_arena;
     game_memory.is_initialized = false;
 
-#if defined(DEBUG)
-    game_code_load();
-#endif
-    update(&wayland, &vulkan, &game_memory, command_buffer);
+    linux_update(&wayland, &sound, &game_code, &vulkan, &game_memory, command_buffer);
 
     return EXIT_SUCCESS;
 }

@@ -11,5 +11,4 @@ typedef struct {
     void *samples;
 } sound_clip;
 
-
 sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *error_stream, const void *memory, usize length);

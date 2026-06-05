@@ -7,7 +7,6 @@ CFLAGS=-DDEBUG -Wall -Wextra -Wpedantic -fPIC -g -I$(GEN_DIRECTORY) -I$(GAME_DIR
 BUILD_DIRECTORY = build
 BIN_DIRECTORY   = $(BUILD_DIRECTORY)/bin
 OBJ_DIRECTORY   = $(BUILD_DIRECTORY)/obj
-LIB_DIRECTORY   = $(BUILD_DIRECTORY)/lib
 GEN_DIRECTORY   = $(BUILD_DIRECTORY)/gen
 
 ASSETS_DIRECTORY = assets
@@ -29,7 +28,6 @@ debug:
 	@mkdir -p $(BUILD_DIRECTORY) \
 		$(BIN_DIRECTORY) \
 		$(OBJ_DIRECTORY) \
-		$(LIB_DIRECTORY) \
 		$(GEN_DIRECTORY)
 	@$(MAKE) --no-print-directory targets
 
@@ -40,8 +38,8 @@ ASSETS =                                         \
 	$(GEN_DIRECTORY)/basic_geometry_vertex.spv.h \
 	$(GEN_DIRECTORY)/basic_geometry_pixel.spv.h  \
 
-GAME_SO = $(LIB_DIRECTORY)/Game.so
-LINUX_EXE = $(BIN_DIRECTORY)/Game_Linux
+GAME_SO = $(BIN_DIRECTORY)/game.so
+LINUX_EXE = $(BIN_DIRECTORY)/game
 
 targets: $(ASSETS) $(GAME_SO) $(LINUX_EXE)
 
