@@ -405,13 +405,13 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     image result = {0};
 
     if (!memory) {
-        memory_stream_write_line(error_stream, "error: invalid parameter: memory.");
+        memory_stream_write_string(error_stream, "error: invalid parameter: memory.\n");
 
         return result;
     }
 
     if (length < png_file_signature_length) {
-        memory_stream_write_line(error_stream, "error: most likely corrupted PNG file as it is too small to even contain a signature.");
+        memory_stream_write_string(error_stream, "error: most likely corrupted PNG file as it is too small to even contain a signature.\n");
 
         return result;
     }
@@ -420,7 +420,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     bool has_valid_signature = memory_equals(image_buffer_pointer, png_file_signature, png_file_signature_length);
     if (!has_valid_signature) {
-        memory_stream_write_line(error_stream, "error: corrupted PNG file.");
+        memory_stream_write_string(error_stream, "error: corrupted PNG file.\n");
 
         return result;
     }
@@ -435,7 +435,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     pngidat_chunk *idat_chunks = MEMORY_ARENA_PUSH_ARRAY(temporary_arena, pngidat_chunk, png_max_idat_chunks);
     if (!idat_chunks) {
-        memory_stream_write_line(error_stream, "error: out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
     }
@@ -473,7 +473,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
 #if !defined(FUZZING)
         if (calculated_crc != expected_crc) {
-            memory_stream_write_line(error_stream, "error: CRC mismatch in PNG chunk.");
+            memory_stream_write_string(error_stream, "error: CRC mismatch in PNG chunk.\n");
 
             break;
         }
@@ -545,7 +545,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     }
 
     if (!has_parsed_ihdr || total_idat_data_size == 0) {
-        memory_stream_write_line(error_stream, "error: missing IHDR or no IDAT data.");
+        memory_stream_write_string(error_stream, "error: missing IHDR or no IDAT data.\n");
 
         return result;
     }
@@ -561,7 +561,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     } else if (image_header.color_type == png_color_type_true_color_alpha) {
         bytes_per_pixel = 4;
     } else {
-        memory_stream_write_line(error_stream, "error: unsupported color type.");
+        memory_stream_write_string(error_stream, "error: unsupported color type.\n");
 
         return result;
     }
@@ -571,14 +571,14 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     u8 *decompressed_buffer = MEMORY_ARENA_PUSH_BYTES(temporary_arena, decompressed_capacity);
     if (!decompressed_buffer) {
-        memory_stream_write_line(error_stream, "error: out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
     }
 
     bool succesfully_decompressed = decompress_deflate(idat_chunks, idat_chunk_count, decompressed_buffer, decompressed_capacity);
     if (!succesfully_decompressed) {
-        memory_stream_write_line(error_stream, "error: could not decompress.");
+        memory_stream_write_string(error_stream, "error: could not decompress.\n");
 
         return result;
     }
@@ -588,7 +588,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     const usize raw_scanline_byte_count = (usize)image_width * bytes_per_pixel;
     if (image_width != 0 && raw_scanline_byte_count / image_width != bytes_per_pixel) {
-        memory_stream_write_line(error_stream, "error: scanline byte count overflow.");
+        memory_stream_write_string(error_stream, "error: scanline byte count overflow.\n");
 
         return result;
     }
@@ -597,7 +597,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     const usize expected_decompressed_byte_count = filtered_scanline_byte_count * image_height;
 
     if (decompressed_capacity < expected_decompressed_byte_count) {
-        memory_stream_write_line(error_stream, "error: decompressed PNG data is smaller than expected.");
+        memory_stream_write_string(error_stream, "error: decompressed PNG data is smaller than expected.\n");
 
         return result;
     }
@@ -605,7 +605,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     const usize total_raw_pixel_byte_count = raw_scanline_byte_count * image_height;
     u8 *raw_pixel_data_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, total_raw_pixel_byte_count);
     if (!raw_pixel_data_buffer) {
-        memory_stream_write_line(error_stream, "error: out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
     }
@@ -615,7 +615,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     for (u32 current_scanline_index = 0; current_scanline_index < image_height; current_scanline_index++) {
         if (source_read_offset + filtered_scanline_byte_count > decompressed_capacity) {
-            memory_stream_write_line(error_stream, "error: scanline data overruns decompressed buffer.");
+            memory_stream_write_string(error_stream, "error: scanline data overruns decompressed buffer.\n");
 
             return result;
         }
@@ -627,7 +627,7 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         const u8 *previous_raw_scanline_data = (current_scanline_index > 0) ? &raw_pixel_data_buffer[destination_write_offset - raw_scanline_byte_count] : 0;
 
         if (scanline_filter_type > 4) {
-            memory_stream_write_line(error_stream, "error: unknown PNG filter type.");
+            memory_stream_write_string(error_stream, "error: unknown PNG filter type.\n");
 
             return result;
         }

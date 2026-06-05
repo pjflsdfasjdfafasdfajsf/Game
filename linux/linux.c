@@ -7,6 +7,7 @@
 #include "linux_vulkan.h"
 #include "game_platform.h"
 #include "game_types.h"
+#include "game.h"
 
 #if defined(DEBUG)
 static void *game_so = 0;
@@ -105,12 +106,12 @@ static void game_code_load(void) {
     absolute_libary_path("libgame.temp.so", temporary_library_path, sizeof(temporary_library_path));
 
     if (!copy_file(source_library_path, temporary_library_path)) {
-        fprintf(stderr, "could not copy Game.so.\n");
+        fprintf(stderr, "error: could not copy Game.so.\n");
     }
 
     game_so = dlopen(temporary_library_path, RTLD_NOW);
     if (!game_so) {
-        fprintf(stderr, "%s\n", dlerror());
+        fprintf(stderr, "error: %s\n", dlerror());
     }
 
     GAME_UPDATE_AND_RENDER = (update_and_render_function *)dlsym(game_so, "update_and_render");
@@ -224,7 +225,7 @@ linux_wayland window_create(const char *title) {
 
     wayland.display = wl_display_connect(0);
     if (!wayland.display) {
-        fprintf(stderr, "could not connect to wayland display.\n");
+        fprintf(stderr, "error: could not connect to wayland display.\n");
         return wayland;
     }
 
@@ -234,7 +235,7 @@ linux_wayland window_create(const char *title) {
     wl_display_roundtrip(wayland.display);
 
     if (!wayland.compositor || !wayland.xdg_wm_base) {
-        fprintf(stderr, "failed to bind wayland compositor or xdg_wm_base.\n");
+        fprintf(stderr, "error: failed to bind wayland compositor or xdg_wm_base.\n");
         return wayland;
     }
 
@@ -257,41 +258,41 @@ linux_wayland window_create(const char *title) {
     return wayland;
 }
 
-// NOTE: audio
-// how it comes that alsa does not need to be ran on separate thread and the audio works perfectly fine when resizing/moving the
-// window?
+// NOTE: sound
+// how it comes that alsa does not need to be ran on separate thread and the sound works perfectly
+// fine when resizing/moving the window?
 // it still will be on separate thread though. just in case.
 
-void audio_pause(linux_audio *audio) {
-    if (!audio || !audio->pcm_handle) {
+void sound_pause(linux_sound *sound) {
+    if (!sound || !sound->pcm_handle) {
         return;
     }
 
-    audio->is_paused = true;
+    sound->is_paused = true;
 
-    snd_pcm_drop(audio->pcm_handle);
+    snd_pcm_drop(sound->pcm_handle);
 }
 
-void audio_resume(linux_audio *audio) {
-    if (!audio || !audio->pcm_handle) {
+void sound_resume(linux_sound *sound) {
+    if (!sound || !sound->pcm_handle) {
         return;
     }
 
-    snd_pcm_prepare(audio->pcm_handle);
+    snd_pcm_prepare(sound->pcm_handle);
 
-    audio->is_paused = false;
+    sound->is_paused = false;
 }
 
-void audio_update(linux_audio *audio) {
-    if (!audio || !audio->pcm_handle) {
+void sound_update(linux_sound *sound) {
+    if (!sound || !sound->pcm_handle) {
         return;
     }
 
-    snd_pcm_sframes_t available_frames = snd_pcm_avail_update(audio->pcm_handle);
+    snd_pcm_sframes_t available_frames = snd_pcm_avail_update(sound->pcm_handle);
 
     if (available_frames < 0) {
         if (available_frames == -EPIPE) {
-            snd_pcm_prepare(audio->pcm_handle);
+            snd_pcm_prepare(sound->pcm_handle);
         }
 
         return;
@@ -301,47 +302,38 @@ void audio_update(linux_audio *audio) {
         return;
     }
 
-    if (available_frames > audio->buffer_frame_count) {
-        available_frames = audio->buffer_frame_count;
+    if (available_frames > sound->buffer_frame_count) {
+        available_frames = sound->buffer_frame_count;
     }
 
-    u32 bytes_per_frame = audio->channels * sizeof(f32);
-    // TODO: DO NOT ALLOCATE!
-    f32 *audio_data = (f32 *)malloc(available_frames * bytes_per_frame);
+    f32 *sound_data = sound->sample_buffer;
 
-    if (!audio_data) {
-        return;
+    if (GAME_GET_SOUND_SAMPLES) {
+        sound_buffer buffer = {0};
+        buffer.samples_per_second = sound->samples_per_second;
+        buffer.channel_count = sound->channels;
+        buffer.frame_count = available_frames;
+        buffer.samples = sound_data;
+
+        GAME_GET_SOUND_SAMPLES(&buffer);
+    } else {
+
+        u32 bytes_to_clear = available_frames * sound->channels * sizeof(f32);
+        memory_zero(sound_data, bytes_to_clear);
     }
 
-    f32 *sample_pointer = audio_data;
-
-    for (u32 frame_index = 0; frame_index < available_frames; frame_index++) {
-        f32 sample_value = (audio->phase < 0.5f) ? 0.05f : -0.05f;
-
-        audio->phase += audio->phase_increment;
-        if (audio->phase > 1.0f) {
-            audio->phase -= 1.0f;
-        }
-
-        for (u32 channel_index = 0; channel_index < audio->channels; channel_index++) {
-            *sample_pointer++ = sample_value;
-        }
-    }
-
-    snd_pcm_sframes_t frames_written = snd_pcm_writei(audio->pcm_handle, audio_data, available_frames);
+    snd_pcm_sframes_t frames_written = snd_pcm_writei(sound->pcm_handle, sound_data, available_frames);
     if (frames_written < 0) {
-        snd_pcm_prepare(audio->pcm_handle);
+        snd_pcm_prepare(sound->pcm_handle);
     }
-
-    free(audio_data);
 }
 
-void *audio_thread_routine(void *thread_parameter) {
-    linux_audio *audio = (linux_audio *)thread_parameter;
+void *sound_thread_routine(void *thread_parameter) {
+    linux_sound *sound = (linux_sound *)thread_parameter;
 
-    while (audio->is_running) {
-        if (!audio->is_paused) {
-            audio_update(audio);
+    while (sound->is_running) {
+        if (!sound->is_paused) {
+            sound_update(sound);
         }
 
         usleep(10000);
@@ -350,49 +342,58 @@ void *audio_thread_routine(void *thread_parameter) {
     return 0;
 }
 
-bool audio_initialize(linux_audio *audio) {
-    if (!audio) {
+bool sound_initialize(linux_sound *sound, memory_arena permanent_arena) {
+    if (!sound) {
         return false;
     }
 
-    memory_zero(audio, sizeof(linux_audio));
+    memory_zero(sound, sizeof(linux_sound));
 
-    audio->samples_per_second = 48000;
-    audio->channels = 2;
-    audio->phase_increment = 440.0f / (f32)audio->samples_per_second;
+    sound->samples_per_second = 48000;
+    sound->channels = 2;
 
-    int error_code = snd_pcm_open(&audio->pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    int error_code = snd_pcm_open(&sound->pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (error_code < 0) {
-        fprintf(stderr, "snd_pcm_open: %s\n", snd_strerror(error_code));
+        fprintf(stderr, "error: snd_pcm_open: %s\n", snd_strerror(error_code));
 
         return false;
     }
 
     snd_pcm_hw_params_t *hardware_parameters;
     snd_pcm_hw_params_alloca(&hardware_parameters);
-    snd_pcm_hw_params_any(audio->pcm_handle, hardware_parameters);
+    snd_pcm_hw_params_any(sound->pcm_handle, hardware_parameters);
 
-    snd_pcm_hw_params_set_access(audio->pcm_handle, hardware_parameters, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(audio->pcm_handle, hardware_parameters, SND_PCM_FORMAT_FLOAT_LE);
-    snd_pcm_hw_params_set_channels(audio->pcm_handle, hardware_parameters, audio->channels);
-    snd_pcm_hw_params_set_rate_near(audio->pcm_handle, hardware_parameters, &audio->samples_per_second, 0);
+    snd_pcm_hw_params_set_access(sound->pcm_handle, hardware_parameters, SND_PCM_ACCESS_RW_INTERLEAVED);
+    snd_pcm_hw_params_set_format(sound->pcm_handle, hardware_parameters, SND_PCM_FORMAT_FLOAT_LE);
+    snd_pcm_hw_params_set_channels(sound->pcm_handle, hardware_parameters, sound->channels);
+    snd_pcm_hw_params_set_rate_near(sound->pcm_handle, hardware_parameters, &sound->samples_per_second, 0);
 
-    error_code = snd_pcm_hw_params(audio->pcm_handle, hardware_parameters);
+    error_code = snd_pcm_hw_params(sound->pcm_handle, hardware_parameters);
     if (error_code < 0) {
-        fprintf(stderr, "snd_pcm_hw_params: %s\n", snd_strerror(error_code));
+        fprintf(stderr, "error: snd_pcm_hw_params: %s\n", snd_strerror(error_code));
 
         return false;
     }
 
-    snd_pcm_hw_params_get_buffer_size(hardware_parameters, (snd_pcm_uframes_t *)&audio->buffer_frame_count);
+    snd_pcm_hw_params_get_buffer_size(hardware_parameters, (snd_pcm_uframes_t *)&sound->buffer_frame_count);
 
-    snd_pcm_prepare(audio->pcm_handle);
+    u32 bytes_per_frame = sound->channels * sizeof(u32);
+    usize total_buffer_size = sound->buffer_frame_count * bytes_per_frame;
 
-    audio->is_running = true;
-    audio->is_paused = false;
+    sound->sample_buffer = (f32 *)MEMORY_ARENA_PUSH_BYTES(&permanent_arena, total_buffer_size);
+    if (!sound->sample_buffer) {
+        fprintf(stderr, "error: out of memory\n");
 
-    if (pthread_create(&audio->thread_handle, 0, audio_thread_routine, audio) != 0) {
-        fprintf(stderr, "could not start audio thread.\n");
+        return false;
+    }
+
+    snd_pcm_prepare(sound->pcm_handle);
+
+    sound->is_running = true;
+    sound->is_paused = false;
+
+    if (pthread_create(&sound->thread_handle, 0, sound_thread_routine, sound) != 0) {
+        fprintf(stderr, "error: could not start sound thread.\n");
     }
 
     return true;
@@ -418,7 +419,7 @@ void memory_dump_standard_streams(game_memory *game_memory) {
     }
 }
 
-void run_update(linux_wayland *wayland, linux_audio *audio, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
+void run_update(linux_wayland *wayland, linux_sound *sound, vulkan *vulkan, game_memory *game_memory, render_command_buffer *command_buffer) {
     if (!wayland || !wayland->display) {
         return;
     }
@@ -440,9 +441,9 @@ void run_update(linux_wayland *wayland, linux_audio *audio, vulkan *vulkan, game
         }
 
         if (!wayland->is_focused && was_focused) {
-            audio_pause(audio);
+            sound_pause(sound);
         } else if (wayland->is_focused && !was_focused) {
-            audio_resume(audio);
+            sound_resume(sound);
         }
 
         was_focused = wayland->is_focused;
@@ -473,11 +474,6 @@ int main(void) {
         return 1;
     }
 
-    linux_audio audio;
-    if (!audio_initialize(&audio)) {
-        return 1;
-    }
-
     usize permanent_arena_size = MEGABYTES(64);
     usize temporary_arena_size = MEGABYTES(256);
 
@@ -498,6 +494,11 @@ int main(void) {
 
     memory_stream_initialize_writable(error_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, error_stream_size), error_stream_size);
     memory_stream_initialize_writable(info_stream, MEMORY_ARENA_PUSH_BYTES(&permanent_arena, info_stream_size), info_stream_size);
+
+    linux_sound sound;
+    if (!sound_initialize(&sound, permanent_arena)) {
+        return 1;
+    }
 
     vulkan vulkan;
     if (!vulkan_initialize(&vulkan, &wayland, info_stream, error_stream)) {
@@ -521,7 +522,7 @@ int main(void) {
     game_code_load();
 #endif
 
-    run_update(&wayland, &audio, &vulkan, &game_memory, command_buffer);
+    run_update(&wayland, &sound, &vulkan, &game_memory, command_buffer);
 
     return 0;
 }

@@ -370,10 +370,6 @@ static inline bool memory_stream_write_string(memory_stream *stream, const char 
     return memory_stream_write_bytes(stream, string, length);
 }
 
-static inline bool memory_stream_write_line(memory_stream *stream, const char *string) {
-    return memory_stream_write_string(stream, string) && memory_stream_write_uint8(stream, '\n');
-}
-
 static char decimal_characters[] = "0123456789";
 static char lower_hex_characters[] = "0123456789abcdef";
 static char upper_hex_characters[] = "0123456789ABCDEF";
@@ -634,7 +630,7 @@ typedef struct {
     u32 channel_count;
     u32 frame_count;
     f32 *samples;
-} audio_buffer;
+} sound_buffer;
 
-#define GET_SOUND_SAMPLES(name) void name(audio_buffer *audio_buffer)
+#define GET_SOUND_SAMPLES(name) void name(sound_buffer *sound_buffer)
 typedef GET_SOUND_SAMPLES(get_sound_samples_function);

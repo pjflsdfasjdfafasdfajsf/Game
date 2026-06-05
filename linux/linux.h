@@ -32,10 +32,9 @@ typedef struct {
     u32 channels;
     u32 buffer_frame_count;
  
-    f32 phase;
-    f32 phase_increment;
+    f32 *sample_buffer;
 
     bool is_running;
     bool is_paused;
     pthread_t thread_handle;
-} linux_audio;
+} linux_sound;

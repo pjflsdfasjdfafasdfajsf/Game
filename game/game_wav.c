@@ -8,10 +8,10 @@ static const u8 riff_file_signature[4] = {'R', 'I', 'F', 'F'};
 static const u8 wave_format_signature[4] = {'W', 'A', 'V', 'E'};
 static const usize riff_header_length = 12;
 
-static const u16 pcm_audio_format = 1;
+static const u16 pcm_sound_format = 1;
 
 typedef struct {
-    u16 audio_format;
+    u16 sound_format;
     u16 channel_count;
     u32 sample_rate;
     u32 byte_rate;
@@ -23,12 +23,14 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
     sound_clip result = {0};
 
     if (!memory) {
-        memory_stream_write_line(error_stream, "error: invalid parameter: memory.");
+        memory_stream_write_string(error_stream, "error: invalid parameter: memory.\n");
+
         return result;
     }
 
     if (length < riff_header_length) {
-        memory_stream_write_line(error_stream, "error: file too small to contain a valid RIFF/WAVE header.");
+        memory_stream_write_string(error_stream, "error: file too small to contain a valid RIFF/WAVE header.\n");
+
         return result;
     }
 
@@ -38,7 +40,8 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
     bool is_valid_wave = memory_equals(&file_buffer_pointer[8], wave_format_signature, 4);
 
     if (!is_valid_riff || !is_valid_wave) {
-        memory_stream_write_line(error_stream, "error: corrupted WAV file");
+        memory_stream_write_string(error_stream, "error: corrupted WAV file\n");
+
         return result;
     }
 
@@ -52,8 +55,8 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
     bool has_parsed_data = false;
 
     wav_format_header format = {0};
-    const u8 *audio_data_pointer = 0;
-    u32 audio_data_length = 0;
+    const u8 *sound_data_pointer = 0;
+    u32 sound_data_length = 0;
 
     while (stream.offset < stream.capacity) {
         if (!memory_stream_has_space(&stream, 8)) {
@@ -66,7 +69,8 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
         u32 chunk_length = memory_stream_read_uint32_little_endian(&stream);
 
         if (!memory_stream_has_space(&stream, chunk_length)) {
-            memory_stream_write_line(error_stream, "error: WAV chunk declares a size that exceeds file bounds.");
+            memory_stream_write_string(error_stream, "error: WAV chunk declares a size that exceeds file bounds.\n");
+
             return result;
         }
 
@@ -84,11 +88,12 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
             }
 
             if (chunk_length < 16) {
-                memory_stream_write_line(error_stream, "error: WAV fmt chunk is smaller than the required 16 bytes.");
+                memory_stream_write_string(error_stream, "error: WAV fmt chunk is smaller than the required 16 bytes.\n");
+
                 return result;
             }
 
-            format.audio_format = read_uint16_little_endian(&chunk_data_pointer[0]);
+            format.sound_format = read_uint16_little_endian(&chunk_data_pointer[0]);
             format.channel_count = read_uint16_little_endian(&chunk_data_pointer[2]);
             format.sample_rate = read_uint32_little_endian(&chunk_data_pointer[4]);
             format.byte_rate = read_uint32_little_endian(&chunk_data_pointer[8]);
@@ -101,8 +106,8 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
                 continue;
             }
 
-            audio_data_pointer = chunk_data_pointer;
-            audio_data_length = chunk_length;
+            sound_data_pointer = chunk_data_pointer;
+            sound_data_length = chunk_length;
 
             has_parsed_data = true;
         }
@@ -114,47 +119,53 @@ sound_clip sound_load_from_wav(memory_arena *permanent_arena, memory_stream *err
 
     bool has_required_chunks = (has_parsed_fmt && has_parsed_data);
     if (!has_required_chunks) {
-        memory_stream_write_line(error_stream, "error: missing required 'fmt ' or 'data' chunks.");
+        memory_stream_write_string(error_stream, "error: missing required 'fmt ' or 'data' chunks.\n");
+
         return result;
     }
 
-    bool is_pcm_format = (format.audio_format == pcm_audio_format);
+    bool is_pcm_format = (format.sound_format == pcm_sound_format);
     if (!is_pcm_format) {
-        memory_stream_write_line(error_stream, "error: only uncompressed PCM WAV files are supported.");
+        memory_stream_write_string(error_stream, "error: only uncompressed PCM WAV files are supported.\n");
+
         return result;
     }
 
     bool is_sane_channel_count = (format.channel_count == 1 || format.channel_count == 2);
     if (!is_sane_channel_count) {
-        memory_stream_write_line(error_stream, "error: unsupported channel count (expected 1 or 2).");
+        memory_stream_write_string(error_stream, "error: unsupported channel count (expected 1 or 2).\n");
+
         return result;
     }
 
     bool is_valid_bit_depth = (format.bits_per_sample == 8 || format.bits_per_sample == 16 ||
                                format.bits_per_sample == 24 || format.bits_per_sample == 32);
     if (!is_valid_bit_depth) {
-        memory_stream_write_line(error_stream, "error: unsupported bit depth (expected 8, 16, 24, or 32).");
+        memory_stream_write_string(error_stream, "error: unsupported bit depth (expected 8, 16, 24, or 32).\n");
+
         return result;
     }
 
     u32 expected_block_align = (format.channel_count * format.bits_per_sample) / 8;
     if (format.block_align != expected_block_align) {
-        memory_stream_write_line(error_stream, "error: block align does not match bits per sample and channels.");
+        memory_stream_write_string(error_stream, "error: block align does not match bits per sample and channels.\n");
+
         return result;
     }
 
     ///
 
-    void *raw_sample_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, audio_data_length);
+    void *raw_sample_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, sound_data_length);
     if (!raw_sample_buffer) {
-        memory_stream_write_line(error_stream, "error: out of memory.");
+        memory_stream_write_string(error_stream, "error: out of memory.\n");
+
         return result;
     }
 
-    memory_copy_forwards(raw_sample_buffer, audio_data_pointer, audio_data_length);
+    memory_copy_forwards(raw_sample_buffer, sound_data_pointer, sound_data_length);
 
     u32 bytes_per_sample = format.bits_per_sample / 8;
-    u32 total_samples = audio_data_length / (format.channel_count * bytes_per_sample);
+    u32 total_samples = sound_data_length / (format.channel_count * bytes_per_sample);
 
     result.sample_rate = format.sample_rate;
     result.channel_count = format.channel_count;

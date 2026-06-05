@@ -6,7 +6,7 @@
 
 UPDATE_AND_RENDER(update_and_render) {
     if (!memory->is_initialized) {
-        memory_stream_write_line(memory->standard_info_stream, "game says hi!");
+        memory_stream_write_string(memory->standard_info_stream, "game says hi!");
 
         static const char watermelon[] = {
 #include "watermelon.png.h"
@@ -23,5 +23,5 @@ UPDATE_AND_RENDER(update_and_render) {
 }
 
 GET_SOUND_SAMPLES(get_sound_samples) {
-    UNUSED(audio_buffer);
+    UNUSED(sound_buffer);
 }
