@@ -1,7 +1,7 @@
 #include <alsa/asoundlib.h>
 #include <sys/stat.h>
 #include <pthread.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <dlfcn.h>
 
 #include "linux.h"
