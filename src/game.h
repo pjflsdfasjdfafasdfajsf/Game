@@ -1,11 +1,24 @@
 #pragma once
 
 #include "game_platform.h"
+#include "game_types.h"
+
+typedef struct {
+	vector2 position;
+	vector2 size;
+} enemy;
 
 typedef struct
 {
     vector2 position;
-	vector2 enemy_position;
+    f32 health;
+    f32 last_hit;
+
+    enemy enemies[4096];
+    u32 enemy_count;
+
+	// NOTE: is never resetted
+	f64 accumelated_time;
 } game_state;
 
 /** NOTE: function definitions below are for release builds where the game is not

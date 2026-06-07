@@ -22,6 +22,7 @@ typedef uint64_t u64;
 typedef int64_t i64;
 
 typedef float f32;
+typedef double f64;
 
 // NOTE: macros.
 

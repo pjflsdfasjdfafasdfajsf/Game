@@ -4,6 +4,20 @@
 #include "game_png.h"
 #include "game_types.h"
 
+// NOTE: in seconds
+const f32 enemy_hit_cooldown = 1.0f;
+
+static void enemy_add(game_state *state, vector2 position, vector2 size) {
+    if (state->enemy_count + 1 > ARRAY_COUNT(state->enemies)) {
+        return;
+    }
+
+    state->enemies[state->enemy_count++] = (enemy){
+        .position = position,
+        .size = size, 
+    };
+}
+
 UPDATE_AND_RENDER(update_and_render)
 {
     game_state *state = (game_state *)memory->permanent_arena.base_pointer;
@@ -11,21 +25,25 @@ UPDATE_AND_RENDER(update_and_render)
     {
         MEMORY_ARENA_PUSH_BYTES(&memory->permanent_arena, sizeof(game_state));
 
-        static const char watermelon[] = {
-#embed "../assets/images/c.png"
+        static const char zig[] = {
+#embed "../assets/images/zig.png"
         };
-        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, watermelon, sizeof(watermelon));
+        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, zig, sizeof(zig));
         render_allocate_texture(render_buffer, 1, image.size, image.pixels);
 
         static const char gangster[] = {
-#embed "../assets/images/zig.png"  
+#embed "../assets/images/gangster.png"  
         };
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
         state->position = v2(10, 10);
-        state->enemy_position = v2(500, 10);
+        state->health = 100.0f;
+        state->last_hit = 0.0f;
+        state->accumelated_time = 0.0;
+
+        state->enemy_count = 0;
 
         memory->is_initialized = true;
     }
@@ -47,6 +65,10 @@ UPDATE_AND_RENDER(update_and_render)
         state->position.x += 500.0f * delta_time;
     }
 
+    if (button_pressed(input->mouse_buttons[mouse_button_left])) {
+        enemy_add(state, input->mouse_position, v2(state->health, state->health));
+    }
+
     rectangle player = rect(state->position, v2(200.0f, 200.0f));
     rectangle wall = rect(v2(50.0f, 1000.0f), v2(1000.0f, 20.0f));
 
@@ -57,18 +79,49 @@ UPDATE_AND_RENDER(update_and_render)
         player = rect(state->position, v2(200.0f, 200.0f));
     }
 
-    // NOTE: update enemy
-    vector2 delta = vector2_su
+    bool hit = false;
+    for (u32 i = 0; i < state->enemy_count; i++) {
+        enemy *enemy = &state->enemies[i];
 
-    rectangle enemy = rect(state->enemy_position, v2(100.0f, 100.0f));
+        vector2 to_player = vector2_subtract(state->position, enemy->position);
+        to_player = vector2_norm(to_player);
+
+        enemy->position = vector2_add(enemy->position, vector2_scale(to_player, delta_time * 200.0f));
+
+        rectangle enemy_bounds = rect(enemy->position, enemy->size);
+
+        aabb_collision_result collision = aabb_collision(player, enemy_bounds);
+        if (collision.is_colliding && state->accumelated_time - state->last_hit > enemy_hit_cooldown) {
+            state->last_hit = state->accumelated_time;
+            state->health -= 35.0f;
+            hit = true;
+        }
+
+        collision = aabb_collision(enemy_bounds, wall);
+        if (collision.is_colliding)
+        {
+            enemy->position = vector2_add(enemy->position, collision.penetration_depth);
+        }
+    }
+
+    state->accumelated_time += delta_time;
 
     render_clear_entire_screen(render_buffer, BLACK);
+
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
 
-    render_draw_rectangle(render_buffer, enemy, WHITE, UNIT, 2);
+    for (u32 i = 0; i < state->enemy_count; i++) {
+        enemy *enemy = &state->enemies[i];
+        rectangle enemy_bounds = rect(enemy->position, enemy->size);
+        render_draw_rectangle(render_buffer, enemy_bounds, WHITE, UNIT, 2);
+    }
     
     render_draw_rectangle(render_buffer, player, GREEN, UNIT, UNTEXTURED);
     render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
+
+    if (state->health < 0.0f || hit) {
+        render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, UNIT, UNTEXTURED);
+    }
 }
 
 GET_SOUND_SAMPLES(get_sound_samples)
