@@ -542,9 +542,9 @@ static inline bool memory_stream_write_string_format(memory_stream *stream, cons
  * implementations */
 typedef struct
 {
-    float x, y, z;
-    float r, g, b, a;
-    float u, v;
+    f32 x, y, z;
+    f32 r, g, b, a;
+    f32 u, v;
 } vertex;
 
 typedef enum
@@ -766,7 +766,7 @@ typedef struct
 
     vector2 mouse_position;
     vector2 mouse_delta;
-    float mouse_scroll;
+    f32 mouse_scroll;
 } input;
 
 #define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, render_buffer *render_buffer, f32 delta_time)
