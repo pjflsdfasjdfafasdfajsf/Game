@@ -4,8 +4,6 @@
 /** NOTE: standard 32-bit float epsilon */
 #define EPSILON 1e-6f
 
-#define SQUARE_ROOT(x) __builtin_sqrtf(x)
-
 /** NOTE: which side of box A was impact during collision */
 typedef enum
 {
@@ -41,7 +39,7 @@ static inline f32 vector2_length_squared(const vector2 vector)
 
 static inline f32 vector2_length(const vector2 vector)
 {
-    return SQUARE_ROOT(vector2_length_squared(vector));
+    return SQRT(vector2_length_squared(vector));
 }
 
 static inline vector2 vector2_norm(const vector2 vector)
