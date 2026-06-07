@@ -570,8 +570,7 @@ typedef struct
 typedef struct
 {
     render_entry_header header;
-    vector2 position;
-    vector2 size;
+    rectangle rectangle;
     vector4 color;
     rectangle uv;
     u32 texture;
@@ -670,7 +669,7 @@ static inline void render_clear_entire_screen(render_buffer *render_buffer, vect
     }
 }
 
-static inline void render_draw_rectangle(render_buffer *render_buffer, vector2 position, vector2 size, vector4 color, rectangle uv, u32 texture)
+static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, rectangle uv, u32 texture)
 {
     if (!render_buffer)
     {
@@ -681,8 +680,7 @@ static inline void render_draw_rectangle(render_buffer *render_buffer, vector2 p
 
     if (command)
     {
-        command->position = position;
-        command->size = size;
+        command->rectangle = rect;
         command->color = color;
         command->uv = uv;
         command->texture = texture;
