@@ -385,7 +385,7 @@ int main(void)
 
     memory.standard_info_stream = &info_stream;
     memory.standard_error_stream = &error_stream;
-    memory.is_initialized = true;
+    memory.is_initialized = false;
 
     render_buffer render_buffer = {0};
     render_buffer_initialize(&render_buffer, render_buffer_memory, render_buffer_size);
