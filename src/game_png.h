@@ -6,7 +6,6 @@
 typedef struct
 {
     vector2u size;
-    u32 bytes_per_pixel;
     u8 *pixels;
 } image;
 
