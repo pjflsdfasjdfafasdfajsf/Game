@@ -14,7 +14,7 @@ UPDATE_AND_RENDER(update_and_render)
         static const char watermelon[] = {
 #embed "../assets/images/c.png"
         };
-        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, animation, sizeof(animation));
+        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, watermelon, sizeof(watermelon));
         render_allocate_texture(render_buffer, 1, image.size, image.pixels);
 
         static const char gangster[] = {
@@ -56,6 +56,9 @@ UPDATE_AND_RENDER(update_and_render)
         state->position = vector2_add(state->position, collision.penetration_depth);
         player = rect(state->position, v2(200.0f, 200.0f));
     }
+
+    // NOTE: update enemy
+    vector2 delta = vector2_su
 
     rectangle enemy = rect(state->enemy_position, v2(100.0f, 100.0f));
 

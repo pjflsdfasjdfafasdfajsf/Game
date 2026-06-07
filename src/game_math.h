@@ -27,6 +27,10 @@ static inline vector2 vector2_add(const vector2 a, const vector2 b)
     return v2(a.x + b.x, a.y + b.y);
 }
 
+static inline vector2 vector2_subtract(const vector2 a, const vector2 b) {
+    return v2(a.x - b.x, a.y - b.y);
+}
+
 static inline vector2 vector2_scale(const vector2 vector, const f32 factor)
 {
     return v2(vector.x * factor, vector.y * factor);

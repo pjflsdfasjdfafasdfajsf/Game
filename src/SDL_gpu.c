@@ -338,7 +338,7 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                         copy_pass = SDL_BeginGPUCopyPass(command_buffer);
                     }
 
-                    if (gpu_upload_texture(gpu->device, copy_pass, new_texture, command->pixels, command->size.x, command->size.y, command->bytes_per_pixel))
+                    if (gpu_upload_texture(gpu->device, copy_pass, new_texture, command->pixels, command->size.x, command->size.y, command->))
                     {
                         if (gpu->textures[command->index])
                         {
