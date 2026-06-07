@@ -47,15 +47,15 @@ UPDATE_AND_RENDER(update_and_render)
     static f32 accumelated_time = 0.0f;
 
     accumelated_time += delta_time;
-    if (accumelated_time > 0.1f) {
+    if (accumelated_time > 0.1f)
+    {
         accumelated_time = 0.0f;
         element = (element + 1) % 6;
     }
     rectangle uv = rect(element * size, row * size, element * size + size, row * size + size);
-    if (!look_right) {
-        f32 tmp = uv.min.x;
-        uv.min.x = uv.max.x;
-        uv.max.x = tmp;
+    if (!look_right)
+    {
+        SWAP(uv.min.x, uv.max.x);
     }
 
     render_clear_entire_screen(render_buffer, red);
