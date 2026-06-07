@@ -717,8 +717,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     }
 
     const usize total_raw_pixel_byte_count = raw_scanline_byte_count * image_height;
-    u8 *raw_pixel_data_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, total_raw_pixel_byte_count);
-    if (!raw_pixel_data_buffer)
+    u8 *raw_pixels = MEMORY_ARENA_PUSH_BYTES(temporary_arena, total_raw_pixel_byte_count);
+    if (!raw_pixels)
     {
         memory_stream_write_string(error_stream, "error: out of memory.\n");
 
@@ -739,9 +739,9 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
         const u8 scanline_filter_type = decompressed_buffer[source_read_offset++];
         const u8 *current_filtered_scanline_data = &decompressed_buffer[source_read_offset];
-        u8 *current_raw_scanline_data = &raw_pixel_data_buffer[destination_write_offset];
+        u8 *current_raw_scanline_data = &raw_pixels[destination_write_offset];
 
-        const u8 *previous_raw_scanline_data = (current_scanline_index > 0) ? &raw_pixel_data_buffer[destination_write_offset - raw_scanline_byte_count] : 0;
+        const u8 *previous_raw_scanline_data = (current_scanline_index > 0) ? &raw_pixels[destination_write_offset - raw_scanline_byte_count] : 0;
 
         if (scanline_filter_type > 4)
         {
@@ -788,10 +788,51 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         destination_write_offset += raw_scanline_byte_count;
     }
 
+    const usize pixel_byte_count = (usize)image_width * image_height * 4;
+    u8 *pixels = MEMORY_ARENA_PUSH_BYTES(permanent_arena, pixel_byte_count);
+
+    if (!pixels)
+    {
+        memory_stream_write_string(error_stream, "error: out of memory.\n");
+        return result;
+    }
+
+    usize pixel_count = (usize)image_width * image_height;
+    for (usize i = 0; i < pixel_count; i++)
+    {
+        if (bytes_per_pixel == 4)
+        {
+            pixels[i * 4 + 0] = raw_pixels[i * 4 + 0];
+            pixels[i * 4 + 1] = raw_pixels[i * 4 + 1];
+            pixels[i * 4 + 2] = raw_pixels[i * 4 + 2];
+            pixels[i * 4 + 3] = raw_pixels[i * 4 + 3];
+        }
+        else if (bytes_per_pixel == 3)
+        {
+            pixels[i * 4 + 0] = raw_pixels[i * 3 + 0];
+            pixels[i * 4 + 1] = raw_pixels[i * 3 + 1];
+            pixels[i * 4 + 2] = raw_pixels[i * 3 + 2];
+            pixels[i * 4 + 3] = 255;
+        }
+        else if (bytes_per_pixel == 2)
+        {
+            pixels[i * 4 + 0] = raw_pixels[i * 2 + 0];
+            pixels[i * 4 + 1] = raw_pixels[i * 2 + 0];
+            pixels[i * 4 + 2] = raw_pixels[i * 2 + 0];
+            pixels[i * 4 + 3] = raw_pixels[i * 2 + 1];
+        }
+        else if (bytes_per_pixel == 1)
+        {
+            pixels[i * 4 + 0] = raw_pixels[i];
+            pixels[i * 4 + 1] = raw_pixels[i];
+            pixels[i * 4 + 2] = raw_pixels[i];
+            pixels[i * 4 + 3] = 255;
+        }
+    }
+
     result.size.width = image_width;
     result.size.height = image_height;
-    result.bytes_per_pixel = bytes_per_pixel;
-    result.pixels = raw_pixel_data_buffer;
+    result.pixels = pixels;
 
     return result;
 }

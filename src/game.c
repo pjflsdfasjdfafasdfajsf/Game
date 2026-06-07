@@ -14,15 +14,15 @@ UPDATE_AND_RENDER(update_and_render)
         static const char watermelon[] = {
 #embed "../assets/images/c.png"
         };
-        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, watermelon, sizeof(watermelon)); 
-        render_allocate_texture(render_buffer, 1, image.size, image.bytes_per_pixel, image.pixels);
+        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, animation, sizeof(animation));
+        render_allocate_texture(render_buffer, 1, image.size, image.pixels);
 
         static const char gangster[] = {
 #embed "../assets/images/zig.png"  
         };
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
-        render_allocate_texture(render_buffer, 2, image.size, image.bytes_per_pixel, image.pixels);
+        render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
         state->position = v2(10, 10);
         state->enemy_position = v2(500, 10);
