@@ -5,13 +5,7 @@
 typedef struct
 {
     vector2 position;
-    vector2 velocity;
-    vector2 accelaration;
-    vector2 player_size;
-    bool look_right;
-    bool on_ground;
-    u32 element;
-    f32 accumulated_time;
+	vector2 enemy_position;
 } game_state;
 
 /** NOTE: function definitions below are for release builds where the game is not
