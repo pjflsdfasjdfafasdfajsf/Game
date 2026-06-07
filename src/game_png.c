@@ -7,19 +7,26 @@
 static u32 crc32_table[256];
 static bool crc32_table_initialized = false;
 
-static void crc32_table_initialize(void) {
-    if (crc32_table_initialized) {
+static void crc32_table_initialize(void)
+{
+    if (crc32_table_initialized)
+    {
         return;
     }
 
     const u32 crc32_polynomial = 0xEDB88320;
 
-    for (u32 i = 0; i < 256; i++) {
+    for (u32 i = 0; i < 256; i++)
+    {
         u32 crc = i;
-        for (u32 j = 0; j < 8; j++) {
-            if (IS_BIT_SET(crc, 1)) {
+        for (u32 j = 0; j < 8; j++)
+        {
+            if (IS_BIT_SET(crc, 1))
+            {
                 crc = crc32_polynomial ^ (crc >> 1);
-            } else {
+            }
+            else
+            {
                 crc = (crc >> 1);
             }
         }
@@ -29,12 +36,14 @@ static void crc32_table_initialize(void) {
     crc32_table_initialized = true;
 }
 
-static u32 crc32_calculate(const u8 *memory, usize length) {
+static u32 crc32_calculate(const u8 *memory, usize length)
+{
     crc32_table_initialize();
 
     u32 crc = 0xFFFFFFFF;
 
-    for (usize i = 0; i < length; i++) {
+    for (usize i = 0; i < length; i++)
+    {
         u32 table_index = (crc ^ memory[i]) & 0xFF;
         crc = crc32_table[table_index] ^ (crc >> 8);
     }
@@ -52,7 +61,8 @@ static const usize png_chunk_crc_size = 4;
 static const u32 pngihdr_chunk_length = 13;
 static const u32 png_max_idat_chunks = 1024;
 
-typedef enum {
+typedef enum
+{
     png_color_type_grayscale = 0,
     png_color_type_true_color = 2,
     png_color_type_indexed = 3,
@@ -60,7 +70,8 @@ typedef enum {
     png_color_type_true_color_alpha = 6
 } png_color_type;
 
-typedef struct {
+typedef struct
+{
     u32 width;
     u32 height;
     u8 bit_depth;
@@ -70,39 +81,32 @@ typedef struct {
     u8 interlace_method;
 } png_header;
 
-typedef struct {
+typedef struct
+{
     const u8 *memory;
     u32 length;
 } pngidat_chunk;
 
 // NOTE: deflating.
 
-static const u16 deflate_length_bases[29] = {
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
-    35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
+static const u16 deflate_length_bases[29] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
 
-static const u8 deflate_length_extra_bits[29] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
-    3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
+static const u8 deflate_length_extra_bits[29] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
 
-static const u16 deflate_distance_bases[30] = {
-    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
-    257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
-    8193, 12289, 16385, 24577};
+static const u16 deflate_distance_bases[30] = {1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577};
 
-static const u8 deflate_distance_extra_bits[30] = {
-    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
-    7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
+static const u8 deflate_distance_extra_bits[30] = {0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
-static const u8 deflate_code_length_order[19] = {
-    16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+static const u8 deflate_code_length_order[19] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
-typedef struct {
+typedef struct
+{
     u16 counts[16];
     u16 symbols[288];
 } huffman_tree;
 
-typedef struct {
+typedef struct
+{
     const pngidat_chunk *chunks;
     usize chunk_count;
     usize current_chunk_index;
@@ -113,9 +117,12 @@ typedef struct {
     bool has_overflowed;
 } bit_stream;
 
-static inline u32 stream_read_bits(bit_stream *stream, u32 bit_count) {
-    while (stream->bits_available < bit_count) {
-        if (stream->current_chunk_index >= stream->chunk_count) {
+static inline u32 stream_read_bits(bit_stream *stream, u32 bit_count)
+{
+    while (stream->bits_available < bit_count)
+    {
+        if (stream->current_chunk_index >= stream->chunk_count)
+        {
             stream->has_overflowed = true;
             return 0;
         }
@@ -128,7 +135,8 @@ static inline u32 stream_read_bits(bit_stream *stream, u32 bit_count) {
 
         stream->byte_offset_in_chunk++;
 
-        if (stream->byte_offset_in_chunk >= current_chunk->length) {
+        if (stream->byte_offset_in_chunk >= current_chunk->length)
+        {
             stream->current_chunk_index++;
             stream->byte_offset_in_chunk = 0;
         }
@@ -141,16 +149,19 @@ static inline u32 stream_read_bits(bit_stream *stream, u32 bit_count) {
     return result;
 }
 
-static u32 stream_decode_symbol(bit_stream *stream, const huffman_tree *tree) {
+static u32 stream_decode_symbol(bit_stream *stream, const huffman_tree *tree)
+{
     u32 code = 0;
     u32 first_code = 0;
     u32 first_symbol_index = 0;
 
-    for (u32 length = 1; length <= 15; length++) {
+    for (u32 length = 1; length <= 15; length++)
+    {
         code = (code << 1) | stream_read_bits(stream, 1);
 
         u32 count = tree->counts[length];
-        if (code - first_code < count) {
+        if (code - first_code < count)
+        {
             return tree->symbols[first_symbol_index + (code - first_code)];
         }
 
@@ -162,12 +173,15 @@ static u32 stream_decode_symbol(bit_stream *stream, const huffman_tree *tree) {
     return 0;
 }
 
-static bool huffman_tree_initialize(huffman_tree *tree, const u8 *lengths, u32 count) {
+static bool huffman_tree_initialize(huffman_tree *tree, const u8 *lengths, u32 count)
+{
     ZERO_ARRAY(tree->counts);
     ZERO_ARRAY(tree->symbols);
 
-    for (u32 i = 0; i < count; i++) {
-        if (lengths[i] > 15) {
+    for (u32 i = 0; i < count; i++)
+    {
+        if (lengths[i] > 15)
+        {
             return false;
         }
 
@@ -179,22 +193,26 @@ static bool huffman_tree_initialize(huffman_tree *tree, const u8 *lengths, u32 c
     ZERO_ARRAY(next_symbol_index);
 
     u16 symbol_index = 0;
-    for (u32 i = 1; i <= 15; i++) {
+    for (u32 i = 1; i <= 15; i++)
+    {
         next_symbol_index[i] = symbol_index;
         symbol_index += tree->counts[i];
     }
 
-    for (u32 i = 0; i < count; i++) {
+    for (u32 i = 0; i < count; i++)
+    {
         u8 length = lengths[i];
 
-        if (length != 0) {
+        if (length != 0)
+        {
             tree->symbols[next_symbol_index[length]++] = (u16)i;
         }
     }
     return true;
 }
 
-static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u8 *output_buffer, usize output_capacity) {
+static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u8 *output_buffer, usize output_capacity)
+{
     bit_stream stream = {0};
 
     stream.chunks = chunks;
@@ -203,15 +221,18 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
     u32 zlib_method_flags = stream_read_bits(&stream, 8);
     u32 zlib_additional_flags = stream_read_bits(&stream, 8);
 
-    if ((zlib_method_flags & 0x0F) != 8) {
+    if ((zlib_method_flags & 0x0F) != 8)
+    {
         // NOTE: not DEFLATE
         return false;
     }
-    if (((zlib_method_flags << 8) + zlib_additional_flags) % 31 != 0) {
+    if (((zlib_method_flags << 8) + zlib_additional_flags) % 31 != 0)
+    {
         // NOTE: checksum failed
         return false;
     }
-    if (IS_BIT_SET(zlib_additional_flags, 0x20)) {
+    if (IS_BIT_SET(zlib_additional_flags, 0x20))
+    {
         // NOTE: preset dictionaries are not allowed in PNG
         return false;
     }
@@ -219,57 +240,72 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
     usize output_position = 0;
     bool is_final_block = false;
 
-    while (!is_final_block && !stream.has_overflowed) {
+    while (!is_final_block && !stream.has_overflowed)
+    {
         is_final_block = stream_read_bits(&stream, 1);
         u32 block_type = stream_read_bits(&stream, 2);
 
-        if (block_type == 0) {
+        if (block_type == 0)
+        {
             stream.bit_buffer = 0;
             stream.bits_available = 0;
 
             u32 length = stream_read_bits(&stream, 16);
             u32 inverted_length = stream_read_bits(&stream, 16);
-            if (length != (~inverted_length & 0xFFFF)) {
+            if (length != (~inverted_length & 0xFFFF))
+            {
                 return false;
             }
 
-            for (u32 i = 0; i < length; i++) {
-                if (output_position >= output_capacity) {
+            for (u32 i = 0; i < length; i++)
+            {
+                if (output_position >= output_capacity)
+                {
                     return false;
                 }
 
                 output_buffer[output_position++] = (u8)stream_read_bits(&stream, 8);
             }
-        } else if (block_type == 1 || block_type == 2) {
+        }
+        else if (block_type == 1 || block_type == 2)
+        {
             huffman_tree literal_tree = {0};
 
             huffman_tree distance_tree = {0};
 
             // NOTE: fixed huffman
-            if (block_type == 1) {
+            if (block_type == 1)
+            {
                 u8 lengths[288];
-                for (u32 i = 0; i <= 143; i++) {
+                for (u32 i = 0; i <= 143; i++)
+                {
                     lengths[i] = 8;
                 }
-                for (u32 i = 144; i <= 255; i++) {
+                for (u32 i = 144; i <= 255; i++)
+                {
                     lengths[i] = 9;
                 }
-                for (u32 i = 256; i <= 279; i++) {
+                for (u32 i = 256; i <= 279; i++)
+                {
                     lengths[i] = 7;
                 }
-                for (u32 i = 280; i <= 287; i++) {
+                for (u32 i = 280; i <= 287; i++)
+                {
                     lengths[i] = 8;
                 }
 
                 huffman_tree_initialize(&literal_tree, lengths, 288);
 
                 u8 dist_lengths[32];
-                for (u32 i = 0; i < 32; i++) {
+                for (u32 i = 0; i < 32; i++)
+                {
                     dist_lengths[i] = 5;
                 }
 
                 huffman_tree_initialize(&distance_tree, dist_lengths, 32);
-            } else { // NOTE: dynamic huffman
+            }
+            else
+            { // NOTE: dynamic huffman
                 u32 hlit = stream_read_bits(&stream, 5) + 257;
                 u32 hdist = stream_read_bits(&stream, 5) + 1;
                 u32 hclen = stream_read_bits(&stream, 4) + 4;
@@ -277,7 +313,8 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
                 u8 code_length_lengths[19];
                 ZERO_ARRAY(code_length_lengths);
 
-                for (u32 i = 0; i < hclen; i++) {
+                for (u32 i = 0; i < hclen; i++)
+                {
                     code_length_lengths[deflate_code_length_order[i]] = (u8)stream_read_bits(&stream, 3);
                 }
 
@@ -291,46 +328,63 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
                 u32 total_codes = hlit + hdist;
                 u32 index = 0;
 
-                while (index < total_codes) {
+                while (index < total_codes)
+                {
                     u32 symbol = stream_decode_symbol(&stream, &code_length_tree);
-                    if (symbol <= 15) {
+                    if (symbol <= 15)
+                    {
                         lengths[index++] = (u8)symbol;
-                    } else if (symbol == 16) {
+                    }
+                    else if (symbol == 16)
+                    {
                         u32 repeat_count = stream_read_bits(&stream, 2) + 3;
 
-                        if (index == 0) {
+                        if (index == 0)
+                        {
                             return false;
                         }
 
-                        if (index + repeat_count > total_codes) {
+                        if (index + repeat_count > total_codes)
+                        {
                             return false;
                         }
 
                         u8 repeat_value = lengths[index - 1];
-                        while (repeat_count--) {
+                        while (repeat_count--)
+                        {
                             lengths[index++] = repeat_value;
                         }
-                    } else if (symbol == 17) {
+                    }
+                    else if (symbol == 17)
+                    {
                         u32 repeat_count = stream_read_bits(&stream, 3) + 3;
 
-                        if (index + repeat_count > total_codes) {
+                        if (index + repeat_count > total_codes)
+                        {
                             return false;
                         }
 
-                        while (repeat_count--) {
+                        while (repeat_count--)
+                        {
                             lengths[index++] = 0;
                         }
-                    } else if (symbol == 18) {
+                    }
+                    else if (symbol == 18)
+                    {
                         u32 repeat_count = stream_read_bits(&stream, 7) + 11;
 
-                        if (index + repeat_count > total_codes) {
+                        if (index + repeat_count > total_codes)
+                        {
                             return false;
                         }
 
-                        while (repeat_count--) {
+                        while (repeat_count--)
+                        {
                             lengths[index++] = 0;
                         }
-                    } else {
+                    }
+                    else
+                    {
                         return false;
                     }
                 }
@@ -339,33 +393,44 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
                 huffman_tree_initialize(&distance_tree, lengths + hlit, hdist);
             }
 
-            while (!stream.has_overflowed) {
+            while (!stream.has_overflowed)
+            {
                 u32 symbol = stream_decode_symbol(&stream, &literal_tree);
 
-                if (symbol < 256) {
-                    if (output_position >= output_capacity) {
+                if (symbol < 256)
+                {
+                    if (output_position >= output_capacity)
+                    {
                         return false;
                     }
 
                     output_buffer[output_position++] = (u8)symbol;
-                } else if (symbol == 256) {
+                }
+                else if (symbol == 256)
+                {
                     break;
-                } else {
-                    if (symbol > 285 || symbol < 257) {
+                }
+                else
+                {
+                    if (symbol > 285 || symbol < 257)
+                    {
                         return false;
                     }
                     symbol -= 257;
                     u32 length = deflate_length_bases[symbol] + stream_read_bits(&stream, deflate_length_extra_bits[symbol]);
 
                     u32 distance_symbol = stream_decode_symbol(&stream, &distance_tree);
-                    if (distance_symbol >= 30) {
+                    if (distance_symbol >= 30)
+                    {
                         return false;
                     }
 
                     u32 distance = deflate_distance_bases[distance_symbol] + stream_read_bits(&stream, deflate_distance_extra_bits[distance_symbol]);
 
-                    for (u32 i = 0; i < length; i++) {
-                        if (output_position >= output_capacity || output_position < distance) {
+                    for (u32 i = 0; i < length; i++)
+                    {
+                        if (output_position >= output_capacity || output_position < distance)
+                        {
                             return false;
                         }
 
@@ -374,7 +439,9 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
                     }
                 }
             }
-        } else {
+        }
+        else
+        {
             return false;
         }
     }
@@ -382,7 +449,8 @@ static bool decompress_deflate(const pngidat_chunk *chunks, usize chunk_count, u
     return !stream.has_overflowed;
 }
 
-static inline u8 paeth_predictor(u8 left_byte, u8 up_byte, u8 up_left_byte) {
+static inline u8 paeth_predictor(u8 left_byte, u8 up_byte, u8 up_left_byte)
+{
     const int a = (int)left_byte;
     const int b = (int)up_byte;
     const int c = (int)up_left_byte;
@@ -392,26 +460,35 @@ static inline u8 paeth_predictor(u8 left_byte, u8 up_byte, u8 up_left_byte) {
     const int distance_b = ABS(initial_estimate - b);
     const int distance_c = ABS(initial_estimate - c);
 
-    if (distance_a <= distance_b && distance_a <= distance_c) {
+    if (distance_a <= distance_b && distance_a <= distance_c)
+    {
         return (u8)a;
-    } else if (distance_b <= distance_c) {
+    }
+    else if (distance_b <= distance_c)
+    {
         return (u8)b;
-    } else {
+    }
+    else
+    {
         return (u8)c;
     }
 }
 
-image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const void *memory, usize length) {
+image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const void *memory, usize length)
+{
     image result = {0};
 
-    if (!memory) {
+    if (!memory)
+    {
         memory_stream_write_string(error_stream, "error: invalid parameter: memory.\n");
 
         return result;
     }
 
-    if (length < png_file_signature_length) {
-        memory_stream_write_string(error_stream, "error: most likely corrupted PNG file as it is too small to even contain a signature.\n");
+    if (length < png_file_signature_length)
+    {
+        memory_stream_write_string(error_stream, "error: most likely corrupted PNG file as it is "
+                                                 "too small to even contain a signature.\n");
 
         return result;
     }
@@ -419,7 +496,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     const u8 *image_buffer_pointer = (const u8 *)memory;
 
     bool has_valid_signature = memory_equals(image_buffer_pointer, png_file_signature, png_file_signature_length);
-    if (!has_valid_signature) {
+    if (!has_valid_signature)
+    {
         memory_stream_write_string(error_stream, "error: corrupted PNG file.\n");
 
         return result;
@@ -434,7 +512,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     png_header image_header = {0};
 
     pngidat_chunk *idat_chunks = MEMORY_ARENA_PUSH_ARRAY(temporary_arena, pngidat_chunk, png_max_idat_chunks);
-    if (!idat_chunks) {
+    if (!idat_chunks)
+    {
         memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
@@ -446,8 +525,10 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     bool has_seen_idat = false;
     bool is_previous_chunk_idat = false;
 
-    while (stream.offset < stream.capacity) {
-        if (!memory_stream_has_space(&stream, png_chunk_length_size + png_chunk_type_size)) {
+    while (stream.offset < stream.capacity)
+    {
+        if (!memory_stream_has_space(&stream, png_chunk_length_size + png_chunk_type_size))
+        {
             break;
         }
 
@@ -456,7 +537,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         const u8 *chunk_type_pointer = &stream.memory[stream.offset];
         stream.offset += png_chunk_type_size;
 
-        if (!memory_stream_has_space(&stream, chunk_length + png_chunk_crc_size)) {
+        if (!memory_stream_has_space(&stream, chunk_length + png_chunk_crc_size))
+        {
             break;
         }
 
@@ -472,26 +554,31 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         UNUSED(calculated_crc);
 
 #if !defined(FUZZING)
-        if (calculated_crc != expected_crc) {
+        if (calculated_crc != expected_crc)
+        {
             memory_stream_write_string(error_stream, "error: CRC mismatch in PNG chunk.\n");
 
             break;
         }
 #endif
 
-        if (memory_equals(chunk_type_pointer, "IHDR", 4)) {
-            if (chunk_length != pngihdr_chunk_length) {
+        if (memory_equals(chunk_type_pointer, "IHDR", 4))
+        {
+            if (chunk_length != pngihdr_chunk_length)
+            {
                 break;
             }
 
-            if (has_parsed_ihdr) {
+            if (has_parsed_ihdr)
+            {
                 break;
             }
 
             image_header.width = read_uint32_big_endian(&chunk_data_pointer[0]);
             image_header.height = read_uint32_big_endian(&chunk_data_pointer[4]);
 #if defined(FUZZING)
-            if (image_header.width > 128 || image_header.height > 128) {
+            if (image_header.width > 128 || image_header.height > 128)
+            {
                 break;
             }
 #endif
@@ -501,24 +588,32 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
             image_header.filter_method = chunk_data_pointer[11];
             image_header.interlace_method = chunk_data_pointer[12];
 
-            if (image_header.width == 0 || image_header.height == 0) {
+            if (image_header.width == 0 || image_header.height == 0)
+            {
                 break;
             }
 
-            if (image_header.compression_method != 0 || image_header.filter_method != 0 || image_header.bit_depth != 8 || image_header.interlace_method != 0) {
+            if (image_header.compression_method != 0 || image_header.filter_method != 0 || image_header.bit_depth != 8 || image_header.interlace_method != 0)
+            {
                 break;
             }
 
             has_parsed_ihdr = true;
             is_previous_chunk_idat = false;
-        } else if (!has_parsed_ihdr) {
+        }
+        else if (!has_parsed_ihdr)
+        {
             break;
-        } else if (memory_equals(chunk_type_pointer, "IDAT", 4)) {
-            if (has_seen_idat && !is_previous_chunk_idat) {
+        }
+        else if (memory_equals(chunk_type_pointer, "IDAT", 4))
+        {
+            if (has_seen_idat && !is_previous_chunk_idat)
+            {
                 break;
             }
 
-            if (idat_chunk_count >= png_max_idat_chunks) {
+            if (idat_chunk_count >= png_max_idat_chunks)
+            {
                 break;
             }
 
@@ -530,13 +625,18 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
             has_seen_idat = true;
             is_previous_chunk_idat = true;
-        } else if (memory_equals(chunk_type_pointer, "IEND", 4)) {
+        }
+        else if (memory_equals(chunk_type_pointer, "IEND", 4))
+        {
             is_previous_chunk_idat = false;
 
             break;
-        } else {
+        }
+        else
+        {
             bool is_critical_chunk = !IS_BIT_SET(chunk_type_pointer[0], 0x20);
-            if (is_critical_chunk) {
+            if (is_critical_chunk)
+            {
                 break;
             }
 
@@ -544,7 +644,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
         }
     }
 
-    if (!has_parsed_ihdr || total_idat_data_size == 0) {
+    if (!has_parsed_ihdr || total_idat_data_size == 0)
+    {
         memory_stream_write_string(error_stream, "error: missing IHDR or no IDAT data.\n");
 
         return result;
@@ -552,15 +653,24 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     u32 bytes_per_pixel = 0;
 
-    if (image_header.color_type == png_color_type_grayscale) {
+    if (image_header.color_type == png_color_type_grayscale)
+    {
         bytes_per_pixel = 1;
-    } else if (image_header.color_type == png_color_type_true_color) {
+    }
+    else if (image_header.color_type == png_color_type_true_color)
+    {
         bytes_per_pixel = 3;
-    } else if (image_header.color_type == png_color_type_grayscale_alpha) {
+    }
+    else if (image_header.color_type == png_color_type_grayscale_alpha)
+    {
         bytes_per_pixel = 2;
-    } else if (image_header.color_type == png_color_type_true_color_alpha) {
+    }
+    else if (image_header.color_type == png_color_type_true_color_alpha)
+    {
         bytes_per_pixel = 4;
-    } else {
+    }
+    else
+    {
         memory_stream_write_string(error_stream, "error: unsupported color type.\n");
 
         return result;
@@ -570,14 +680,16 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     usize decompressed_capacity = scanline_stride * image_header.height;
 
     u8 *decompressed_buffer = MEMORY_ARENA_PUSH_BYTES(temporary_arena, decompressed_capacity);
-    if (!decompressed_buffer) {
+    if (!decompressed_buffer)
+    {
         memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
     }
 
     bool succesfully_decompressed = decompress_deflate(idat_chunks, idat_chunk_count, decompressed_buffer, decompressed_capacity);
-    if (!succesfully_decompressed) {
+    if (!succesfully_decompressed)
+    {
         memory_stream_write_string(error_stream, "error: could not decompress.\n");
 
         return result;
@@ -587,7 +699,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     const u32 image_height = image_header.height;
 
     const usize raw_scanline_byte_count = (usize)image_width * bytes_per_pixel;
-    if (image_width != 0 && raw_scanline_byte_count / image_width != bytes_per_pixel) {
+    if (image_width != 0 && raw_scanline_byte_count / image_width != bytes_per_pixel)
+    {
         memory_stream_write_string(error_stream, "error: scanline byte count overflow.\n");
 
         return result;
@@ -596,7 +709,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     const usize filtered_scanline_byte_count = raw_scanline_byte_count + 1;
     const usize expected_decompressed_byte_count = filtered_scanline_byte_count * image_height;
 
-    if (decompressed_capacity < expected_decompressed_byte_count) {
+    if (decompressed_capacity < expected_decompressed_byte_count)
+    {
         memory_stream_write_string(error_stream, "error: decompressed PNG data is smaller than expected.\n");
 
         return result;
@@ -604,7 +718,8 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
     const usize total_raw_pixel_byte_count = raw_scanline_byte_count * image_height;
     u8 *raw_pixel_data_buffer = MEMORY_ARENA_PUSH_BYTES(permanent_arena, total_raw_pixel_byte_count);
-    if (!raw_pixel_data_buffer) {
+    if (!raw_pixel_data_buffer)
+    {
         memory_stream_write_string(error_stream, "error: out of memory.\n");
 
         return result;
@@ -613,8 +728,10 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
     usize source_read_offset = 0;
     usize destination_write_offset = 0;
 
-    for (u32 current_scanline_index = 0; current_scanline_index < image_height; current_scanline_index++) {
-        if (source_read_offset + filtered_scanline_byte_count > decompressed_capacity) {
+    for (u32 current_scanline_index = 0; current_scanline_index < image_height; current_scanline_index++)
+    {
+        if (source_read_offset + filtered_scanline_byte_count > decompressed_capacity)
+        {
             memory_stream_write_string(error_stream, "error: scanline data overruns decompressed buffer.\n");
 
             return result;
@@ -626,34 +743,42 @@ image image_load_from_png(memory_arena *permanent_arena, memory_arena *temporary
 
         const u8 *previous_raw_scanline_data = (current_scanline_index > 0) ? &raw_pixel_data_buffer[destination_write_offset - raw_scanline_byte_count] : 0;
 
-        if (scanline_filter_type > 4) {
+        if (scanline_filter_type > 4)
+        {
             memory_stream_write_string(error_stream, "error: unknown PNG filter type.\n");
 
             return result;
         }
 
-        for (usize byte_index = 0; byte_index < raw_scanline_byte_count; byte_index++) {
+        for (usize byte_index = 0; byte_index < raw_scanline_byte_count; byte_index++)
+        {
             u8 raw_left = (byte_index >= bytes_per_pixel) ? current_raw_scanline_data[byte_index - bytes_per_pixel] : 0;
             u8 raw_up = previous_raw_scanline_data ? previous_raw_scanline_data[byte_index] : 0;
 
             u8 prediction = 0;
-            switch (scanline_filter_type) {
-            case 1: {
+            switch (scanline_filter_type)
+            {
+            case 1:
+            {
                 prediction = raw_left;
                 break;
             }
-            case 2: {
+            case 2:
+            {
                 prediction = raw_up;
                 break;
             }
-            case 3: {
+            case 3:
+            {
                 prediction = (u8)(((u16)raw_left + (u16)raw_up) / 2);
                 break;
             }
-            case 4: {
+            case 4:
+            {
                 u8 raw_up_left = (previous_raw_scanline_data && byte_index >= bytes_per_pixel) ? previous_raw_scanline_data[byte_index - bytes_per_pixel] : 0;
                 prediction = paeth_predictor(raw_left, raw_up, raw_up_left);
-            } break;
+            }
+            break;
             }
 
             current_raw_scanline_data[byte_index] = current_filtered_scanline_data[byte_index] + prediction;

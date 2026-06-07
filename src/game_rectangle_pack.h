@@ -3,7 +3,8 @@
 #include "game_platform.h"
 #include "game_types.h"
 
-typedef struct {
+typedef struct
+{
     vector2u *points;
     u32 maximum_width;
     u32 maximum_height;

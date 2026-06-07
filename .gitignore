@@ -1,5 +1,8 @@
 # build output
-build
+*.o
+*.spv
+*.so
+Game
 # test output
 *.log
 *.ppm

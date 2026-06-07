@@ -3,7 +3,8 @@
 #include "game_platform.h"
 #include "game_types.h"
 
-typedef struct {
+typedef struct
+{
     vector2u size;
     u32 bytes_per_pixel;
     u8 *pixels;

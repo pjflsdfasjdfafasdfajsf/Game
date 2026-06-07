@@ -1,9 +1,10 @@
 #pragma once
 
-#include "game_types.h"
 #include "game_platform.h"
+#include "game_types.h"
 
-typedef struct {
+typedef struct
+{
     u32 sample_rate;
     u32 sample_count;
     u16 channel_count;
