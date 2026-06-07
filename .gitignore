@@ -9,4 +9,6 @@ Game
 crash-*
 # bear stuff
 compile_commands.json
+
 .cache
+.vscode
