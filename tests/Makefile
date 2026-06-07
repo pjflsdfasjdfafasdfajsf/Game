@@ -1,6 +1,6 @@
 CC := clang
 
-CFLAGS_TEST := -g -O1 -fsanitize=address,undefined -Wall -Wextra -Wpedantic -I../src
+CFLAGS_TEST := -g -O1 -fsanitize=address,undefined -Wall -Wextra -Wpedantic -std=c23 -I../src 
 CFLAGS_FUZZ := $(CFLAGS_TEST) -DFUZZING -fsanitize=fuzzer
 
 BUILD_DIRECTORY := build
