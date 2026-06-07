@@ -294,8 +294,15 @@ void sound_update(state *state, sound_buffer *sound_buffer)
 
 void update(state *state, gpu *gpu, memory *memory, input *input, render_buffer *render_buffer, sound_buffer *sound_buffer)
 {
+    u64 last_counter = SDL_GetPerformanceCounter();
+    u64 counter_frequency = SDL_GetPerformanceFrequency();
+
     while (true)
     {
+        u64 current_counter = SDL_GetPerformanceCounter();
+        f32 delta_time = (f32)(current_counter - last_counter) / (f32)counter_frequency;
+        last_counter = current_counter;
+
         window_update(input);
 
         render_buffer_reset(render_buffer);
@@ -312,18 +319,13 @@ void update(state *state, gpu *gpu, memory *memory, input *input, render_buffer 
         code_update(&state->code);
         if (state->code.update_and_render)
         {
-            /** TODO: pass in delta time */
-            state->code.update_and_render(memory, input, render_buffer, 0.0f);
+            state->code.update_and_render(memory, input, render_buffer, delta_time);
         }
 
         if (memory->standard_info_stream && memory->standard_info_stream->offset > 0)
-        {
             SDL_Log("%.*s", (int)memory->standard_info_stream->offset, memory->standard_info_stream->memory);
-        }
         if (memory->standard_error_stream && memory->standard_error_stream->offset > 0)
-        {
             SDL_Log("%.*s", (int)memory->standard_error_stream->offset, memory->standard_error_stream->memory);
-        }
 
         sound_update(state, sound_buffer);
         gpu_update(gpu, render_buffer);

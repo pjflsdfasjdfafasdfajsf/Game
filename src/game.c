@@ -15,19 +15,19 @@ UPDATE_AND_RENDER(update_and_render)
 
     if (button_held(input->keys[key_code_w]))
     {
-        position->y -= 5.0f;
+        position->y -= 500.0f * delta_time;
     }
     if (button_held(input->keys[key_code_s]))
     {
-        position->y += 5.0f;
+        position->y += 500.0f * delta_time;
     }
     if (button_held(input->keys[key_code_a]))
     {
-        position->x -= 5.0f;
+        position->x -= 500.0f * delta_time;
     }
     if (button_held(input->keys[key_code_d]))
     {
-        position->x += 5.0f;
+        position->x += 500.0f * delta_time;
     }
 
     render_clear_entire_screen(render_buffer, black);

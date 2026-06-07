@@ -768,7 +768,7 @@ typedef struct
     float mouse_scroll;
 } input;
 
-#define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, render_buffer *render_buffer, f32 delta)
+#define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, render_buffer *render_buffer, f32 delta_time)
 typedef UPDATE_AND_RENDER(update_and_render_function);
 
 typedef struct
