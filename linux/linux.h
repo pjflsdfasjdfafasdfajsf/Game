@@ -1,8 +1,9 @@
 #pragma once
 
 #include <alsa/asoundlib.h>
-
 #include <wayland-client.h>
+
+#include <pthread.h>
 
 #include "cursor-shape-v1-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"

@@ -493,6 +493,7 @@ typedef struct {
     vector2 position;
     vector2 size;
     vector4 color;
+    rectangle uv;
     u32 texture;
 } render_command_draw_rectangle;
 
@@ -579,7 +580,7 @@ static inline void render_clear_entire_screen(render_command_buffer *command_buf
     }
 }
 
-static inline void render_draw_rectangle(render_command_buffer *command_buffer, vector2 position, vector2 size, vector4 color, u32 texture) {
+static inline void render_draw_rectangle(render_command_buffer *command_buffer, vector2 position, vector2 size, vector4 color, rectangle uv, u32 texture) {
     if (!command_buffer) {
         return;
     }
@@ -590,6 +591,7 @@ static inline void render_draw_rectangle(render_command_buffer *command_buffer, 
         command->position = position;
         command->size = size;
         command->color = color;
+        command->uv = uv;
         command->texture = texture;
     }
 }

@@ -66,7 +66,7 @@ static void vulkan_buffer_host_visible_destroy(vulkan *vulkan, vulkan_buffer buf
     vulkan->vkDestroyBuffer(vulkan->logical_device, buffer.handle, 0);
 }
 
-static void vulkan_instance_create(vulkan *vulkan, PFN_vkCreateInstance vkCreateInstance, const char *platform_extension) {
+static bool vulkan_instance_create(vulkan *vulkan, PFN_vkCreateInstance vkCreateInstance, const char *platform_extension) {
     const char *extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
         platform_extension,
@@ -76,8 +76,6 @@ static void vulkan_instance_create(vulkan *vulkan, PFN_vkCreateInstance vkCreate
     };
 
 #if defined(DEBUG)
-    memory_stream_write_string_format(vulkan->error_stream, "validation layers will be enabled\n");
-
     const char *layers[] = {
         "VK_LAYER_KHRONOS_validation",
     };
@@ -103,11 +101,28 @@ static void vulkan_instance_create(vulkan *vulkan, PFN_vkCreateInstance vkCreate
 #endif
     };
 
-    if (vkCreateInstance(&instance_create_info, 0, &vulkan->instance) != VK_SUCCESS) {
-        memory_stream_write_string_format(vulkan->error_stream, "error: failed to create vulkan instance.\n");
+    VkResult result = vkCreateInstance(&instance_create_info, 0, &vulkan->instance);
 
-        return;
+#if defined(DEBUG)
+    if (result == VK_ERROR_LAYER_NOT_PRESENT || result == VK_ERROR_EXTENSION_NOT_PRESENT) {
+        memory_stream_write_string_format(vulkan->info_stream, "warning: validation layers were requested but are not available\n");
+
+        instance_create_info.enabledLayerCount = 0;
+        instance_create_info.ppEnabledLayerNames = 0;
+        instance_create_info.enabledExtensionCount = ARRAY_COUNT(extensions) - 1;
+
+        result = vkCreateInstance(&instance_create_info, 0, &vulkan->instance);
+    } else if (result == VK_SUCCESS) {
+        memory_stream_write_string_format(vulkan->info_stream, "validation layers enabled\n");
     }
+#endif
+
+    if (result != VK_SUCCESS) {
+        memory_stream_write_string_format(vulkan->error_stream, "error: failed to create vulkan instance.\n");
+        return false;
+    }
+
+    return true;
 }
 
 #if defined(DEBUG)
@@ -939,7 +954,9 @@ static bool vulkan_common_initialize(vulkan *vulkan, linux_wayland *window) {
     vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(vulkan->instance, #name);
     VULKAN_DEBUG_FUNCTIONS
 #undef DEBUG_FUNCTION
-    vulkan_debug_messenger_create(vulkan);
+    if (vulkan->vkCreateDebugUtilsMessengerEXT) {
+        vulkan_debug_messenger_create(vulkan);
+    }
 #endif
 
     if (!vulkan_physical_device_pick(vulkan)) {
@@ -1002,7 +1019,10 @@ bool vulkan_initialize(vulkan *vulkan, linux_wayland *window, memory_stream *inf
     PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(lib_vulkan, "vkGetInstanceProcAddr");
     PFN_vkCreateInstance vkCreateInstance = (PFN_vkCreateInstance)vkGetInstanceProcAddr(0, "vkCreateInstance");
 
-    vulkan_instance_create(vulkan, vkCreateInstance, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
+    if (!vulkan_instance_create(vulkan, vkCreateInstance, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME)) {
+        return false;
+    }
+
     vulkan->vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 
     PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(vulkan->instance, "vkCreateWaylandSurfaceKHR");
@@ -1078,10 +1098,10 @@ static void vulkan_frame_pass_render(vulkan *vulkan, const render_command_buffer
                 f32 top_edge = 1.0f - (command->position.y / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
                 f32 bottom_edge = 1.0f - ((command->position.y + command->size.y) / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
 
-                vertex top_left = {{left_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 0.0f}};
-                vertex top_right = {{right_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 0.0f}};
-                vertex bottom_left = {{left_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 1.0f}};
-                vertex bottom_right = {{right_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 1.0f}};
+                vertex top_left = {{left_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.min.x, command->uv.min.y}};
+                vertex top_right = {{right_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.max.x, command->uv.min.y}};
+                vertex bottom_left = {{left_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.min.x, command->uv.max.y}};
+                vertex bottom_right = {{right_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.max.x, command->uv.max.y}};
 
                 vertex *current_vertex_destination = (vertex *)vulkan->vertex_data + vulkan->vertex_count;
                 current_vertex_destination[0] = top_left;

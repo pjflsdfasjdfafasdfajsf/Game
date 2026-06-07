@@ -35,6 +35,7 @@ debug:
 ASSETS =                                         \
 	$(GEN_DIRECTORY)/arial.ttf.h                 \
 	$(GEN_DIRECTORY)/watermelon.png.h            \
+	$(GEN_DIRECTORY)/animation.png.h             \
 	$(GEN_DIRECTORY)/basic_geometry_vertex.spv.h \
 	$(GEN_DIRECTORY)/basic_geometry_pixel.spv.h  \
 
