@@ -359,10 +359,10 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
             {
                 render_entry_draw_rectangle *command = (render_entry_draw_rectangle *)header;
 
-                float left = command->position.x * pixels_to_ndc_x - 1.0f;
-                float right = (command->position.x + command->size.x) * pixels_to_ndc_x - 1.0f;
-                float top = 1.0f - command->position.y * pixels_to_ndc_y;
-                float bottom = 1.0f - (command->position.y + command->size.y) * pixels_to_ndc_y;
+                float left = command->rectangle.x * pixels_to_ndc_x - 1.0f;
+                float right = (command->rectangle.x + command->rectangle.width) * pixels_to_ndc_x - 1.0f;
+                float top = 1.0f - command->rectangle.y * pixels_to_ndc_y;
+                float bottom = 1.0f - (command->rectangle.y + command->rectangle.height) * pixels_to_ndc_y;
 
                 map[current_vertex++] = (vertex){left, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.min.y};
                 map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};

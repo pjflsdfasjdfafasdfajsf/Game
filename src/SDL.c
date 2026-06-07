@@ -4,8 +4,6 @@
 #include "SDL_gpu.h"
 
 /** TODO:
- * 1. finish this base platform layer
- * 2. create SDL_gpu.c/SDL_gpu.h and implement them
  *  FOR SHADERS: !!!
  *      Shadercross is very bloated but it has a binary that allows you to
  * compile shader source file to any bytecode we need, such as MSL, SPIRV, et

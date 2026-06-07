@@ -1,7 +1,8 @@
+#include "game.h"
+#include "game_math.h"
 #include "game_platform.h"
 #include "game_png.h"
-#include "game_math.h"
-#include "game.h"
+#include "game_types.h"
 
 UPDATE_AND_RENDER(update_and_render)
 {
@@ -11,7 +12,7 @@ UPDATE_AND_RENDER(update_and_render)
         MEMORY_ARENA_PUSH_BYTES(&memory->permanent_arena, sizeof(game_state));
 
         static const char animation[] = {
-#embed "../assets/images/animation.png"
+#embed "../assets/images/watermelon.png"
         };
         image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, animation, sizeof(animation));
         render_allocate_texture(render_buffer, 1, image.size, image.bytes_per_pixel, image.pixels);
@@ -65,25 +66,19 @@ UPDATE_AND_RENDER(update_and_render)
 
     state->velocity = vector2_scale(state->velocity, 0.99f);
 
-    const f32 size = 1.0f / 6.0f;
-    const u32 row = 1;
+    rectangle player = rect(state->position, v2(200.0f, 200.0f));
+    rectangle wall = rect(v2(10.0f, 1000.0f), v2(500.0f, 500.0f));
 
-    state->accumulated_time += delta_time;
-    if (state->accumulated_time > 0.1f)
+    aabb_collision_result collision = aabb_collision(player, wall);
+    if (collision.is_colliding)
     {
-        state->accumulated_time = 0.0f;
-        state->element = (state->element + 1) % 6;
+        state->position = vector2_add(state->position, collision.penetration_depth);
+        player = rect(state->position, v2(200.0f, 200.0f));
     }
 
-    rectangle uv = rect(state->element * size, row * size, state->element * size + size, row * size + size);
-    if (!state->look_right)
-    {
-        SWAP(uv.min.x, uv.max.x);
-    }
-
-    render_clear_entire_screen(render_buffer, red);
-    render_draw_rectangle(render_buffer, state->position, state->player_size, red, uv, 1);
-    render_draw_rectangle(render_buffer, v2(10, 700), v2(1000, 500), blue, uv, UNTEXTURED);
+    render_clear_entire_screen(render_buffer, BLACK);
+    render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
+    render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
 }
 
 GET_SOUND_SAMPLES(get_sound_samples)
