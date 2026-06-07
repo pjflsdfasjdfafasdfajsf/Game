@@ -117,3 +117,23 @@ typedef struct {
 static inline vector2u v2u(u32 x, u32 y) {
     return (vector2u){{{x, y}}};
 }
+
+typedef struct {
+    union {
+        struct {
+            vector2 min;
+            vector2 max;
+        };
+
+        struct {
+            f32 x;
+            f32 y;
+            f32 width;
+            f32 height; 
+        };
+    };
+} rectangle;
+
+static inline rectangle rect(f32 x, f32 y, f32 width, f32 height) {
+    return (rectangle){ .x = x, .y = y, .width = width, .height = height };
+}

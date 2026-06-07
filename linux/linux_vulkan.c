@@ -1098,10 +1098,10 @@ static void vulkan_frame_pass_render(vulkan *vulkan, const render_command_buffer
                 f32 top_edge = 1.0f - (command->position.y / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
                 f32 bottom_edge = 1.0f - ((command->position.y + command->size.y) / (f32)DEFAULT_WINDOW_HEIGHT) * 2.0f;
 
-                vertex top_left = {{left_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 0.0f}};
-                vertex top_right = {{right_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 0.0f}};
-                vertex bottom_left = {{left_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {0.0f, 1.0f}};
-                vertex bottom_right = {{right_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {1.0f, 1.0f}};
+                vertex top_left = {{left_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.min.x, command->uv.min.y}};
+                vertex top_right = {{right_edge, top_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.max.x, command->uv.min.y}};
+                vertex bottom_left = {{left_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.min.x, command->uv.max.y}};
+                vertex bottom_right = {{right_edge, bottom_edge, 0.0f}, {command->color.r, command->color.g, command->color.b, command->color.a}, {command->uv.max.x, command->uv.max.y}};
 
                 vertex *current_vertex_destination = (vertex *)vulkan->vertex_data + vulkan->vertex_count;
                 current_vertex_destination[0] = top_left;

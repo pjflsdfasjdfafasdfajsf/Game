@@ -727,6 +727,7 @@ static void linux_update(linux_wayland *wayland, linux_sound *sound, linux_game_
         }
     }
 }
+
 int main(void) {
     linux_wayland wayland = {0};
     if (!linux_wayland_initialize(&wayland)) {
