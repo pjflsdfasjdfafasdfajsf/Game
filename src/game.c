@@ -1,6 +1,6 @@
 #include "game_platform.h"
 #include "game_png.h"
-#include "game_types.h"
+#include "game_math.h"
 
 UPDATE_AND_RENDER(update_and_render)
 {
