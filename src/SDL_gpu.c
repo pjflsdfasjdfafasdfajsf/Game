@@ -151,14 +151,14 @@ bool gpu_buffers_initialize(gpu *gpu)
     return true;
 }
 
-bool gpu_upload_texture(SDL_GPUDevice *device, SDL_GPUCopyPass *copy_pass, SDL_GPUTexture *texture, const void *pixels, u32 width, u32 height, u32 bytes_per_pixel)
+bool gpu_upload_texture(SDL_GPUDevice *device, SDL_GPUCopyPass *copy_pass, SDL_GPUTexture *texture, const void *pixels, u32 width, u32 height)
 {
     if (!device || !copy_pass || !texture || !pixels)
     {
         return false;
     }
 
-    usize texture_size = width * height * bytes_per_pixel;
+    usize texture_size = width * height * 4;
 
     SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info = {0};
     transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
@@ -180,17 +180,17 @@ bool gpu_upload_texture(SDL_GPUDevice *device, SDL_GPUCopyPass *copy_pass, SDL_G
     memory_copy_forwards(mapped_memory, pixels, texture_size);
     SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
 
-    SDL_GPUTextureTransferInfo dest_info = {0};
-    dest_info.transfer_buffer = transfer_buffer;
-    dest_info.offset = 0;
+    SDL_GPUTextureTransferInfo destination_transfer_info = {0};
+    destination_transfer_info.transfer_buffer = transfer_buffer;
+    destination_transfer_info.offset = 0;
 
-    SDL_GPUTextureRegion dest_region = {0};
-    dest_region.texture = texture;
-    dest_region.w = width;
-    dest_region.h = height;
-    dest_region.d = 1;
+    SDL_GPUTextureRegion destination_region = {0};
+    destination_region.texture = texture;
+    destination_region.w = width;
+    destination_region.h = height;
+    destination_region.d = 1;
 
-    SDL_UploadToGPUTexture(copy_pass, &dest_info, &dest_region, false);
+    SDL_UploadToGPUTexture(copy_pass, &destination_transfer_info, &destination_region, false);
     SDL_ReleaseGPUTransferBuffer(device, transfer_buffer);
 
     return true;
@@ -224,7 +224,7 @@ bool gpu_magic_pixel_create(gpu *gpu)
     static const u8 pixels[4] = {255, 255, 255, 255};
 
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    bool ok = gpu_upload_texture(gpu->device, copy_pass, gpu->textures[UNTEXTURED], pixels, 1, 1, 4);
+    bool ok = gpu_upload_texture(gpu->device, copy_pass, gpu->textures[UNTEXTURED], pixels, 1, 1);
     SDL_EndGPUCopyPass(copy_pass);
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -338,7 +338,7 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                         copy_pass = SDL_BeginGPUCopyPass(command_buffer);
                     }
 
-                    if (gpu_upload_texture(gpu->device, copy_pass, new_texture, command->pixels, command->size.x, command->size.y, command->bytes_per_pixel))
+                    if (gpu_upload_texture(gpu->device, copy_pass, new_texture, command->pixels, command->size.x, command->size.y))
                     {
                         if (gpu->textures[command->index])
                         {

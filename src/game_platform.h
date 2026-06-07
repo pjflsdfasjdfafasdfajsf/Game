@@ -580,7 +580,6 @@ typedef struct
 {
     render_entry_header header;
     u32 index;
-    u32 bytes_per_pixel;
     vector2u size;
     const void *pixels;
 } render_entry_allocate_texture;
@@ -687,7 +686,7 @@ static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle
     }
 }
 
-static inline void render_allocate_texture(render_buffer *render_buffer, u32 index, vector2u size, u32 bytes_per_pixel, const void *pixels)
+static inline void render_allocate_texture(render_buffer *render_buffer, u32 index, vector2u size, const void *pixels)
 {
     if (!render_buffer)
     {
@@ -700,7 +699,6 @@ static inline void render_allocate_texture(render_buffer *render_buffer, u32 ind
     {
         command->index = index;
         command->size = size;
-        command->bytes_per_pixel = bytes_per_pixel;
         command->pixels = pixels;
     }
 }

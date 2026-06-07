@@ -15,7 +15,7 @@ UPDATE_AND_RENDER(update_and_render)
 #embed "../assets/images/watermelon.png"
         };
         image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, animation, sizeof(animation));
-        render_allocate_texture(render_buffer, 1, image.size, image.bytes_per_pixel, image.pixels);
+        render_allocate_texture(render_buffer, 1, image.size, image.pixels);
 
         state->position = v2(10, 10);
 
