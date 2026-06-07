@@ -5,7 +5,11 @@
 typedef struct
 {
     vector2 position;
+    vector2 velocity;
+    vector2 accelaration;
+    vector2 player_size;
     bool look_right;
+    bool on_ground;
     u32 element;
     f32 accumulated_time;
 } game_state;
