@@ -364,12 +364,12 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                 float top = 1.0f - command->position.y * pixels_to_ndc_y;
                 float bottom = 1.0f - (command->position.y + command->size.y) * pixels_to_ndc_y;
 
-                map[current_vertex++] = (vertex){left, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 0.0f, 0.0f};
-                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 1.0f, 0.0f};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 0.0f, 1.0f};
-                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 1.0f, 0.0f};
-                map[current_vertex++] = (vertex){right, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 1.0f, 1.0f};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, 0.0f, 1.0f};
+                map[current_vertex++] = (vertex){left, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.min.y};
+                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};
+                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.max.y};
+                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};
+                map[current_vertex++] = (vertex){right, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.max.y};
+                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.max.y};
             }
         }
 
