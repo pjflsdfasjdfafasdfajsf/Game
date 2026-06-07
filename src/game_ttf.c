@@ -944,9 +944,8 @@ image true_type_glyph_rasterize(memory_arena *arena, memory_stream *error_stream
 
     result.size.x = target_pixel_width;
     result.size.y = target_pixel_height;
-    result.bytes_per_pixel = 4;
 
-    usize pixels_allocation_size = (usize)result.size.x * (usize)result.size.y * result.bytes_per_pixel;
+    usize pixels_allocation_size = (usize)result.size.x * (usize)result.size.y * 4;
     result.pixels = MEMORY_ARENA_PUSH_BYTES(arena, pixels_allocation_size);
 
     if (!result.pixels)
@@ -1265,9 +1264,8 @@ image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *tem
 
     result.size.x = atlas_width;
     result.size.y = atlas_height;
-    result.bytes_per_pixel = 4;
 
-    usize pixels_allocation_size = (usize)result.size.x * (usize)result.size.y * result.bytes_per_pixel;
+    usize pixels_allocation_size = (usize)result.size.x * (usize)result.size.y * 4;
     result.pixels = MEMORY_ARENA_PUSH_BYTES(permanent_arena, pixels_allocation_size);
 
     if (!result.pixels)
@@ -1317,8 +1315,8 @@ image true_type_font_bake_atlas(memory_arena *permanent_arena, memory_arena *tem
                 {
                     for (u32 x = 0; x < (u32)image.size.x; x++)
                     {
-                        u32 source_index = (y * (u32)image.size.x + x) * result.bytes_per_pixel;
-                        u32 destination_index = ((position_y + y) * atlas_width + (position_x + x)) * result.bytes_per_pixel;
+                        u32 source_index = (y * (u32)image.size.x + x) * 4;
+                        u32 destination_index = ((position_y + y) * atlas_width + (position_x + x)) * 4;
 
                         memory_copy_forwards(&result.pixels[destination_index], &image.pixels[source_index], 4);
                     }
