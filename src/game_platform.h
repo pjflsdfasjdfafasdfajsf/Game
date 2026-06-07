@@ -702,6 +702,48 @@ static inline void render_allocate_texture(render_buffer *render_buffer, u32 ind
     }
 }
 
+typedef enum
+{
+    key_code_none = 0,
+
+    key_code_w,
+    key_code_a,
+    key_code_s,
+    key_code_d,
+
+    key_code_count,
+} key_code;
+
+typedef enum
+{
+    mouse_button_left = 0,
+    mouse_button_right,
+    mouse_button_middle,
+
+    mouse_button_count,
+} mouse_button;
+
+typedef struct
+{
+    bool is_down;
+    bool was_down;
+} button_state;
+
+static inline bool button_pressed(button_state button)
+{
+    return button.is_down && !button.was_down;
+}
+
+static inline bool button_released(button_state button)
+{
+    return !button.is_down && button.was_down;
+}
+
+static inline bool button_held(button_state button)
+{
+    return button.is_down && button.was_down;
+}
+
 /****************************************************/
 
 typedef struct
@@ -716,7 +758,17 @@ typedef struct
     bool is_initialized;
 } memory;
 
-#define UPDATE_AND_RENDER(name) void name(memory *memory, render_buffer *render_buffer)
+typedef struct
+{
+    button_state keys[key_code_count];
+    button_state mouse_buttons[mouse_button_count];
+
+    vector2 mouse_position;
+    vector2 mouse_delta;
+    float mouse_scroll;
+} input;
+
+#define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, render_buffer *render_buffer, f32 delta)
 typedef UPDATE_AND_RENDER(update_and_render_function);
 
 typedef struct

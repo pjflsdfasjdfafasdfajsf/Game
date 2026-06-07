@@ -34,9 +34,101 @@ bool SDL_initialize(void)
     return true;
 }
 
-// /****************************************************
-//  * NOTE: game loading
-//  ****************************************************/
+/****************************************************
+ * NOTE: input
+ ****************************************************/
+
+static key_code input_map(SDL_Scancode scancode)
+{
+    switch (scancode)
+    {
+    case SDL_SCANCODE_W:
+        return key_code_w;
+    case SDL_SCANCODE_A:
+        return key_code_a;
+    case SDL_SCANCODE_S:
+        return key_code_s;
+    case SDL_SCANCODE_D:
+        return key_code_d;
+    default:
+        return key_code_none;
+    }
+}
+
+void input_update_pre_event(input *input)
+{
+    for (u32 key_index = 0; key_index < key_code_count; key_index++)
+    {
+        input->keys[key_index].was_down = input->keys[key_index].is_down;
+    }
+    for (u32 button_index = 0; button_index < mouse_button_count; button_index++)
+    {
+        input->mouse_buttons[button_index].was_down = input->mouse_buttons[button_index].is_down;
+    }
+    input->mouse_delta.x = 0.0f;
+    input->mouse_delta.y = 0.0f;
+    input->mouse_scroll = 0.0f;
+}
+
+void input_handle_event(input *input, SDL_Event *event)
+{
+    switch (event->type)
+    {
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+    {
+        key_code code = input_map(event->key.scancode);
+        if (code != key_code_none)
+        {
+            input->keys[code].is_down = (event->type == SDL_EVENT_KEY_DOWN);
+        }
+    }
+    break;
+
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+    {
+        mouse_button button = mouse_button_count;
+        if (event->button.button == SDL_BUTTON_LEFT)
+        {
+            button = mouse_button_left;
+        }
+        else if (event->button.button == SDL_BUTTON_RIGHT)
+        {
+            button = mouse_button_right;
+        }
+        else if (event->button.button == SDL_BUTTON_MIDDLE)
+        {
+            button = mouse_button_middle;
+        }
+
+        if (button != mouse_button_count)
+        {
+            input->mouse_buttons[button].is_down = (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+        }
+    }
+    break;
+
+    case SDL_EVENT_MOUSE_MOTION:
+    {
+        input->mouse_position.x += event->motion.xrel;
+        input->mouse_position.y += event->motion.yrel;
+        input->mouse_delta.x += event->motion.xrel;
+        input->mouse_delta.y += event->motion.yrel;
+    }
+    break;
+
+    case SDL_EVENT_MOUSE_WHEEL:
+    {
+        input->mouse_scroll += event->wheel.y;
+    }
+    break;
+    }
+}
+
+/****************************************************
+ * NOTE: game loading
+ ****************************************************/
 
 /** TODO: in release mode the game should be compiled into a single
 executable */
@@ -126,18 +218,24 @@ bool window_initialize(state *state)
     return true;
 }
 
-void window_update(void)
+void window_update(input *input)
 {
-    SDL_Event event;
+    input_update_pre_event(input);
 
+    SDL_Event event;
     while (SDL_PollEvent(&event))
     {
         switch (event.type)
         {
-
         case SDL_EVENT_QUIT:
         {
             exit(EXIT_SUCCESS);
+        }
+        break;
+
+        default:
+        {
+            input_handle_event(input, &event);
         }
         break;
         }
@@ -194,11 +292,11 @@ void sound_update(state *state, sound_buffer *sound_buffer)
 
 /****************************************************/
 
-void update(state *state, gpu *gpu, memory *memory, render_buffer *render_buffer, sound_buffer *sound_buffer)
+void update(state *state, gpu *gpu, memory *memory, input *input, render_buffer *render_buffer, sound_buffer *sound_buffer)
 {
     while (true)
     {
-        window_update();
+        window_update(input);
 
         render_buffer_reset(render_buffer);
 
@@ -214,7 +312,8 @@ void update(state *state, gpu *gpu, memory *memory, render_buffer *render_buffer
         code_update(&state->code);
         if (state->code.update_and_render)
         {
-            state->code.update_and_render(memory, render_buffer);
+            /** TODO: pass in delta time */
+            state->code.update_and_render(memory, input, render_buffer, 0.0f);
         }
 
         if (memory->standard_info_stream && memory->standard_info_stream->offset > 0)
@@ -305,7 +404,8 @@ int main(void)
     sound_buffer.channel_count = sound_channel_count;
     sound_buffer.samples = (f32 *)sound_samples_memory;
 
-    update(&state, &gpu, &memory, &render_buffer, &sound_buffer);
+    input input = {0};
+    update(&state, &gpu, &memory, &input, &render_buffer, &sound_buffer);
 
     return EXIT_SUCCESS;
 }
