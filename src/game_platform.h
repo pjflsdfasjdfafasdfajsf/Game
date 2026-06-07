@@ -215,7 +215,10 @@ static inline void *memory_arena_allocate_bytes_aligned(memory_arena *arena, usi
     return allocated_memory;
 }
 
-static inline void *memory_arena_allocate_bytes(memory_arena *arena, usize allocation_size) { return memory_arena_allocate_bytes_aligned(arena, allocation_size, 8); }
+static inline void *memory_arena_allocate_bytes(memory_arena *arena, usize allocation_size)
+{
+    return memory_arena_allocate_bytes_aligned(arena, allocation_size, 8);
+}
 
 static inline void *memory_arena_allocate_bytes_and_zero(memory_arena *arena, usize allocation_size)
 {
