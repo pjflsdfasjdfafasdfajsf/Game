@@ -1,0 +1,1 @@
+while inotifywait -e close_write game*.c; do make --no-print-directory -C ..; done
