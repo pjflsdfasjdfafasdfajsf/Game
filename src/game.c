@@ -83,7 +83,7 @@ UPDATE_AND_RENDER(update_and_render)
     for (u32 i = 0; i < state->enemy_count; i++) {
         enemy *enemy = &state->enemies[i];
 
-        vector2 to_player = vector2_subtract(state->position, enemy->position);
+        vector2 to_player = vector2_sub(state->position, enemy->position);
         to_player = vector2_norm(to_player);
 
         enemy->position = vector2_add(enemy->position, vector2_scale(to_player, delta_time * 200.0f));
@@ -106,7 +106,6 @@ UPDATE_AND_RENDER(update_and_render)
 
     state->accumelated_time += delta_time;
 
-    render_clear_entire_screen(render_buffer, BLACK);
     vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
     vector2 direction = vector2_sub(input->mouse_position, start);
     raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall);
@@ -124,6 +123,7 @@ UPDATE_AND_RENDER(update_and_render)
 
     if (state->health < 0.0f || hit) {
         render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, UNIT, UNTEXTURED);
+    }
     if (ray.is_hitting)
     {
         render_draw_line(render_buffer, start, ray.hit_position, GREEN);
