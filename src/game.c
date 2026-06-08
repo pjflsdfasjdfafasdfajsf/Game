@@ -38,10 +38,6 @@ UPDATE_AND_RENDER(update_and_render)
     {
         state->position.x += 500.0f * delta_time;
     }
-    if (button_pressed(input->mouse_buttons[mouse_button_left]))
-    {
-        
-    }
     
     rectangle player = rect(state->position, v2(200.0f, 200.0f));
     rectangle wall = rect(v2(10.0f, 1000.0f), v2(500.0f, 500.0f));
@@ -51,12 +47,20 @@ UPDATE_AND_RENDER(update_and_render)
     {
         state->position = vector2_add(state->position, collision.penetration_depth);
         player = rect(state->position, v2(200.0f, 200.0f));
-
     }
 
-    render_draw_line(render_buffer, v2(0, 100), v2(2000, 100), BLUE);
+    vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
+    vector2 end = vector2_add(start, v2(800.0f, 900.0f));
+    raycast_result ray = ray_intersect_rectangle(start, end, wall);
+
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
     render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
+
+    if (ray.is_hitting) {
+        render_draw_line(render_buffer, start, ray.hit_position, BLUE);
+    } else {
+        render_draw_line(render_buffer, start, end, RED);
+    }
 }
 
 GET_SOUND_SAMPLES(get_sound_samples)

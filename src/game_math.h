@@ -4,24 +4,6 @@
 /** NOTE: standard 32-bit float epsilon */
 #define EPSILON 1e-6f
 
-/** NOTE: which side of box A was impact during collision */
-typedef enum
-{
-    AABB_SIDE_NONE = 0,
-    AABB_SIDE_LEFT,
-    AABB_SIDE_RIGHT,
-    AABB_SIDE_TOP,
-    AABB_SIDE_BOTTOM,
-} aabb_side;
-
-typedef struct
-{
-    bool is_colliding;
-    aabb_side impact_side;
-    /** NOTE: how far to push box A to resolve collision */
-    vector2 penetration_depth;
-} aabb_collision_result;
-
 static inline vector2 vector2_add(const vector2 a, const vector2 b)
 {
     return v2(a.x + b.x, a.y + b.y);
@@ -62,6 +44,24 @@ static inline vector2 vector2_norm(const vector2 vector)
 
     return v2(vector.x / length, vector.y / length);
 }
+
+/** NOTE: which side of box A was impact during collision */
+typedef enum
+{
+    AABB_SIDE_NONE = 0,
+    AABB_SIDE_LEFT,
+    AABB_SIDE_RIGHT,
+    AABB_SIDE_TOP,
+    AABB_SIDE_BOTTOM,
+} aabb_side;
+
+typedef struct
+{
+    bool is_colliding;
+    aabb_side impact_side;
+    /** NOTE: how far to push box A to resolve collision */
+    vector2 penetration_depth;
+} aabb_collision_result;
 
 static inline aabb_collision_result aabb_collision(const rectangle a, const rectangle b)
 {
@@ -121,6 +121,53 @@ static inline aabb_collision_result aabb_collision(const rectangle a, const rect
             result.impact_side = AABB_SIDE_TOP;
             result.penetration_depth = v2(0.0f, -overlap.y);
         }
+    }
+
+    return result;
+}
+
+typedef struct
+{
+    bool is_hitting;
+    f32 hit_time;
+    vector2 hit_position;
+} raycast_result;
+
+static inline raycast_result ray_intersect_rectangle(const vector2 start, const vector2 end, rectangle rect)
+{
+    raycast_result result = {0};
+
+    vector2 direction = vector2_sub(end, start);
+
+    f32 inverse_direction_x = 1.0f / direction.x;
+    f32 inverse_direction_y = 1.0f / direction.y;
+
+    f32 time_left = (rect.x - start.x) * inverse_direction_x;
+    f32 time_right = (rect.x + rect.width - start.x) * inverse_direction_x;
+
+    f32 entry_time_x = MIN(time_left, time_right);
+    f32 exit_time_x = MAX(time_left, time_right);
+
+    f32 time_top = (rect.y - start.y) * inverse_direction_y;
+    f32 time_bottom = (rect.y + rect.height - start.y) * inverse_direction_y;
+
+    f32 entry_time_y = MIN(time_top, time_bottom);
+    f32 exit_time_y = MAX(time_top, time_bottom);
+
+    f32 entry_time = MAX(entry_time_x, entry_time_y);
+    f32 exit_time = MIN(exit_time_x, exit_time_y);
+
+    bool is_overlapping_axes = entry_time <= exit_time;
+    bool is_in_front_of_ray = exit_time > 0.0f;
+    bool is_within_segment = entry_time <= 1.0f;
+
+    if (is_overlapping_axes && is_in_front_of_ray && is_within_segment)
+    {
+        result.is_hitting = true;
+        result.hit_time = MAX(entry_time, 0.0f);
+
+        vector2 traveled_vector = vector2_scale(direction, result.hit_time);
+        result.hit_position = vector2_add(start, traveled_vector);
     }
 
     return result;

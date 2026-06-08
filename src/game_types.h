@@ -31,8 +31,8 @@ typedef float f32;
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define UNUSED(x) (void)x
-#define ARRAY_COUNT(array) (sizeof((array)) / sizeof((array)[0]))
-#define ASSERT(expression)      \
+#define ARRAY_COUNT(x) (sizeof((x)) / sizeof((x)[0]))
+#define ASSERT(x)      \
     if (!(expression))          \
     {                           \
         *(volatile int *)0 = 0; \
@@ -44,10 +44,10 @@ typedef float f32;
         (x) = (y);                \
         (y) = _tmp;               \
     } while (0)
-#define KILOBYTES(value) ((value) * 1024ULL)
-#define MEGABYTES(value) (KILOBYTES(value) * 1024ULL)
-#define GIGABYTES(value) (MEGABYTES(value) * 1024ULL)
-#define TERABYTES(value) (GIGABYTES(value) * 1024ULL)
+#define KILOBYTES(x) ((x) * 1024ULL)
+#define MEGABYTES(x) (KILOBYTES(x) * 1024ULL)
+#define GIGABYTES(x) (MEGABYTES(x) * 1024ULL)
+#define TERABYTES(x) (GIGABYTES(x) * 1024ULL)
 
 #define SQRT(x) __builtin_sqrtf(x)
 
