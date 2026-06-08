@@ -27,9 +27,19 @@ static inline vector2 vector2_add(const vector2 a, const vector2 b)
     return v2(a.x + b.x, a.y + b.y);
 }
 
+static inline vector2 vector2_sub(const vector2 a, const vector2 b)
+{
+    return v2(a.x - b.x, a.y - b.y);
+}
+
 static inline vector2 vector2_scale(const vector2 vector, const f32 factor)
 {
     return v2(vector.x * factor, vector.y * factor);
+}
+
+static inline vector2 vector2_abs(const vector2 vector)
+{
+    return v2(ABS(vector.x), ABS(vector.y));
 }
 
 static inline f32 vector2_length_squared(const vector2 vector)
@@ -60,64 +70,56 @@ static inline aabb_collision_result aabb_collision(const rectangle a, const rect
     result.impact_side = AABB_SIDE_NONE;
     result.penetration_depth = v2(0.0f, 0.0f);
 
-    f32 a_half_x = a.width * 0.5f;
-    f32 a_half_y = a.height * 0.5f;
-    
-    f32 b_half_x = b.width * 0.5f;
-    f32 b_half_y = b.height * 0.5f;
+    vector2 a_half = v2(a.width * 0.5f, a.height * 0.5f);
+    vector2 b_half = v2(b.width * 0.5f, b.height * 0.5f);
 
-    vector2 a_center;
-    a_center.x = a.x + a_half_x;
-    a_center.y = a.y + a_half_y;
+    vector2 a_center = vector2_add(v2(a.x, a.y), a_half);
+    vector2 b_center = vector2_add(v2(b.x, b.y), b_half);
 
-    vector2 b_center;
-    b_center.x = b.x + b_half_x;
-    b_center.y = b.y + b_half_y;
-
-    vector2 distance_between_centers;
-    distance_between_centers.x = a_center.x - b_center.x;
-    distance_between_centers.y = a_center.y - b_center.y;
+    vector2 distance_between_centers = vector2_sub(a_center, b_center);
     /** NOTE: (to not be colliding) */
-    vector2 minimum_safe_distance;
-    minimum_safe_distance.x = a_half_x + b_half_x;
-    minimum_safe_distance.y = a_half_y + b_half_y;
+    vector2 minimum_safe_distance = vector2_add(a_half, b_half);
+    vector2 absolute_distance = vector2_abs(distance_between_centers);
 
-    f32 absolute_distance_x = ABS(distance_between_centers.x);
-    f32 absolute_distance_y = ABS(distance_between_centers.y);
-    /** NOTE: if the actual distance is greater than the minimum distance on either distance there's a gap between boxes
+    /** NOTE: if the actual distance is greater than the minimum distance on either axis there's a gap between boxes
      * and therefore are not colliding
      */
-    if (absolute_distance_x >= minimum_safe_distance.x)
+    if (absolute_distance.x >= minimum_safe_distance.x || absolute_distance.y >= minimum_safe_distance.y)
     {
         return result;
     }
-    if (absolute_distance_y >= minimum_safe_distance.y)
-    {
-        return result;
-    }
+
     result.is_colliding = true;
 
-    f32 overlap_x = minimum_safe_distance.x - absolute_distance_x;
-    f32 overlap_y = minimum_safe_distance.y - absolute_distance_y;
+    vector2 overlap = vector2_sub(minimum_safe_distance, absolute_distance);
 
-    if (overlap_x < overlap_y) {
+    if (overlap.x < overlap.y)
+    {
         /** NOTE: the collision is primarily horizontal */
-        if (distance_between_centers.x > 0.0f) {
+        if (distance_between_centers.x > 0.0f)
+        {
             /** NOTE: box A center is further right than box B center, so box B hit box A on its left side */
             result.impact_side = AABB_SIDE_LEFT;
-            result.penetration_depth = v2(overlap_x, 0.0f);
-        } else {
-            result.impact_side = AABB_SIDE_RIGHT;
-            result.penetration_depth = v2(-overlap_x, 0.0f);
+            result.penetration_depth = v2(overlap.x, 0.0f);
         }
-    } else {
+        else
+        {
+            result.impact_side = AABB_SIDE_RIGHT;
+            result.penetration_depth = v2(-overlap.x, 0.0f);
+        }
+    }
+    else
+    {
         /** NOTE: the collision is primarily vertical */
-        if (distance_between_centers.y > 0.0f) {
+        if (distance_between_centers.y > 0.0f)
+        {
             result.impact_side = AABB_SIDE_BOTTOM;
-            result.penetration_depth = v2(0.0f, overlap_y);
-        } else {
+            result.penetration_depth = v2(0.0f, overlap.y);
+        }
+        else
+        {
             result.impact_side = AABB_SIDE_TOP;
-            result.penetration_depth = v2(0.0f, -overlap_y);
+            result.penetration_depth = v2(0.0f, -overlap.y);
         }
     }
 
