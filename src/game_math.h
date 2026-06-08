@@ -4,6 +4,10 @@
 /** NOTE: standard 32-bit float epsilon */
 #define EPSILON 1e-6f
 
+/****************************************************
+ * NOTE: vector math
+ ****************************************************/
+
 static inline vector2 vector2_add(const vector2 a, const vector2 b)
 {
     return v2(a.x + b.x, a.y + b.y);
@@ -44,6 +48,10 @@ static inline vector2 vector2_norm(const vector2 vector)
 
     return v2(vector.x / length, vector.y / length);
 }
+
+/****************************************************
+ * NOTE: AABB
+ ****************************************************/
 
 /** NOTE: which side of box A was impact during collision */
 typedef enum
@@ -126,19 +134,30 @@ static inline aabb_collision_result aabb_collision(const rectangle a, const rect
     return result;
 }
 
+/****************************************************
+ * NOTE: raycasting
+ ****************************************************/
+
 typedef struct
 {
     bool is_hitting;
+    /** NOTE: how far along the line segment the hit happened, from 0.0 to 1.0 */
     f32 hit_time;
     vector2 hit_position;
 } raycast_result;
 
+/** NOTE: this is an implementation of the slab method:
+ * https://en.wikipedia.org/wiki/Slab_method
+ */
 static inline raycast_result ray_intersect_rectangle(const vector2 start, const vector2 end, rectangle rect)
 {
     raycast_result result = {0};
 
     vector2 direction = vector2_sub(end, start);
 
+    /** NOTE: you may think that this will break in case direction.x/.y is zero but in case of zeroes it would evaluate
+     * to Infinity/-Infinity and the next min/max operations will work perfectly fine
+     */
     f32 inverse_direction_x = 1.0f / direction.x;
     f32 inverse_direction_y = 1.0f / direction.y;
 
@@ -164,6 +183,7 @@ static inline raycast_result ray_intersect_rectangle(const vector2 start, const 
     if (is_overlapping_axes && is_in_front_of_ray && is_within_segment)
     {
         result.is_hitting = true;
+        /** NOTE: this handles the case when ray starts inside the box */
         result.hit_time = MAX(entry_time, 0.0f);
 
         vector2 traveled_vector = vector2_scale(direction, result.hit_time);
