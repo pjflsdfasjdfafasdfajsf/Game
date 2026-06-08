@@ -63,8 +63,6 @@ void input_update_pre_event(input *input)
     {
         input->mouse_buttons[button_index].was_down = input->mouse_buttons[button_index].is_down;
     }
-    input->mouse_delta.x = 0.0f;
-    input->mouse_delta.y = 0.0f;
     input->mouse_scroll = 0.0f;
 }
 
@@ -109,10 +107,8 @@ void input_handle_event(input *input, SDL_Event *event)
 
     case SDL_EVENT_MOUSE_MOTION:
     {
-        input->mouse_position.x += event->motion.xrel;
-        input->mouse_position.y += event->motion.yrel;
-        input->mouse_delta.x += event->motion.xrel;
-        input->mouse_delta.y += event->motion.yrel;
+        input->mouse_position.x = event->motion.x;
+        input->mouse_position.y = event->motion.y;
     }
     break;
 

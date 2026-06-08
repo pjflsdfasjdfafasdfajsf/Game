@@ -769,7 +769,6 @@ typedef struct
     button_state mouse_buttons[mouse_button_count];
 
     vector2 mouse_position;
-    vector2 mouse_delta;
     f32 mouse_scroll;
 } input;
 
