@@ -1,8 +1,6 @@
 CC     := clang
 GLSLC  := glslc
 
-CFLAGS := -Wall -Wextra -Wpedantic -fPIC -std=c23
-LDLIBS := -lSDL3
 
 ##################################################
 
@@ -11,6 +9,9 @@ EXE_SOURCES := src/SDL.c     \
                src/SDL_gpu.c
 EXE_OBJECTS := $(EXE_SOURCES:.c=.o)
 
+EXE_CFLAGS := -Wall -Wextra -Wpedantic -std=c23
+EXE_LDLIBS := -lSDL3 -lm
+
 DLL         := Game.so
 DLL_SOURCES := src/game_png.c            \
                src/game_rectangle_pack.c \
@@ -18,6 +19,9 @@ DLL_SOURCES := src/game_png.c            \
                src/game_wav.c            \
                src/game.c
 DLL_OBJECTS := $(DLL_SOURCES:.c=.o)
+
+DLL_CFLAGS := -Wall -Wextra -Wpedantic -fPIC -nostdlib -std=c23
+DLL_LDLIBS := 
 
 SHADER_SOURCES := src/shaders/regular.frag src/shaders/regular.vert
 SHADER_OBJECTS := $(SHADER_SOURCES:%=%.spv)
@@ -29,12 +33,15 @@ all: $(EXE) $(DLL)
 
 $(EXE_OBJECTS): $(SHADER_OBJECTS)
 $(EXE): $(EXE_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+	$(CC) $(EXE_CFLAGS) $^ -o $@ $(EXE_LDLIBS)
 
 $(DLL): $(DLL_OBJECTS)
-	$(CC) $(CFLAGS) -shared $^ -o $@
+	$(CC) $(DLL_CFLAGS) -shared $^ -o $@ $(DLL_LDLIBS)
 
 ###
+
+$(EXE_OBJECTS): CFLAGS = $(EXE_CFLAGS)
+$(DLL_OBJECTS): CFLAGS = $(DLL_CFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

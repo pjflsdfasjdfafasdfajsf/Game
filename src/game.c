@@ -38,7 +38,11 @@ UPDATE_AND_RENDER(update_and_render)
     {
         state->position.x += 500.0f * delta_time;
     }
-
+    if (button_pressed(input->mouse_buttons[mouse_button_left]))
+    {
+        
+    }
+    
     rectangle player = rect(state->position, v2(200.0f, 200.0f));
     rectangle wall = rect(v2(10.0f, 1000.0f), v2(500.0f, 500.0f));
 
@@ -47,9 +51,10 @@ UPDATE_AND_RENDER(update_and_render)
     {
         state->position = vector2_add(state->position, collision.penetration_depth);
         player = rect(state->position, v2(200.0f, 200.0f));
+
     }
 
-    render_clear_entire_screen(render_buffer, BLACK);
+    render_draw_line(render_buffer, v2(0, 100), v2(2000, 100), BLUE);
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
     render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
 }
