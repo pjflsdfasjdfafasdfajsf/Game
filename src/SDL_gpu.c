@@ -91,12 +91,12 @@ bool gpu_pipeline_initialize(gpu *gpu)
     vertex_attributes[1].location = 1;
     vertex_attributes[1].buffer_slot = 0;
     vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
-    vertex_attributes[1].offset = sizeof(float) * 3;
+    vertex_attributes[1].offset = sizeof(f32) * 3;
 
     vertex_attributes[2].location = 2;
     vertex_attributes[2].buffer_slot = 0;
     vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-    vertex_attributes[2].offset = sizeof(float) * 7;
+    vertex_attributes[2].offset = sizeof(f32) * 7;
 
     SDL_GPUGraphicsPipelineCreateInfo pipeline_create_info = {0};
     pipeline_create_info.vertex_shader = vertex_shader;
@@ -305,8 +305,8 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
 
     int width, height;
     SDL_GetWindowSizeInPixels(gpu->window, &width, &height);
-    float pixels_to_ndc_x = 2.0f / (float)width;
-    float pixels_to_ndc_y = 2.0f / (float)height;
+    f32 pixels_to_ndc_x = 2.0f / (f32)width;
+    f32 pixels_to_ndc_y = 2.0f / (f32)height;
 
     current_offset = 0;
     u32 current_vertex = 0;
@@ -359,10 +359,10 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
             {
                 render_entry_draw_rectangle *command = (render_entry_draw_rectangle *)header;
 
-                float left = command->rectangle.x * pixels_to_ndc_x - 1.0f;
-                float right = (command->rectangle.x + command->rectangle.width) * pixels_to_ndc_x - 1.0f;
-                float top = 1.0f - command->rectangle.y * pixels_to_ndc_y;
-                float bottom = 1.0f - (command->rectangle.y + command->rectangle.height) * pixels_to_ndc_y;
+                f32 left = command->rectangle.x * pixels_to_ndc_x - 1.0f;
+                f32 right = (command->rectangle.x + command->rectangle.width) * pixels_to_ndc_x - 1.0f;
+                f32 top = 1.0f - command->rectangle.y * pixels_to_ndc_y;
+                f32 bottom = 1.0f - (command->rectangle.y + command->rectangle.height) * pixels_to_ndc_y;
 
                 map[current_vertex++] = (vertex){left, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.min.y};
                 map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};
