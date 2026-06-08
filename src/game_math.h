@@ -2,7 +2,8 @@
 
 #include "game_types.h"
 /** NOTE: standard 32-bit float epsilon */
-#define EPSILON 1e-6f
+#define FLOAT_EPSILON 1e-6f
+#define FLOAT_MAX 3.402823466e+38f
 
 /****************************************************
  * NOTE: vector math
@@ -41,7 +42,7 @@ static inline f32 vector2_length(const vector2 vector)
 static inline vector2 vector2_norm(const vector2 vector)
 {
     f32 length = vector2_length(vector);
-    if (length < EPSILON)
+    if (length < FLOAT_EPSILON)
     {
         return v2(0, 0);
     }
@@ -138,22 +139,28 @@ static inline aabb_collision_result aabb_collision(const rectangle a, const rect
  * NOTE: raycasting
  ****************************************************/
 
+/** please tell me we will have to use both finite and infinite versions this code is so good im so proud of it pls pls */
+
 typedef struct
 {
     bool is_hitting;
-    /** NOTE: how far along the line segment the hit happened, from 0.0 to 1.0 */
+    /** NOTE: how far along the line segment the hit happened, from 0.0 to 1.0 (if returned by ray_intersect_rectangle_finite,
+     * is an absolute distance otherwise)
+     */
     f32 hit_time;
     vector2 hit_position;
 } raycast_result;
 
-/** NOTE: this is an implementation of the slab method:
+/** NOTE: DO NOT USE THIS, see ray_intersect_rectangle_infinite/finite instead
+ *
+ * this is an implementation of the slab method:
  * https://en.wikipedia.org/wiki/Slab_method
+ *
+ * t is how far along the direction vector the ray is allowed to register a hit
  */
-static inline raycast_result ray_intersect_rectangle(const vector2 start, const vector2 end, rectangle rect)
+static inline raycast_result ray_intersect_rectangle_inner(const vector2 start, const vector2 direction, const f32 t, rectangle rect)
 {
     raycast_result result = {0};
-
-    vector2 direction = vector2_sub(end, start);
 
     /** NOTE: you may think that this will break in case direction.x/.y is zero but in case of zeroes it would evaluate
      * to Infinity/-Infinity and the next min/max operations will work perfectly fine
@@ -178,9 +185,9 @@ static inline raycast_result ray_intersect_rectangle(const vector2 start, const 
 
     bool is_overlapping_axes = entry_time <= exit_time;
     bool is_in_front_of_ray = exit_time > 0.0f;
-    bool is_within_segment = entry_time <= 1.0f;
+    bool is_within_bounds = entry_time <= t;
 
-    if (is_overlapping_axes && is_in_front_of_ray && is_within_segment)
+    if (is_overlapping_axes && is_in_front_of_ray && is_within_bounds)
     {
         result.is_hitting = true;
         /** NOTE: this handles the case when ray starts inside the box */
@@ -191,4 +198,25 @@ static inline raycast_result ray_intersect_rectangle(const vector2 start, const 
     }
 
     return result;
+}
+
+static inline raycast_result ray_intersect_rectangle_finite(const vector2 start, const vector2 end, rectangle rect)
+{
+    vector2 direction = vector2_sub(end, start);
+    return ray_intersect_rectangle_inner(start, direction, 1.0f, rect);
+}
+
+/** NOTE: in the returned `raycast_result` `hit_time` instead means the absolute distance
+ *  traveled to hit the rectangle
+ */
+static inline raycast_result ray_intersect_rectangle_infinite(const vector2 start, const vector2 direction, rectangle rect)
+{
+    vector2 norm = vector2_norm(direction);
+
+    if (norm.x == 0.0f && norm.y == 0.0f)
+    {
+        return (raycast_result){0};
+    }
+
+    return ray_intersect_rectangle_inner(start, norm, FLOAT_MAX, rect);
 }

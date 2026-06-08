@@ -38,7 +38,7 @@ UPDATE_AND_RENDER(update_and_render)
     {
         state->position.x += 500.0f * delta_time;
     }
-    
+
     rectangle player = rect(state->position, v2(200.0f, 200.0f));
     rectangle wall = rect(v2(10.0f, 1000.0f), v2(500.0f, 500.0f));
 
@@ -50,16 +50,19 @@ UPDATE_AND_RENDER(update_and_render)
     }
 
     vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
-    vector2 end = vector2_add(start, v2(800.0f, 900.0f));
-    raycast_result ray = ray_intersect_rectangle(start, end, wall);
+    vector2 direction = vector2_sub(input->mouse_position, start);
+    raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall);
 
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
     render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
 
-    if (ray.is_hitting) {
-        render_draw_line(render_buffer, start, ray.hit_position, BLUE);
-    } else {
-        render_draw_line(render_buffer, start, end, RED);
+    if (ray.is_hitting)
+    {
+        render_draw_line(render_buffer, start, ray.hit_position, GREEN);
+    }
+    else
+    {
+        render_draw_line(render_buffer, start, vector2_add(start, vector2_scale(vector2_norm(direction), 3000.0f)), RED);
     }
 }
 
