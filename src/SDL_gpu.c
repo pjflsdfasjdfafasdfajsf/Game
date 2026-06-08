@@ -91,12 +91,12 @@ bool gpu_pipeline_initialize(gpu *gpu)
     vertex_attributes[1].location = 1;
     vertex_attributes[1].buffer_slot = 0;
     vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
-    vertex_attributes[1].offset = sizeof(float) * 3;
+    vertex_attributes[1].offset = sizeof(f32) * 3;
 
     vertex_attributes[2].location = 2;
     vertex_attributes[2].buffer_slot = 0;
     vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-    vertex_attributes[2].offset = sizeof(float) * 7;
+    vertex_attributes[2].offset = sizeof(f32) * 7;
 
     SDL_GPUGraphicsPipelineCreateInfo pipeline_create_info = {0};
     pipeline_create_info.vertex_shader = vertex_shader;
@@ -270,18 +270,18 @@ bool gpu_initialize(gpu *gpu, SDL_Window *window)
 
 void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffer *command_buffer, u32 *out_vertex_count)
 {
-    SDL_GPUCopyPass *copy_pass = 0;
-    usize current_offset = 0;
     u32 vertices = 0;
+    usize offset = 0;
 
-    while (current_offset < render_buffer->current_offset)
+    while (offset < render_buffer->current_offset)
     {
-        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + current_offset);
-        if (header->type == render_entry_type_draw_rectangle)
+        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + offset);
+        if (header->type == render_entry_type_draw_rectangle ||
+            header->type == render_entry_type_draw_line)
         {
             vertices += 6;
         }
-        current_offset += header->size;
+        offset += header->size;
     }
 
     vertices = MIN(vertices, 4096);
@@ -292,10 +292,10 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
 
     if (vertices > 0)
     {
-        SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info = {0};
-        transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        transfer_buffer_create_info.size = vertices * sizeof(vertex);
-        vertex_transfer_buffer = SDL_CreateGPUTransferBuffer(gpu->device, &transfer_buffer_create_info);
+        SDL_GPUTransferBufferCreateInfo transfer_info = {0};
+        transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transfer_info.size = vertices * sizeof(vertex);
+        vertex_transfer_buffer = SDL_CreateGPUTransferBuffer(gpu->device, &transfer_info);
 
         if (vertex_transfer_buffer)
         {
@@ -305,21 +305,27 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
 
     int width, height;
     SDL_GetWindowSizeInPixels(gpu->window, &width, &height);
-    float pixels_to_ndc_x = 2.0f / (float)width;
-    float pixels_to_ndc_y = 2.0f / (float)height;
+    f32 normalied_width_x = 2.0f / (f32)width;
+    f32 normalized_height_y = 2.0f / (f32)height;
 
-    current_offset = 0;
+    SDL_GPUCopyPass *copy_pass = 0;
+    offset = 0;
     u32 current_vertex = 0;
 
-    while (current_offset < render_buffer->current_offset)
-    {
-        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + current_offset);
-        usize next_offset = current_offset + header->size;
+    /****************************************************/
 
-        if (header->type == render_entry_type_allocate_texture)
+    while (offset < render_buffer->current_offset)
+    {
+        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + offset);
+
+        switch (header->type)
+        {
+        case render_entry_type_allocate_texture:
         {
             render_entry_allocate_texture *command = (render_entry_allocate_texture *)header;
-            if (command->index > UNTEXTURED && command->index < ARRAY_COUNT(gpu->textures) && command->pixels != 0)
+            bool is_index_valid = (command->index > UNTEXTURED && command->index < ARRAY_COUNT(gpu->textures));
+
+            if (is_index_valid && command->pixels)
             {
                 SDL_GPUTextureCreateInfo texture_info = {0};
                 texture_info.type = SDL_GPU_TEXTURETYPE_2D;
@@ -353,27 +359,92 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                 }
             }
         }
-        else if (header->type == render_entry_type_draw_rectangle)
+        break;
+
+        case render_entry_type_draw_rectangle:
         {
             if (map && current_vertex + 6 <= vertices)
             {
                 render_entry_draw_rectangle *command = (render_entry_draw_rectangle *)header;
 
-                float left = command->rectangle.x * pixels_to_ndc_x - 1.0f;
-                float right = (command->rectangle.x + command->rectangle.width) * pixels_to_ndc_x - 1.0f;
-                float top = 1.0f - command->rectangle.y * pixels_to_ndc_y;
-                float bottom = 1.0f - (command->rectangle.y + command->rectangle.height) * pixels_to_ndc_y;
+                f32 left = (command->rectangle.x) * normalied_width_x - 1.0f;
+                f32 right = (command->rectangle.x + command->rectangle.width) * normalied_width_x - 1.0f;
+                f32 top = 1.0f - (command->rectangle.y) * normalized_height_y;
+                f32 bottom = 1.0f - (command->rectangle.y + command->rectangle.height) * normalized_height_y;
 
-                map[current_vertex++] = (vertex){left, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.min.y};
-                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.max.y};
-                map[current_vertex++] = (vertex){right, top, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.min.y};
-                map[current_vertex++] = (vertex){right, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.max.x, command->uv.max.y};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, command->color.r, command->color.g, command->color.b, command->color.a, command->uv.min.x, command->uv.max.y};
+                f32 r = command->color.r;
+                f32 g = command->color.g;
+                f32 b = command->color.b;
+                f32 a = command->color.a;
+
+                f32 u_min = command->uv.min.x;
+                f32 v_min = command->uv.min.y;
+                f32 u_max = command->uv.max.x;
+                f32 v_max = command->uv.max.y;
+
+                map[current_vertex++] = (vertex){left, top, 0.0f, r, g, b, a, u_min, v_min};
+                map[current_vertex++] = (vertex){right, top, 0.0f, r, g, b, a, u_max, v_min};
+                map[current_vertex++] = (vertex){left, bottom, 0.0f, r, g, b, a, u_min, v_max};
+
+                map[current_vertex++] = (vertex){right, top, 0.0f, r, g, b, a, u_max, v_min};
+                map[current_vertex++] = (vertex){right, bottom, 0.0f, r, g, b, a, u_max, v_max};
+                map[current_vertex++] = (vertex){left, bottom, 0.0f, r, g, b, a, u_min, v_max};
             }
         }
+        break;
 
-        current_offset = next_offset;
+        case render_entry_type_draw_line:
+        {
+            if (map && current_vertex + 6 <= vertices)
+            {
+                render_entry_draw_line *command = (render_entry_draw_line *)header;
+
+                f32 dx = command->end.x - command->start.x;
+                f32 dy = command->end.y - command->start.y;
+                f32 length = SQRT(dx * dx + dy * dy);
+
+                if (length > 0.0001f)
+                {
+                    f32 nx = -dy / length;
+                    f32 ny = dx / length;
+
+                    f32 tx = nx * 1.0f;
+                    f32 ty = ny * 1.0f;
+
+                    f32 cx0 = (command->start.x + tx) * normalied_width_x - 1.0f;
+                    f32 cy0 = 1.0f - (command->start.y + ty) * normalized_height_y;
+
+                    f32 cx1 = (command->start.x - tx) * normalied_width_x - 1.0f;
+                    f32 cy1 = 1.0f - (command->start.y - ty) * normalized_height_y;
+
+                    f32 cx2 = (command->end.x + tx) * normalied_width_x - 1.0f;
+                    f32 cy2 = 1.0f - (command->end.y + ty) * normalized_height_y;
+
+                    f32 cx3 = (command->end.x - tx) * normalied_width_x - 1.0f;
+                    f32 cy3 = 1.0f - (command->end.y - ty) * normalized_height_y;
+
+                    f32 r = command->color.r;
+                    f32 g = command->color.g;
+                    f32 b = command->color.b;
+                    f32 a = command->color.a;
+
+                    map[current_vertex++] = (vertex){cx0, cy0, 0.0f, r, g, b, a, 0.0f, 0.0f};
+                    map[current_vertex++] = (vertex){cx2, cy2, 0.0f, r, g, b, a, 0.0f, 0.0f};
+                    map[current_vertex++] = (vertex){cx1, cy1, 0.0f, r, g, b, a, 0.0f, 0.0f};
+
+                    map[current_vertex++] = (vertex){cx2, cy2, 0.0f, r, g, b, a, 0.0f, 0.0f};
+                    map[current_vertex++] = (vertex){cx3, cy3, 0.0f, r, g, b, a, 0.0f, 0.0f};
+                    map[current_vertex++] = (vertex){cx1, cy1, 0.0f, r, g, b, a, 0.0f, 0.0f};
+                }
+            }
+        }
+        break;
+
+        default:
+            break;
+        }
+
+        offset += header->size;
     }
 
     if (vertex_transfer_buffer && map)
@@ -385,14 +456,14 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
             copy_pass = SDL_BeginGPUCopyPass(command_buffer);
         }
 
-        SDL_GPUTransferBufferLocation source_location = {0};
-        source_location.transfer_buffer = vertex_transfer_buffer;
+        SDL_GPUTransferBufferLocation source = {0};
+        source.transfer_buffer = vertex_transfer_buffer;
 
-        SDL_GPUBufferRegion destination_region = {0};
-        destination_region.buffer = gpu->vertex_buffer;
-        destination_region.size = vertices * sizeof(vertex);
+        SDL_GPUBufferRegion destination = {0};
+        destination.buffer = gpu->vertex_buffer;
+        destination.size = vertices * sizeof(vertex);
 
-        SDL_UploadToGPUBuffer(copy_pass, &source_location, &destination_region, false);
+        SDL_UploadToGPUBuffer(copy_pass, &source, &destination, false);
     }
 
     if (copy_pass)
@@ -419,53 +490,43 @@ void gpu_pass_render(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
 
     SDL_GPUColorTargetInfo color_target_info = {0};
     color_target_info.texture = swapchain_texture;
-    color_target_info.clear_color.r = 0.0f;
-    color_target_info.clear_color.g = 0.0f;
-    color_target_info.clear_color.b = 0.0f;
-    color_target_info.clear_color.a = 1.0f;
     color_target_info.load_op = SDL_GPU_LOADOP_LOAD;
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
 
-    usize current_offset = 0;
-    while (current_offset < render_buffer->current_offset)
-    {
-        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + current_offset);
-        if (header->type == render_entry_type_clear_entire_screen)
-        {
-            render_entry_clear_entire_screen *command = (render_entry_clear_entire_screen *)header;
-            color_target_info.clear_color = (SDL_FColor){command->color.r, command->color.g, command->color.b, command->color.a};
-            color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
-            break;
-        }
-        current_offset += header->size;
-    }
-
     SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, 0);
     if (!render_pass)
+    {
         return;
+    }
 
     SDL_BindGPUGraphicsPipeline(render_pass, gpu->pipeline);
 
-    SDL_GPUBufferBinding vertex_binding = {0};
-    vertex_binding.buffer = gpu->vertex_buffer;
-    vertex_binding.offset = 0;
-    SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_binding, 1);
+    SDL_GPUBufferBinding vertex_buffer_binding = {0};
+    vertex_buffer_binding.buffer = gpu->vertex_buffer;
+    vertex_buffer_binding.offset = 0;
+    SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
 
-    current_offset = 0;
-    u32 current_vertex_offset = 0;
+    usize offset = 0;
+    u32 current_vertex = 0;
 
-    while (current_offset < render_buffer->current_offset)
+    /****************************************************/
+
+    while (offset < render_buffer->current_offset)
     {
-        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + current_offset);
+        render_entry_header *header = (render_entry_header *)(render_buffer->base_pointer + offset);
 
-        if (header->type == render_entry_type_draw_rectangle)
+        switch (header->type)
+        {
+        case render_entry_type_draw_rectangle:
         {
             render_entry_draw_rectangle *command = (render_entry_draw_rectangle *)header;
 
-            if (current_vertex_offset + 6 <= vertices)
+            if (current_vertex + 6 <= vertices)
             {
                 SDL_GPUTexture *texture = gpu->textures[UNTEXTURED];
-                if (command->texture > 0 && command->texture < ARRAY_COUNT(gpu->textures) && gpu->textures[command->texture])
+                bool has_valid_texture = (command->texture > 0 && command->texture < ARRAY_COUNT(gpu->textures) && gpu->textures[command->texture]);
+
+                if (has_valid_texture)
                 {
                     texture = gpu->textures[command->texture];
                 }
@@ -473,14 +534,36 @@ void gpu_pass_render(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                 SDL_GPUTextureSamplerBinding sampler_binding = {0};
                 sampler_binding.texture = texture;
                 sampler_binding.sampler = gpu->sampler;
-                SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
 
-                SDL_DrawGPUPrimitives(render_pass, 6, 1, current_vertex_offset, 0);
-                current_vertex_offset += 6;
+                SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
+                SDL_DrawGPUPrimitives(render_pass, 6, 1, current_vertex, 0);
+
+                current_vertex += 6;
             }
         }
+        break;
 
-        current_offset += header->size;
+        case render_entry_type_draw_line:
+        {
+            if (current_vertex + 6 <= vertices)
+            {
+                SDL_GPUTextureSamplerBinding sampler_binding = {0};
+                sampler_binding.texture = gpu->textures[UNTEXTURED];
+                sampler_binding.sampler = gpu->sampler;
+
+                SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
+                SDL_DrawGPUPrimitives(render_pass, 6, 1, current_vertex, 0);
+
+                current_vertex += 6;
+            }
+        }
+        break;
+
+        default:
+            break;
+        }
+
+        offset += header->size;
     }
 
     SDL_EndGPURenderPass(render_pass);

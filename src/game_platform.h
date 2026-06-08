@@ -542,16 +542,16 @@ static inline bool memory_stream_write_string_format(memory_stream *stream, cons
  * implementations */
 typedef struct
 {
-    float x, y, z;
-    float r, g, b, a;
-    float u, v;
+    f32 x, y, z;
+    f32 r, g, b, a;
+    f32 u, v;
 } vertex;
 
 typedef enum
 {
     render_entry_type_none = 0,
-    render_entry_type_clear_entire_screen,
     render_entry_type_draw_rectangle,
+    render_entry_type_draw_line,
     render_entry_type_allocate_texture,
 } render_entry_type;
 
@@ -564,17 +564,19 @@ typedef struct
 typedef struct
 {
     render_entry_header header;
-    vector4 color;
-} render_entry_clear_entire_screen;
-
-typedef struct
-{
-    render_entry_header header;
     rectangle rectangle;
     vector4 color;
     rectangle uv;
     u32 texture;
 } render_entry_draw_rectangle;
+
+typedef struct
+{
+    render_entry_header header;
+    vector2 start;
+    vector2 end;
+    vector4 color;
+} render_entry_draw_line;
 
 typedef struct
 {
@@ -653,21 +655,6 @@ static inline void *render_buffer_allocate_bytes(render_buffer *render_buffer, u
 
 #define RENDER_BUFFER_PUSH_COMMAND(buffer, command_name) (render_entry_##command_name *)render_buffer_allocate_bytes((buffer), render_entry_type_##command_name, sizeof(render_entry_##command_name))
 
-static inline void render_clear_entire_screen(render_buffer *render_buffer, vector4 color)
-{
-    if (!render_buffer)
-    {
-        return;
-    }
-
-    render_entry_clear_entire_screen *command = RENDER_BUFFER_PUSH_COMMAND(render_buffer, clear_entire_screen);
-
-    if (command)
-    {
-        command->color = color;
-    }
-}
-
 static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, rectangle uv, u32 texture)
 {
     if (!render_buffer)
@@ -683,6 +670,23 @@ static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle
         command->color = color;
         command->uv = uv;
         command->texture = texture;
+    }
+}
+
+static inline void render_draw_line(render_buffer *render_buffer, vector2 start, vector2 end, vector4 color)
+{
+    if (!render_buffer)
+    {
+        return;
+    }
+
+    render_entry_draw_line *command = RENDER_BUFFER_PUSH_COMMAND(render_buffer, draw_line);
+
+    if (command)
+    {
+        command->start = start;
+        command->end = end;
+        command->color = color;
     }
 }
 
@@ -765,8 +769,7 @@ typedef struct
     button_state mouse_buttons[mouse_button_count];
 
     vector2 mouse_position;
-    vector2 mouse_delta;
-    float mouse_scroll;
+    f32 mouse_scroll;
 } input;
 
 #define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, render_buffer *render_buffer, f32 delta_time)

@@ -107,6 +107,9 @@ UPDATE_AND_RENDER(update_and_render)
     state->accumelated_time += delta_time;
 
     render_clear_entire_screen(render_buffer, BLACK);
+    vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
+    vector2 direction = vector2_sub(input->mouse_position, start);
+    raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall);
 
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
 
@@ -121,6 +124,13 @@ UPDATE_AND_RENDER(update_and_render)
 
     if (state->health < 0.0f || hit) {
         render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, UNIT, UNTEXTURED);
+    if (ray.is_hitting)
+    {
+        render_draw_line(render_buffer, start, ray.hit_position, GREEN);
+    }
+    else
+    {
+        render_draw_line(render_buffer, start, vector2_add(start, vector2_scale(vector2_norm(direction), 3000.0f)), RED);
     }
 }
 
