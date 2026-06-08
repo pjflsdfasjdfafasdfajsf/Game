@@ -490,7 +490,7 @@ void gpu_pass_render(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
 
     SDL_GPUColorTargetInfo color_target_info = {0};
     color_target_info.texture = swapchain_texture;
-    color_target_info.load_op = SDL_GPU_LOADOP_LOAD;
+    color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
 
     SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, 0);
