@@ -795,9 +795,7 @@ typedef struct
 } input;
 
 typedef struct {
-    void *(*file_load)(const char *file, usize *out_size);
     bool (*file_save)(const char *file, const void *data, usize size);
-    void (*file_free)(void *file_data);
 } platform;
 
 #define UPDATE_AND_RENDER(name) void name(memory *memory, input *input, platform *platform, render_buffer *render_buffer, f32 delta_time)

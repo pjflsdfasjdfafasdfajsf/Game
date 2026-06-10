@@ -121,11 +121,11 @@ enum
 // NOTE: table tags
 enum
 {
-    true_type_table_tag_head = FOURCC_BE('h', 'e', 'a', 'd'),
-    true_type_table_tag_maxp = FOURCC_BE('m', 'a', 'x', 'p'),
-    true_type_table_tag_cmap = FOURCC_BE('c', 'm', 'a', 'p'),
-    true_type_table_tag_loca = FOURCC_BE('l', 'o', 'c', 'a'),
-    true_type_table_tag_glyf = FOURCC_BE('g', 'l', 'y', 'f'),
+    true_type_table_tag_head = FOURCC('h', 'e', 'a', 'd'),
+    true_type_table_tag_maxp = FOURCC('m', 'a', 'x', 'p'),
+    true_type_table_tag_cmap = FOURCC('c', 'm', 'a', 'p'),
+    true_type_table_tag_loca = FOURCC('l', 'o', 'c', 'a'),
+    true_type_table_tag_glyf = FOURCC('g', 'l', 'y', 'f'),
 };
 
 typedef struct
@@ -194,15 +194,15 @@ true_type_font true_type_font_load_from_memory(memory_arena *arena, memory_strea
     {
         result.scaler_type = true_type_scaler_type_windows;
     }
-    else if (scaler_type_value == FOURCC_BE('t', 'r', 'u', 'e'))
+    else if (scaler_type_value == FOURCC('t', 'r', 'u', 'e'))
     {
         result.scaler_type = true_type_scaler_type_mac;
     }
-    else if (scaler_type_value == FOURCC_BE('t', 'y', 'p', '1'))
+    else if (scaler_type_value == FOURCC('t', 'y', 'p', '1'))
     {
         result.scaler_type = true_type_scaler_type_post_script;
     }
-    else if (scaler_type_value == FOURCC_BE('O', 'T', 'T', 'O'))
+    else if (scaler_type_value == FOURCC('O', 'T', 'T', 'O'))
     {
         result.scaler_type = true_type_scaler_type_open_type;
     }

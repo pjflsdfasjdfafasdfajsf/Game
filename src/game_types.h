@@ -52,8 +52,7 @@ typedef double f64;
 
 #define SQRT(x) __builtin_sqrtf(x)
 
-#define FOURCC_BE(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
-#define FOURCC_LE(a, b, c, d) (((u32)(a)) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d << 24)))
+#define FOURCC(a, b, c, d) (((u32)(a) << 24) | ((u32)(b) << 16) | ((u32)(c) << 8) | ((u32)(d)))
 
 // NOTE: math types.
 

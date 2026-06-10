@@ -10,7 +10,7 @@ typedef struct
 	u32 rectangle_count;
 
 	/* NOTE: store for future reasons like displaying maps in the ui */
-	const char *name;
+	char name[64];
 } map;
 
 map map_create(const char *name);
@@ -19,4 +19,4 @@ bool map_add(map *map, rectangle rectangle);
 
 bool map_write(memory *memory, platform *platform, map *map);
 
-bool map_load(memory *memory, platform *platform, const char *map_file, map *map);
+bool map_load(memory *memory, const void *data, usize size, map *map);

@@ -405,9 +405,7 @@ int main(void)
 
     platform platform = {
         /* NOTE: no point in in making own functions that wrap SDL */ 
-        .file_load = SDL_LoadFile,
         .file_save = SDL_SaveFile,
-        .file_free = SDL_free,        
     };
 
     update(&state, &gpu, &memory, &input, &platform, &render_buffer, &sound_buffer);

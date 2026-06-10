@@ -36,6 +36,9 @@ UPDATE_AND_RENDER(update_and_render)
 #embed "../assets/images/gangster.png"  
         };
 
+        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
+        render_allocate_texture(render_buffer, 2, image.size, image.pixels);
+
         map map = map_create("test.map");
 
         map_add(&map, rect(v2(0, 0), v2(10, 10)));
@@ -43,10 +46,15 @@ UPDATE_AND_RENDER(update_and_render)
         map_add(&map, rect(v2(100.0f, 101.0f), v2(102.f, 103.f)));
 
         map_write(memory, platform, &map);
-        map_load(memory, platform, "test.map", &map);
 
-        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
-        render_allocate_texture(render_buffer, 2, image.size, image.pixels);
+        /* NOTE: change path of the map to be in assets?
+         * im not sure because its right now just for testing
+         * so i will keep it here for now */
+        static const char map_data[] = {
+#embed "../test.map"  
+        };
+        
+        map_load(memory, map_data, sizeof(map_data), &map);
 
         state->position = v2(10, 10);
         state->health = 100.0f;
