@@ -113,6 +113,8 @@ UPDATE_AND_RENDER(update_and_render)
         vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
         vector2 direction = vector2_sub(input->mouse_position, start);
         raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall->bounding_box);
+
+        /* NOTE: doesnt check the nearest collision at the moment so the ray might hit through another object */
         if (ray.is_hitting)
         {
             ray_hit = true;
@@ -135,6 +137,7 @@ UPDATE_AND_RENDER(update_and_render)
 
         rectangle enemy_bounds = rect(enemy->position, enemy->size);
 
+        /* NOTE: collision with player */
         aabb_collision_result collision = aabb_collision(player, enemy_bounds);
         if (collision.is_colliding && state->accumelated_time - state->last_hit > enemy_hit_cooldown)
         {
@@ -143,9 +146,10 @@ UPDATE_AND_RENDER(update_and_render)
             hit = true;
         }
 
+        /* NOTE: collision with map */
         for (u32 j = 0; j < state->test_map.wall_count; j++)
         {
-            aabb_collision_result collision = aabb_collision(player, state->test_map.walls[i].bounding_box);
+            aabb_collision_result collision = aabb_collision(rect(enemy->position, enemy->size), state->test_map.walls[j].bounding_box);
             if (collision.is_colliding)
             {
                 enemy->position = vector2_add(enemy->position, collision.penetration_depth);

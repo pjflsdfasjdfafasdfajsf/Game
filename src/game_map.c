@@ -68,7 +68,7 @@ bool map_write(memory *memory, platform *platform, map *map)
 		memory_stream_write_uint8(&map_stream, map->name[i]);
 	}
 
-	/* NOTE: rectangle count */
+	/* NOTE: wall count */
 	memory_stream_write_uint32(&map_stream, map->wall_count);	
 
 	for (usize i = 0; i < map->wall_count; i++)
