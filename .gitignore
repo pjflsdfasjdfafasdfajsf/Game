@@ -12,3 +12,6 @@ compile_commands.json
 
 .cache
 .vscode
+
+# game stuff
+*.map

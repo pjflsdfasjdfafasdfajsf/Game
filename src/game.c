@@ -2,6 +2,7 @@
 #include "game_math.h"
 #include "game_platform.h"
 #include "game_png.h"
+#include "game_map.h"
 #include "game_types.h"
 
 // NOTE: in seconds
@@ -34,6 +35,14 @@ UPDATE_AND_RENDER(update_and_render)
         static const char gangster[] = {
 #embed "../assets/images/gangster.png"  
         };
+
+        map map = map_create("test.map");
+
+        map_add(&memory->permanent_arena, &map, rect(v2(0, 0), v2(10, 10)));
+        map_add(&memory->permanent_arena, &map, rect(v2(67, 68), v2(69, 70)));
+        map_add(&memory->permanent_arena, &map, rect(v2(100.0f, 101.0f), v2(102.f, 103.f)));
+
+        map_write(platform, &memory->temporary_arena, &map);
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);

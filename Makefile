@@ -17,6 +17,7 @@ DLL_SOURCES := src/game_png.c            \
                src/game_rectangle_pack.c \
                src/game_ttf.c            \
                src/game_wav.c            \
+               src/game_map.c            \
                src/game.c
 DLL_OBJECTS := $(DLL_SOURCES:.c=.o)
 

@@ -2,6 +2,7 @@
 
 #include "SDL.h"
 #include "SDL_gpu.h"
+#include "game_platform.h"
 
 /** TODO:
  *  FOR SHADERS: !!!
@@ -286,7 +287,7 @@ void sound_update(state *state, sound_buffer *sound_buffer)
 
 /****************************************************/
 
-void update(state *state, gpu *gpu, memory *memory, input *input, render_buffer *render_buffer, sound_buffer *sound_buffer)
+void update(state *state, gpu *gpu, memory *memory, input *input, platform *platform, render_buffer *render_buffer, sound_buffer *sound_buffer)
 {
     u64 last_counter = SDL_GetPerformanceCounter();
     u64 counter_frequency = SDL_GetPerformanceFrequency();
@@ -313,7 +314,7 @@ void update(state *state, gpu *gpu, memory *memory, input *input, render_buffer 
         code_update(&state->code);
         if (state->code.update_and_render)
         {
-            state->code.update_and_render(memory, input, render_buffer, delta_time);
+            state->code.update_and_render(memory, input, platform, render_buffer, delta_time);
         }
 
         if (memory->standard_info_stream && memory->standard_info_stream->offset > 0)
@@ -401,7 +402,15 @@ int main(void)
     sound_buffer.samples = (f32 *)sound_samples_memory;
 
     input input = {0};
-    update(&state, &gpu, &memory, &input, &render_buffer, &sound_buffer);
+
+    platform platform = {
+        /* NOTE: no point in in making own functions that wrap SDL */ 
+        .file_load = SDL_LoadFile,
+        .file_save = SDL_SaveFile,
+        .file_free = SDL_free,        
+    };
+
+    update(&state, &gpu, &memory, &input, &platform, &render_buffer, &sound_buffer);
 
     return EXIT_SUCCESS;
 }
