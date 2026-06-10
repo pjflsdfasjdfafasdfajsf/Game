@@ -386,6 +386,28 @@ static inline bool memory_stream_write_bytes(memory_stream *stream, const void *
 
 static inline bool memory_stream_write_uint8(memory_stream *stream, u8 value) { return memory_stream_write_bytes(stream, &value, 1); }
 
+static inline bool memory_stream_write_uint32(memory_stream *stream, u32 value)
+{
+    if (!memory_stream_write_uint8(stream, (value >> 0) & 0xff))
+    {
+        return false;
+    }
+    if (!memory_stream_write_uint8(stream, (value >> 8) & 0xff))
+    {
+        return false;
+    }
+    if (!memory_stream_write_uint8(stream, (value >> 16) & 0xff))
+    {
+        return false;
+    }
+    if (!memory_stream_write_uint8(stream, (value >> 24) & 0xff))
+    {
+        return false;
+    }
+
+    return true;
+}
+
 static inline bool memory_stream_write_string(memory_stream *stream, const char *string)
 {
     if (!string)

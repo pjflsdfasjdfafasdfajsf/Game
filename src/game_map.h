@@ -15,6 +15,8 @@ typedef struct
 
 map map_create(const char *name);
 
-bool map_add(memory_arena *permanent_arena, map *map, rectangle rectangle);
+bool map_add(map *map, rectangle rectangle);
 
-bool map_write(platform *platform, memory_arena *temporary_arena, map *map);
+bool map_write(memory *memory, platform *platform, map *map);
+
+bool map_load(memory *memory, platform *platform, const char *map_file, map *map);

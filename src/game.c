@@ -38,11 +38,12 @@ UPDATE_AND_RENDER(update_and_render)
 
         map map = map_create("test.map");
 
-        map_add(&memory->permanent_arena, &map, rect(v2(0, 0), v2(10, 10)));
-        map_add(&memory->permanent_arena, &map, rect(v2(67, 68), v2(69, 70)));
-        map_add(&memory->permanent_arena, &map, rect(v2(100.0f, 101.0f), v2(102.f, 103.f)));
+        map_add(&map, rect(v2(0, 0), v2(10, 10)));
+        map_add(&map, rect(v2(67, 68), v2(69, 70)));
+        map_add(&map, rect(v2(100.0f, 101.0f), v2(102.f, 103.f)));
 
-        map_write(platform, &memory->temporary_arena, &map);
+        map_write(memory, platform, &map);
+        map_load(memory, platform, "test.map", &map);
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
