@@ -363,6 +363,13 @@ static inline i64 memory_stream_read_int64_big_endian(memory_stream *stream)
     return result;
 }
 
+static inline f32 memory_stream_read_f32_little_endian(memory_stream *stream)
+{
+    u32 value_int = memory_stream_read_uint32_little_endian(stream);
+    /* NOTE: maybe do this conversion with a union in the future? */
+    return *(f32 *)&value_int; 
+}
+
 static inline bool memory_stream_write_bytes(memory_stream *stream, const void *data, usize size)
 {
     if (!stream->is_writable)
@@ -407,6 +414,14 @@ static inline bool memory_stream_write_uint32(memory_stream *stream, u32 value)
 
     return true;
 }
+
+static inline bool memory_stream_write_f32(memory_stream *stream, f32 value)
+{
+    /* NOTE: maybe do this conversion with a union in the future? */
+    u32 value_int = *(u32 *)&value;
+    return memory_stream_write_uint32(stream, value_int);    
+}
+
 
 static inline bool memory_stream_write_string(memory_stream *stream, const char *string)
 {

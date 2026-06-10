@@ -6,8 +6,14 @@
 
 typedef struct
 {
-	rectangle rectangles[128];
-	u32 rectangle_count;
+	rectangle bounding_box;
+	vector4 color;
+} map_wall;
+
+typedef struct
+{
+	map_wall walls[128];
+	u32 wall_count;
 
 	/* NOTE: store for future reasons like displaying maps in the ui */
 	char name[64];
@@ -15,7 +21,7 @@ typedef struct
 
 map map_create(const char *name);
 
-bool map_add(map *map, rectangle rectangle);
+bool map_add(map *map, rectangle bounding_box, vector4 color);
 
 bool map_write(memory *memory, platform *platform, map *map);
 

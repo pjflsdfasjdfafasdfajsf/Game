@@ -39,11 +39,13 @@ UPDATE_AND_RENDER(update_and_render)
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
+        /* NOTE: watch out that you embed the correct map when changing the name */
         map map = map_create("test.map");
 
-        map_add(&map, rect(v2(0, 0), v2(10, 10)));
-        map_add(&map, rect(v2(20, 20), v2(20, 20)));
-        map_add(&map, rect(v2(60, 60), v2(40, 40)));
+        map_add(&map, rect(v2(0, 0), v2(10, 10)), RED);
+        map_add(&map, rect(v2(20, 20), v2(20, 20)), BLUE);
+        map_add(&map, rect(v2(60, 60), v2(40, 40)), WHITE);
+        map_add(&map, rect(v2(50, 1000), v2(1000, 20)), WHITE);
 
         map_write(memory, platform, &map);
 
@@ -84,21 +86,46 @@ UPDATE_AND_RENDER(update_and_render)
     }
 
     if (button_pressed(input->mouse_buttons[mouse_button_left])) {
+        
         enemy_add(state, input->mouse_position, v2(state->health, state->health));
     }
 
     rectangle player = rect(state->position, v2(200.0f, 200.0f));
-    rectangle wall = rect(v2(50.0f, 1000.0f), v2(1000.0f, 20.0f));
 
-    aabb_collision_result collision = aabb_collision(player, wall);
-    if (collision.is_colliding)
+    /* NOTE: remove later only here for the ray visualisation on the map */
+    bool ray_hit = false;
+    vector2 ray_start;
+    vector2 ray_end;
+    vector2 ray_direction;
+
+    /* NOTE: player collisions with the map */
+    for (u32 i = 0; i < state->test_map.wall_count; i++)
     {
-        state->position = vector2_add(state->position, collision.penetration_depth);
-        player = rect(state->position, v2(200.0f, 200.0f));
+        map_wall *wall = &state->test_map.walls[i];
+
+        aabb_collision_result collision = aabb_collision(player, wall->bounding_box);
+        if (collision.is_colliding)
+        {
+            state->position = vector2_add(state->position, collision.penetration_depth);
+            player = rect(state->position, v2(200.0f, 200.0f));
+        }
+        
+        vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
+        vector2 direction = vector2_sub(input->mouse_position, start);
+        raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall->bounding_box);
+        if (ray.is_hitting)
+        {
+            ray_hit = true;
+            ray_end = ray.hit_position;
+        }
+        ray_direction = direction;
+        ray_start = start;
     }
 
+    /* NOTE: enemy collisions with the map */
     bool hit = false;
-    for (u32 i = 0; i < state->enemy_count; i++) {
+    for (u32 i = 0; i < state->enemy_count; i++)
+    {
         enemy *enemy = &state->enemies[i];
 
         vector2 to_player = vector2_sub(state->position, enemy->position);
@@ -109,51 +136,54 @@ UPDATE_AND_RENDER(update_and_render)
         rectangle enemy_bounds = rect(enemy->position, enemy->size);
 
         aabb_collision_result collision = aabb_collision(player, enemy_bounds);
-        if (collision.is_colliding && state->accumelated_time - state->last_hit > enemy_hit_cooldown) {
+        if (collision.is_colliding && state->accumelated_time - state->last_hit > enemy_hit_cooldown)
+        {
             state->last_hit = state->accumelated_time;
             state->health -= 35.0f;
             hit = true;
         }
 
-        collision = aabb_collision(enemy_bounds, wall);
-        if (collision.is_colliding)
+        for (u32 j = 0; j < state->test_map.wall_count; j++)
         {
-            enemy->position = vector2_add(enemy->position, collision.penetration_depth);
-        }
+            aabb_collision_result collision = aabb_collision(player, state->test_map.walls[i].bounding_box);
+            if (collision.is_colliding)
+            {
+                enemy->position = vector2_add(enemy->position, collision.penetration_depth);
+            }
+        }        
     }
 
     state->accumelated_time += delta_time;
 
-    vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
-    vector2 direction = vector2_sub(input->mouse_position, start);
-    raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall);
-
     /* NOTE: draw map */
-    for (u32 i = 0; i < state->test_map.rectangle_count; i++) {
-        render_draw_rectangle(render_buffer, state->test_map.rectangles[i], RED, UNIT, UNTEXTURED);
+    for (u32 i = 0; i < state->test_map.wall_count; i++)
+    {
+        map_wall *wall = &state->test_map.walls[i];
+        render_draw_rectangle(render_buffer, wall->bounding_box, wall->color, UNIT, UNTEXTURED);
     }
 
-    render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
-
-    for (u32 i = 0; i < state->enemy_count; i++) {
+    for (u32 i = 0; i < state->enemy_count; i++)
+    {
         enemy *enemy = &state->enemies[i];
         rectangle enemy_bounds = rect(enemy->position, enemy->size);
         render_draw_rectangle(render_buffer, enemy_bounds, WHITE, UNIT, 2);
     }
-    
+
+    /* NOTE: player */
     render_draw_rectangle(render_buffer, player, GREEN, UNIT, UNTEXTURED);
     render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
 
-    if (state->health < 0.0f || hit) {
+    if (state->health < 0.0f || hit)
+    {
         render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, UNIT, UNTEXTURED);
     }
-    if (ray.is_hitting)
+    if (ray_hit)
     {
-        render_draw_line(render_buffer, start, ray.hit_position, GREEN);
+        render_draw_line(render_buffer, ray_start, ray_end, GREEN);
     }
     else
     {
-        render_draw_line(render_buffer, start, vector2_add(start, vector2_scale(vector2_norm(direction), 3000.0f)), RED);
+        render_draw_line(render_buffer, ray_start, vector2_add(ray_start, vector2_scale(vector2_norm(ray_direction), 3000.0f)), RED);
     }
 }
 

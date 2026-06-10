@@ -15,26 +15,29 @@ map map_create(const char *name)
 	usize name_length = string_get_length(name);
 
 	/* NOTE: one slot for null terminator */
-	name_length = MAX(name_length, ARRAY_COUNT(result.name) - 1);
+	name_length = MIN(name_length, ARRAY_COUNT(result.name) - 1);
 
 	memory_copy_forwards(result.name, name, name_length);
 
 	return result;
 }
 
-bool map_add(map *map, rectangle rectangle)
+bool map_add(map *map, rectangle bounding_box, vector4 color)
 {
 	if (!map)
 	{
 		return false;
 	}
 
-	if (map->rectangle_count + 1 > ARRAY_COUNT(map->rectangles))
+	if (map->wall_count + 1 > ARRAY_COUNT(map->walls))
 	{
 		return false;
 	}
 
-	map->rectangles[map->rectangle_count++] = rectangle;
+	map->walls[map->wall_count++] = (map_wall){
+		.bounding_box = bounding_box,
+		.color = color,	
+	};
 
 	return true;
 }
@@ -66,15 +69,20 @@ bool map_write(memory *memory, platform *platform, map *map)
 	}
 
 	/* NOTE: rectangle count */
-	memory_stream_write_uint32(&map_stream, map->rectangle_count);	
+	memory_stream_write_uint32(&map_stream, map->wall_count);	
 
-	for (usize i = 0; i < map->rectangle_count; i++)
+	for (usize i = 0; i < map->wall_count; i++)
 	{
-		rectangle *rectangle = &map->rectangles[i];
-		memory_stream_write_uint32(&map_stream, rectangle->x);		
-		memory_stream_write_uint32(&map_stream, rectangle->y);		
-		memory_stream_write_uint32(&map_stream, rectangle->width);		
-		memory_stream_write_uint32(&map_stream, rectangle->height);		
+		map_wall *wall = &map->walls[i];
+		memory_stream_write_f32(&map_stream, wall->bounding_box.x);		
+		memory_stream_write_f32(&map_stream, wall->bounding_box.y);		
+		memory_stream_write_f32(&map_stream, wall->bounding_box.width);		
+		memory_stream_write_f32(&map_stream, wall->bounding_box.height);
+
+		memory_stream_write_f32(&map_stream, wall->color.r);
+		memory_stream_write_f32(&map_stream, wall->color.g);
+		memory_stream_write_f32(&map_stream, wall->color.b);
+		memory_stream_write_f32(&map_stream, wall->color.a);
 	}
 
 	platform->file_save(map->name, map_stream.memory, map_stream.offset);
@@ -110,21 +118,32 @@ bool map_load(memory *memory, const void *data, usize size, map *map)
 
 	memory_stream_write_string_format(memory->standard_info_stream, "INFO: Loaded map: %s\n", map->name);
 
-	u32 rectangle_count = memory_stream_read_uint32_little_endian(&map_stream);
-	memory_stream_write_string_format(memory->standard_info_stream, "INFO: Map rectangle count: %u\n", rectangle_count);
+	u32 wall_count = memory_stream_read_uint32_little_endian(&map_stream);
+	memory_stream_write_string_format(memory->standard_info_stream, "INFO: Map wall count: %u\n", wall_count);
 
-	map->rectangle_count = 0;
+	map->wall_count = 0;
 	
-	while (rectangle_count != 0)
+	while (wall_count != 0)
 	{
-		u32 x = memory_stream_read_uint32_little_endian(&map_stream);
-		u32 y = memory_stream_read_uint32_little_endian(&map_stream);
-		u32 width = memory_stream_read_uint32_little_endian(&map_stream);
-		u32 height = memory_stream_read_uint32_little_endian(&map_stream);
+		f32 x = memory_stream_read_f32_little_endian(&map_stream);
+		f32 y = memory_stream_read_f32_little_endian(&map_stream);
+		f32 width = memory_stream_read_f32_little_endian(&map_stream);
+		f32 height = memory_stream_read_f32_little_endian(&map_stream);
 
-		map->rectangles[map->rectangle_count++] = rect(v2(x, y), v2(width, height));
+		vector4 color;
+		color.r = memory_stream_read_f32_little_endian(&map_stream);
+		color.g = memory_stream_read_f32_little_endian(&map_stream);
+		color.b = memory_stream_read_f32_little_endian(&map_stream);
+		color.a = memory_stream_read_f32_little_endian(&map_stream);
 
-		--rectangle_count;
+		map_wall wall = {
+			.bounding_box = rect(v2(x, y), v2(width, height)),
+			.color = color,
+		};
+
+		map->walls[map->wall_count++] = wall;
+
+		--wall_count;
 	}
 
 	return true;		
