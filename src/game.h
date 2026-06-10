@@ -2,6 +2,7 @@
 
 #include "game_platform.h"
 #include "game_types.h"
+#include "game_map.h"
 
 typedef struct {
 	vector2 position;
@@ -16,6 +17,8 @@ typedef struct
 
     enemy enemies[4096];
     u32 enemy_count;
+
+    map test_map;
 
 	// NOTE: is never resetted
 	f64 accumelated_time;

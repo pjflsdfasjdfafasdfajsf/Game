@@ -42,8 +42,8 @@ UPDATE_AND_RENDER(update_and_render)
         map map = map_create("test.map");
 
         map_add(&map, rect(v2(0, 0), v2(10, 10)));
-        map_add(&map, rect(v2(67, 68), v2(69, 70)));
-        map_add(&map, rect(v2(100.0f, 101.0f), v2(102.f, 103.f)));
+        map_add(&map, rect(v2(20, 20), v2(20, 20)));
+        map_add(&map, rect(v2(60, 60), v2(40, 40)));
 
         map_write(memory, platform, &map);
 
@@ -54,7 +54,7 @@ UPDATE_AND_RENDER(update_and_render)
 #embed "../test.map"  
         };
         
-        map_load(memory, map_data, sizeof(map_data), &map);
+        map_load(memory, map_data, sizeof(map_data), &state->test_map);
 
         state->position = v2(10, 10);
         state->health = 100.0f;
@@ -127,6 +127,11 @@ UPDATE_AND_RENDER(update_and_render)
     vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
     vector2 direction = vector2_sub(input->mouse_position, start);
     raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall);
+
+    /* NOTE: draw map */
+    for (u32 i = 0; i < state->test_map.rectangle_count; i++) {
+        render_draw_rectangle(render_buffer, state->test_map.rectangles[i], RED, UNIT, UNTEXTURED);
+    }
 
     render_draw_rectangle(render_buffer, wall, WHITE, UNIT, UNTEXTURED);
 
