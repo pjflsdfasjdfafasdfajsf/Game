@@ -2,7 +2,7 @@ name: Fuzz
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "ttchef" ]
 
 jobs:
   fuzzing:
@@ -21,14 +21,19 @@ jobs:
     - name: Fuzz PNG
       run: |
         cd tests
-        make fuzz-png FUZZING_TIME_IN_SECONDS=180
+        make fuzz-png
 
     - name: Fuzz TTF
       run: |
         cd tests
-        make fuzz-ttf FUZZING_TIME_IN_SECONDS=180
+        make fuzz-ttf
 
     - name: Fuzz WAV
       run: |
         cd tests
-        make fuzz-wav FUZZING_TIME_IN_SECONDS=180
+        make fuzz-wav
+
+    - name: Fuzz MAP
+      run: |
+        cd tests
+        make fuzz-map
