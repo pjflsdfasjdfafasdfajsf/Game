@@ -1,12 +1,13 @@
 #pragma once
 
+#include "game_map.h"
 #include "game_platform.h"
 #include "game_types.h"
-#include "game_map.h"
 
-typedef struct {
-	vector2 position;
-	vector2 size;
+typedef struct
+{
+    vector2 position;
+    vector2 size;
 } enemy;
 
 typedef struct
@@ -20,8 +21,8 @@ typedef struct
 
     map test_map;
 
-	// NOTE: is never resetted
-	f64 accumelated_time;
+    // NOTE: is never resetted
+    f64 accumelated_time;
 } game_state;
 
 /** NOTE: function definitions below are for release builds where the game is not

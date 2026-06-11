@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game_platform.h" 
+#include "game_platform.h"
 #include "game_types.h"
 
 #include <SDL3/SDL.h>

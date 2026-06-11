@@ -1,21 +1,23 @@
 #include "game.h"
+#include "game_map.h"
 #include "game_math.h"
 #include "game_platform.h"
 #include "game_png.h"
-#include "game_map.h"
 #include "game_types.h"
 
 // NOTE: in seconds
 const f32 enemy_hit_cooldown = 1.0f;
 
-static void enemy_add(game_state *state, vector2 position, vector2 size) {
-    if (state->enemy_count + 1 > ARRAY_COUNT(state->enemies)) {
+static void enemy_add(game_state *state, vector2 position, vector2 size)
+{
+    if (state->enemy_count + 1 > ARRAY_COUNT(state->enemies))
+    {
         return;
     }
 
     state->enemies[state->enemy_count++] = (enemy){
         .position = position,
-        .size = size, 
+        .size = size,
     };
 }
 
@@ -33,10 +35,10 @@ UPDATE_AND_RENDER(update_and_render)
         render_allocate_texture(render_buffer, 1, image.size, image.pixels);
 
         static const char gangster[] = {
-#embed "../assets/images/gangster.png"  
+#embed "../assets/images/gangster.png"
         };
 
-        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster)); 
+        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
         /* NOTE: watch out that you embed the correct map when changing the name */
@@ -53,9 +55,9 @@ UPDATE_AND_RENDER(update_and_render)
          * im not sure because its right now just for testing
          * so i will keep it here for now */
         static const char map_data[] = {
-#embed "../test.map"  
+#embed "../test.map"
         };
-        
+
         map_load(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, map_data, sizeof(map_data), &state->test_map);
 
         state->position = v2(10, 10);
@@ -85,8 +87,9 @@ UPDATE_AND_RENDER(update_and_render)
         state->position.x += 500.0f * delta_time;
     }
 
-    if (button_pressed(input->mouse_buttons[mouse_button_left])) {
-        
+    if (button_pressed(input->mouse_buttons[mouse_button_left]))
+    {
+
         enemy_add(state, input->mouse_position, v2(state->health, state->health));
     }
 
@@ -109,7 +112,7 @@ UPDATE_AND_RENDER(update_and_render)
             state->position = vector2_add(state->position, collision.penetration_depth);
             player = rect(state->position, v2(200.0f, 200.0f));
         }
-        
+
         vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
         vector2 direction = vector2_sub(input->mouse_position, start);
         raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall->bounding_box);
@@ -154,7 +157,7 @@ UPDATE_AND_RENDER(update_and_render)
             {
                 enemy->position = vector2_add(enemy->position, collision.penetration_depth);
             }
-        }        
+        }
     }
 
     state->accumelated_time += delta_time;

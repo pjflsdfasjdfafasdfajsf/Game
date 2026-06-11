@@ -320,6 +320,10 @@ static inline u8 memory_stream_read_uint8(memory_stream *stream)
 
 static inline u32 memory_stream_read_uint32_little_endian(memory_stream *stream)
 {
+    if (!memory_stream_has_space(stream, 4))
+    {
+        return 0;
+    }
     u32 result = read_uint32_little_endian(&stream->memory[stream->offset]);
     stream->offset += 4;
     return result;
@@ -367,7 +371,7 @@ static inline f32 memory_stream_read_f32_little_endian(memory_stream *stream)
 {
     u32 value_int = memory_stream_read_uint32_little_endian(stream);
     /* NOTE: maybe do this conversion with a union in the future? */
-    return *(f32 *)&value_int; 
+    return *(f32 *)&value_int;
 }
 
 static inline bool memory_stream_write_bytes(memory_stream *stream, const void *data, usize size)
@@ -419,9 +423,8 @@ static inline bool memory_stream_write_f32(memory_stream *stream, f32 value)
 {
     /* NOTE: maybe do this conversion with a union in the future? */
     u32 value_int = *(u32 *)&value;
-    return memory_stream_write_uint32(stream, value_int);    
+    return memory_stream_write_uint32(stream, value_int);
 }
-
 
 static inline bool memory_stream_write_string(memory_stream *stream, const char *string)
 {
@@ -809,7 +812,8 @@ typedef struct
     f32 mouse_scroll;
 } input;
 
-typedef struct {
+typedef struct
+{
     bool (*file_save)(const char *file, const void *data, usize size);
 } platform;
 

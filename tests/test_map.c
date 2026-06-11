@@ -3,7 +3,6 @@
 #include "utilities/file.h"
 
 #include "game_map.h"
-#include "game_platform.h"
 
 #if defined(FUZZING)
 

@@ -14,7 +14,7 @@
  * - every mutlibyte number is stored in little endian (because we are not ttf or png)
  *
  * The .map format starts with a signatures of 4 bytes being
- * [., m, a, p] 
+ * [., m, a, p]
  * this needs to be the case for EVERY ".map" file
  *
  * The next byte represents the length of the name of the map.
@@ -32,21 +32,21 @@
  * [position x, position y, width, height]
  * [color red, color green, color blue, color alpha]
  *
-*/
+ */
 
 typedef struct
 {
-	rectangle bounding_box;
-	vector4 color;
+    rectangle bounding_box;
+    vector4 color;
 } map_wall;
 
 typedef struct
 {
-	map_wall walls[128];
-	u32 wall_count;
+    map_wall walls[128];
+    u32 wall_count;
 
-	/* NOTE: store for future reasons like displaying maps in the ui */
-	char name[64];
+    /* NOTE: store for future reasons like displaying maps in the ui */
+    char name[64];
 } map;
 
 map map_create(const char *name);

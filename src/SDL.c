@@ -404,7 +404,7 @@ int main(void)
     input input = {0};
 
     platform platform = {
-        /* NOTE: no point in in making own functions that wrap SDL */ 
+        /* NOTE: no point in in making own functions that wrap SDL */
         .file_save = SDL_SaveFile,
     };
 
