@@ -33,7 +33,7 @@ typedef double f64;
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define UNUSED(x) (void)x
 #define ARRAY_COUNT(x) (sizeof((x)) / sizeof((x)[0]))
-#define ASSERT(x)      \
+#define ASSERT(expression)      \
     if (!(expression))          \
     {                           \
         *(volatile int *)0 = 0; \

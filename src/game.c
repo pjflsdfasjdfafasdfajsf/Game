@@ -42,12 +42,12 @@ UPDATE_AND_RENDER(update_and_render)
         /* NOTE: watch out that you embed the correct map when changing the name */
         map map = map_create("test.map");
 
-        map_add(&map, rect(v2(0, 0), v2(10, 10)), RED);
-        map_add(&map, rect(v2(20, 20), v2(20, 20)), BLUE);
+        map_add(&map, rect(v2(100, 100), v2(10, 100)), RED);
+        map_add(&map, rect(v2(100, 100), v2(100, 10)), BLUE);
         map_add(&map, rect(v2(60, 60), v2(40, 40)), WHITE);
         map_add(&map, rect(v2(50, 1000), v2(1000, 20)), WHITE);
 
-        map_write(memory, platform, &map);
+        map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &map);
 
         /* NOTE: change path of the map to be in assets?
          * im not sure because its right now just for testing
@@ -56,7 +56,7 @@ UPDATE_AND_RENDER(update_and_render)
 #embed "../test.map"  
         };
         
-        map_load(memory, map_data, sizeof(map_data), &state->test_map);
+        map_load(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, map_data, sizeof(map_data), &state->test_map);
 
         state->position = v2(10, 10);
         state->health = 100.0f;

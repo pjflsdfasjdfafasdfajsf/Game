@@ -24,10 +24,7 @@ map map_create(const char *name)
 
 bool map_add(map *map, rectangle bounding_box, vector4 color)
 {
-	if (!map)
-	{
-		return false;
-	}
+	ASSERT(map);
 
 	if (map->wall_count + 1 > ARRAY_COUNT(map->walls))
 	{
@@ -42,16 +39,13 @@ bool map_add(map *map, rectangle bounding_box, vector4 color)
 	return true;
 }
 
-bool map_write(memory *memory, platform *platform, map *map)
+bool map_write(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, platform *platform, map *map)
 {
-	if (!platform || !memory || !map)
-	{
-		return false;
-	}
+	ASSERT(permanent_arena && temporary_arena && error_stream && platform && map);
 
 	/* TODO: handle the max size better */
 	usize map_stream_size = 2048;
-	void *map_stream_memory = MEMORY_ARENA_PUSH_BYTES(&memory->temporary_arena, map_stream_size);	
+	void *map_stream_memory = MEMORY_ARENA_PUSH_BYTES(temporary_arena, map_stream_size);	
 	memory_stream map_stream = {0};
 
 	memory_stream_initialize_writable(&map_stream, map_stream_memory, map_stream_size);
@@ -85,17 +79,16 @@ bool map_write(memory *memory, platform *platform, map *map)
 		memory_stream_write_f32(&map_stream, wall->color.a);
 	}
 
-	platform->file_save(map->name, map_stream.memory, map_stream.offset);
+	if (!platform->file_save(map->name, map_stream.memory, map_stream.offset)) {
+		return false;
+	}
 
 	return true;
 }
 
-bool map_load(memory *memory, const void *data, usize size, map *map)
+bool map_load(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, const void *data, usize size, map *map)
 {
-	if (!data || !memory || !map)
-	{
-		return false;
-	}
+	ASSERT(permanent_arena && temporary_arena && error_stream && data && map);
 
 	memory_stream map_stream = {0};
 	memory_stream_initialize_read_only(&map_stream, data, size);
@@ -103,24 +96,25 @@ bool map_load(memory *memory, const void *data, usize size, map *map)
 	u32 signature = memory_stream_read_uint32_little_endian(&map_stream);
 	if (signature != *(u32 *)map_signature)
 	{
-		memory_stream_write_string_format(memory->standard_error_stream, "ERROR: map signature didnt match for map\n");
+		memory_stream_write_string_format(error_stream, "error: map signature didnt match for map\n");
 		return false;	
 	}
 
 	u8 name_length = memory_stream_read_uint8(&map_stream);
+	if (name_length >= ARRAY_COUNT(map->name)) {
+		memory_stream_write_string_format(error_stream, "error: map name length is too long (%u >= %u). This might be a corrupted map\n", name_length, ARRAY_COUNT(map->name));
+		return false;
+	}
+	
 	for (u8 i = 0; i < name_length; i++) {
 		u8 c = memory_stream_read_uint8(&map_stream);
 		map->name[i] = c;
 	}
 
-	/* NOTE: guarnteed to have another space for null terminator */
+	ASSERT(name_length < ARRAY_COUNT(map->name));
 	map->name[name_length] = '\0';
 
-	memory_stream_write_string_format(memory->standard_info_stream, "INFO: Loaded map: %s\n", map->name);
-
 	u32 wall_count = memory_stream_read_uint32_little_endian(&map_stream);
-	memory_stream_write_string_format(memory->standard_info_stream, "INFO: Map wall count: %u\n", wall_count);
-
 	map->wall_count = 0;
 	
 	while (wall_count != 0)

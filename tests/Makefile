@@ -51,6 +51,7 @@ endef
 $(eval $(call TEST,png, image.png,    4096,  ../src/game_png.c))
 $(eval $(call TEST,ttf, font.ttf,     65536, ../src/game_ttf.c ../src/game_rectangle_pack.c))
 $(eval $(call TEST,wav, sine_440.wav, 4096,  ../src/game_wav.c))
+$(eval $(call TEST,map, test.map, 4096,  ../src/game_map.c))
 
 .PHONY: clean
 clean:

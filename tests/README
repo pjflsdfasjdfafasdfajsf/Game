@@ -6,6 +6,8 @@ You can run tests in two modes:
 * Regular:
 	$ make test-ttf
 	$ make test-png
+	$ make test-wav
+	$ make test-map
 
   There are tests for the logic itself, that everything works and parses correctly. The two commands above
   output ttf.ppm and png.ppm everywhere. Strictly speaking these tests are not fully automated. Aside from
@@ -15,6 +17,8 @@ You can run tests in two modes:
 * Fuzzing:
 	$ make fuzz-ttf
 	$ make fuzz-png
+	$ make fuzz-wav
+	$ make fuzz-map
 
   These test for any vulnerabilities or C bugs like UB. Passing here is considered when fuzzing lasted
   15 minutes without any errors. If any errors occured during the process you will see them.  
