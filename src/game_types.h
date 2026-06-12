@@ -91,6 +91,7 @@ static inline vector4 v4(f32 x, f32 y, f32 z, f32 w)
 #define RED v4(1.0f, 0.0f, 0.0f, 1.0f)
 #define GREEN v4(0.0f, 1.0f, 0.0f, 1.0f)
 #define BLUE v4(0.0f, 0.0f, 1.0f, 1.0f)
+#define YELLOW v4(1.0f, 1.0f, 0.0f, 1.0f)
 #define BLACK v4(0.0f, 0.0f, 0.0f, 1.0f)
 
 typedef struct

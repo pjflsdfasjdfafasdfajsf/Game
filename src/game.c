@@ -44,10 +44,9 @@ UPDATE_AND_RENDER(update_and_render)
         /* NOTE: watch out that you embed the correct map when changing the name */
         map map = map_create("test.map");
 
-        map_add(&map, rect(v2(100, 100), v2(10, 100)), RED);
-        map_add(&map, rect(v2(100, 100), v2(100, 10)), BLUE);
-        map_add(&map, rect(v2(60, 60), v2(40, 40)), WHITE);
-        map_add(&map, rect(v2(50, 1000), v2(1000, 20)), WHITE);
+        map_add(&map, rect(v2(1200, 1200), v2(70, 40)), BLUE);
+        map_add(&map, rect(v2(1280, 1300), v2(70, 40)), BLUE);
+        map_add(&map, rect(v2(1100, 1100), v2(70, 40)), BLUE);
 
         map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &map);
 
@@ -90,10 +89,10 @@ UPDATE_AND_RENDER(update_and_render)
     if (button_pressed(input->mouse_buttons[mouse_button_left]))
     {
 
-        enemy_add(state, input->mouse_position, v2(state->health, state->health));
+        enemy_add(state, input->mouse_position, v2(state->health * 0.2f, state->health * 0.2f));
     }
 
-    rectangle player = rect(state->position, v2(200.0f, 200.0f));
+    rectangle player = rect(state->position, v2(20.0f, 20.0f));
 
     /* NOTE: remove later only here for the ray visualisation on the map */
     bool ray_hit = false;
@@ -110,10 +109,10 @@ UPDATE_AND_RENDER(update_and_render)
         if (collision.is_colliding)
         {
             state->position = vector2_add(state->position, collision.penetration_depth);
-            player = rect(state->position, v2(200.0f, 200.0f));
+            player = rect(state->position, v2(20.0f, 20.0f));
         }
 
-        vector2 start = v2(state->position.x + 100.0f, state->position.y + 100.0f);
+        vector2 start = v2(state->position.x + 10.0f, state->position.y + 10.0f);
         vector2 direction = vector2_sub(input->mouse_position, start);
         raycast_result ray = ray_intersect_rectangle_infinite(start, direction, wall->bounding_box);
 
