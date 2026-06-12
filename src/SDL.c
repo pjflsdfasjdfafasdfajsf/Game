@@ -49,6 +49,8 @@ static key_code input_map(SDL_Scancode scancode)
         return key_code_s;
     case SDL_SCANCODE_D:
         return key_code_d;
+    case SDL_SCANCODE_M:
+        return key_code_m;
     default:
         return key_code_none;
     }

@@ -21,54 +21,14 @@ static void enemy_add(game_state *state, vector2 position, vector2 size)
     };
 }
 
-UPDATE_AND_RENDER(update_and_render)
+UPDATE_AND_RENDER(game_mode_play_update_and_render)
 {
     game_state *state = (game_state *)memory->permanent_arena.base_pointer;
     if (!memory->is_initialized)
     {
-        MEMORY_ARENA_PUSH_BYTES(&memory->permanent_arena, sizeof(game_state));
-
-        static const char zig[] = {
-#embed "../assets/images/zig.png"
-        };
-        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, zig, sizeof(zig));
-        render_allocate_texture(render_buffer, 1, image.size, image.pixels);
-
-        static const char gangster[] = {
-#embed "../assets/images/gangster.png"
-        };
-
-        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
-        render_allocate_texture(render_buffer, 2, image.size, image.pixels);
-
-        /* NOTE: watch out that you embed the correct map when changing the name */
-        map map = map_create("test.map");
-
-        map_add(&map, rect(v2(1200, 1200), v2(70, 40)), BLUE);
-        map_add(&map, rect(v2(1280, 1300), v2(70, 40)), BLUE);
-        map_add(&map, rect(v2(1100, 1100), v2(70, 40)), BLUE);
-
-        map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &map);
-
-        /* NOTE: change path of the map to be in assets?
-         * im not sure because its right now just for testing
-         * so i will keep it here for now */
-        static const char map_data[] = {
-#embed "../test.map"
-        };
-
-        map_load(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, map_data, sizeof(map_data), &state->test_map);
-
-        state->position = v2(10, 10);
-        state->health = 100.0f;
-        state->last_hit = 0.0f;
-        state->accumelated_time = 0.0;
-
-        state->enemy_count = 0;
-
-        memory->is_initialized = true;
+        return;
     }
-
+    
     if (button_held(input->keys[key_code_w]))
     {
         state->position.y -= 500.0f * delta_time;
@@ -88,8 +48,12 @@ UPDATE_AND_RENDER(update_and_render)
 
     if (button_pressed(input->mouse_buttons[mouse_button_left]))
     {
-
         enemy_add(state, input->mouse_position, v2(state->health * 0.2f, state->health * 0.2f));
+    }
+
+    if (button_pressed(input->keys[key_code_m]))
+    {
+        state->game_mode = GAME_MODE_EDITOR;
     }
 
     rectangle player = rect(state->position, v2(20.0f, 20.0f));
@@ -190,6 +154,82 @@ UPDATE_AND_RENDER(update_and_render)
     else
     {
         render_draw_line(render_buffer, ray_start, vector2_add(ray_start, vector2_scale(vector2_norm(ray_direction), 3000.0f)), RED);
+    }
+}
+
+UPDATE_AND_RENDER(game_mode_editor_update_and_render)
+{
+    game_state *state = (game_state *)memory->permanent_arena.base_pointer;
+    if (!memory->is_initialized)
+    {
+        return;
+    }
+    if (button_pressed(input->keys[key_code_m]))
+    {
+        state->game_mode = GAME_MODE_PLAY;
+    }
+    render_draw_rectangle(render_buffer, rect(v2(10, 10), v2(10, 10)), WHITE, UNIT, UNTEXTURED);
+}
+
+UPDATE_AND_RENDER(update_and_render)
+{
+    game_state *state = (game_state *)memory->permanent_arena.base_pointer;
+    if (!memory->is_initialized)
+    {
+        MEMORY_ARENA_PUSH_BYTES(&memory->permanent_arena, sizeof(game_state));
+
+        static const char zig[] = {
+#embed "../assets/images/zig.png"
+        };
+        image image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, zig, sizeof(zig));
+        render_allocate_texture(render_buffer, 1, image.size, image.pixels);
+
+        static const char gangster[] = {
+#embed "../assets/images/gangster.png"
+        };
+
+        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
+        render_allocate_texture(render_buffer, 2, image.size, image.pixels);
+
+        /* NOTE: watch out that you embed the correct map when changing the name */
+        map map = map_create("test.map");
+
+        map_add(&map, rect(v2(100, 200), v2(70, 40)), BLUE);
+        map_add(&map, rect(v2(280, 300), v2(70, 40)), BLUE);
+        map_add(&map, rect(v2(400, 800), v2(70, 40)), BLUE);
+
+        map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &map);
+
+        /* NOTE: change path of the map to be in assets?
+         * im not sure because its right now just for testing
+         * so i will keep it here for now */
+        static const char map_data[] = {
+#embed "../test.map"
+        };
+
+        map_load(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, map_data, sizeof(map_data), &state->test_map);
+
+        state->game_mode = GAME_MODE_PLAY;
+        state->position = v2(10, 10);
+        state->health = 100.0f;
+        state->last_hit = 0.0f;
+        state->accumelated_time = 0.0;
+
+        state->enemy_count = 0;
+
+        memory->is_initialized = true;
+    }
+
+    switch (state->game_mode)
+    {
+    case GAME_MODE_PLAY:
+    {
+        game_mode_play_update_and_render(memory, input, platform, render_buffer, delta_time);
+    } break;
+    case GAME_MODE_EDITOR:
+    {
+        game_mode_editor_update_and_render(memory, input, platform, render_buffer, delta_time);
+    } break;
     }
 }
 

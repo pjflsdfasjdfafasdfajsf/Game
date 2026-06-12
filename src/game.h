@@ -10,8 +10,15 @@ typedef struct
     vector2 size;
 } enemy;
 
+typedef enum
+{
+    GAME_MODE_PLAY,
+    GAME_MODE_EDITOR,
+} game_mode;
+
 typedef struct
 {
+    game_mode game_mode;
     vector2 position;
     f32 health;
     f32 last_hit;

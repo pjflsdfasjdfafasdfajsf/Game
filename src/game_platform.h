@@ -755,6 +755,7 @@ typedef enum
     key_code_a,
     key_code_s,
     key_code_d,
+    key_code_m,
 
     key_code_count,
 } key_code;
