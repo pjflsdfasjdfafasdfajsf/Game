@@ -606,7 +606,7 @@ typedef struct
     render_entry_header header;
     rectangle rectangle;
     vector4 color;
-    rectangle uv;
+    uv uv;
     u32 texture;
 } render_entry_draw_rectangle;
 
@@ -695,7 +695,7 @@ static inline void *render_buffer_allocate_bytes(render_buffer *render_buffer, u
 
 #define RENDER_BUFFER_PUSH_COMMAND(buffer, command_name) (render_entry_##command_name *)render_buffer_allocate_bytes((buffer), render_entry_type_##command_name, sizeof(render_entry_##command_name))
 
-static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, rectangle uv, u32 texture)
+static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, uv uv, u32 texture)
 {
     if (!render_buffer)
     {
@@ -751,11 +751,17 @@ typedef enum
 {
     key_code_none = 0,
 
+    key_code_1,
+    key_code_2,
+
     key_code_w,
     key_code_a,
     key_code_s,
     key_code_d,
     key_code_m,
+
+    key_code_ctrl,
+    key_code_shift,
 
     key_code_count,
 } key_code;
@@ -810,6 +816,7 @@ typedef struct
     button_state mouse_buttons[mouse_button_count];
 
     vector2 mouse_position;
+    vector2 last_mouse_position;
     f32 mouse_scroll;
 } input;
 

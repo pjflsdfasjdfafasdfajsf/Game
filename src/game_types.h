@@ -152,6 +152,12 @@ typedef struct
 
         struct
         {
+            vector2 position;
+            vector2 dimensions;  
+        };
+
+        struct
+        {
             f32 x;
             f32 y;
             f32 width;
@@ -165,4 +171,40 @@ static inline rectangle rect(vector2 position, vector2 size)
     return (rectangle){{{position, size}}};
 }
 
-#define UNIT rect(v2(0.0f, 0.0f), v2(1.0f, 1.0f))
+/* NOTE: uv coordinates are specified like this relative to an image
+ *
+ * top left (0 | 0)            top right (1 | 0)
+ * v                               v
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * [-------------------------------]
+ * ^                               ^
+ * bottom left (0 | 1)         bottom right (1 | 1)
+*/
+
+typedef struct {
+    vector2 top_left;
+    vector2 top_right;
+    vector2 bottom_left;
+    vector2 bottom_right;
+} uv;
+
+static inline uv uv_coords(vector2 top_left, vector2 top_right, vector2 bottom_left, vector2 bottom_right)
+{
+    return (uv){top_left, top_right, bottom_left, bottom_right};
+}
+
+static inline uv uv_from_rect(rectangle rectangle)
+{
+    return (uv){rectangle.min, v2(rectangle.max.x, rectangle.min.y), v2(rectangle.min.x, rectangle.max.y), rectangle.max};
+}
+
+#define UNIT uv_from_rect(rect(v2(0.0f, 0.0f), v2(1.0f, 1.0f)))

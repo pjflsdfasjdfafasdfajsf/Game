@@ -4,6 +4,8 @@
 #include "game_platform.h"
 #include "game_types.h"
 
+#define NO_WALL UINT32_MAX
+
 typedef struct
 {
     vector2 position;
@@ -15,6 +17,12 @@ typedef enum
     GAME_MODE_PLAY,
     GAME_MODE_EDITOR,
 } game_mode;
+
+typedef enum
+{
+    SELECTION_MODE_MOVE,
+    SELECTION_MODE_SCALE,
+} selection_mode;
 
 typedef struct
 {
@@ -30,6 +38,8 @@ typedef struct
 
     /* NOTE: editor */
     vector2 start_press;
+    u32 selected_wall;
+    selection_mode selection_mode;
     bool rectangle_press;
 
     /* NOTE: shared */

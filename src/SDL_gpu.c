@@ -377,18 +377,13 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
                 f32 b = command->color.b;
                 f32 a = command->color.a;
 
-                f32 u_min = command->uv.min.x;
-                f32 v_min = command->uv.min.y;
-                f32 u_max = command->uv.max.x;
-                f32 v_max = command->uv.max.y;
+                map[current_vertex++] = (vertex){left,  top,    0.0f, r, g, b, a, command->uv.top_left.x,     command->uv.top_left.y};
+                map[current_vertex++] = (vertex){right, top,    0.0f, r, g, b, a, command->uv.top_right.x,    command->uv.top_right.y};
+                map[current_vertex++] = (vertex){left,  bottom, 0.0f, r, g, b, a, command->uv.bottom_left.x,  command->uv.bottom_left.y};
 
-                map[current_vertex++] = (vertex){left, top, 0.0f, r, g, b, a, u_min, v_min};
-                map[current_vertex++] = (vertex){right, top, 0.0f, r, g, b, a, u_max, v_min};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, r, g, b, a, u_min, v_max};
-
-                map[current_vertex++] = (vertex){right, top, 0.0f, r, g, b, a, u_max, v_min};
-                map[current_vertex++] = (vertex){right, bottom, 0.0f, r, g, b, a, u_max, v_max};
-                map[current_vertex++] = (vertex){left, bottom, 0.0f, r, g, b, a, u_min, v_max};
+                map[current_vertex++] = (vertex){right, top,    0.0f, r, g, b, a, command->uv.top_right.x,    command->uv.top_right.y};
+                map[current_vertex++] = (vertex){right, bottom, 0.0f, r, g, b, a, command->uv.bottom_right.x, command->uv.bottom_right.y};
+                map[current_vertex++] = (vertex){left,  bottom, 0.0f, r, g, b, a, command->uv.bottom_left.x,  command->uv.bottom_left.y};
             }
         }
         break;

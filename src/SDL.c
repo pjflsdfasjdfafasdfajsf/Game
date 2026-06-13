@@ -1,3 +1,4 @@
+#include <SDL3/SDL_scancode.h>
 #include <stdlib.h>
 
 #include "SDL.h"
@@ -41,6 +42,10 @@ static key_code input_map(SDL_Scancode scancode)
 {
     switch (scancode)
     {
+    case SDL_SCANCODE_1:
+        return key_code_1;
+    case SDL_SCANCODE_2:
+        return key_code_2;
     case SDL_SCANCODE_W:
         return key_code_w;
     case SDL_SCANCODE_A:
@@ -51,6 +56,10 @@ static key_code input_map(SDL_Scancode scancode)
         return key_code_d;
     case SDL_SCANCODE_M:
         return key_code_m;
+    case SDL_SCANCODE_LCTRL:
+        return key_code_ctrl;
+    case SDL_SCANCODE_LSHIFT:
+        return key_code_shift;
     default:
         return key_code_none;
     }
@@ -67,6 +76,7 @@ void input_update_pre_event(input *input)
         input->mouse_buttons[button_index].was_down = input->mouse_buttons[button_index].is_down;
     }
     input->mouse_scroll = 0.0f;
+    input->last_mouse_position = input->mouse_position;
 }
 
 void input_handle_event(input *input, SDL_Event *event)

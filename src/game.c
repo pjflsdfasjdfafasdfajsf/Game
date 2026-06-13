@@ -176,12 +176,51 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
     {
         return;
     }
+
+    /* NOTE: switch back to GAME_MODE_PLAY */
     if (button_pressed(input->keys[key_code_m]))
     {
         state->game_mode = GAME_MODE_PLAY;
         map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &state->test_map);
     }
 
+    /* NOTE: switch to move tool */
+    if (button_pressed(input->keys[key_code_1]))
+    {
+        state->selection_mode = SELECTION_MODE_MOVE;
+    }
+
+    /* NOTE: switch to scale tool */
+    if (button_pressed(input->keys[key_code_2]))
+    {
+        state->selection_mode = SELECTION_MODE_SCALE;
+    }
+
+    /* NOTE: select a wall */
+    if (button_pressed(input->mouse_buttons[mouse_button_left]))
+    {
+        vector2 selection_dimension = v2(2, 2);
+        vector2 pos = vector2_sub(input->mouse_position, vector2_scale(selection_dimension, 0.5f));
+
+        bool on_wall = false;
+        for (u32 i = 0; i < state->test_map.wall_count; i++)
+        {
+            aabb_collision_result collision = aabb_collision(rect(pos, selection_dimension), state->test_map.walls[i].bounding_box);
+            if (collision.is_colliding)
+            {
+                state->selected_wall = i;
+                on_wall = true;
+                break; 
+            }   
+        }
+
+        if (!on_wall)
+        {
+            state->selected_wall = NO_WALL;
+        }
+    }
+
+    /* NOTE: creating new wall */
     if (button_pressed(input->mouse_buttons[mouse_button_right]))
     {
         state->start_press = input->mouse_position;
@@ -199,6 +238,17 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
         map_add(&state->test_map, rect(top_left, dimensions), GREEN);
     }
 
+    if (button_held(input->keys[key_code_shift]) && state->selected_wall != NO_WALL)
+    {
+        vector2 mouse_delta = vector2_sub(input->mouse_position, input->last_mouse_position);
+
+        ASSERT(state->selected_wall < state->test_map.wall_count);
+
+        map_wall *wall = &state->test_map.walls[state->selected_wall];
+        wall->bounding_box.x += mouse_delta.x;
+        wall->bounding_box.y += mouse_delta.y;
+    }
+
     if (state->rectangle_press)
     {
         vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
@@ -209,7 +259,38 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
     for (u32 i = 0; i < state->test_map.wall_count; i++)
     {
         map_wall *wall = &state->test_map.walls[i];
-        render_draw_rectangle(render_buffer, wall->bounding_box, wall->color, UNIT, UNTEXTURED);
+
+        vector4 color = state->selected_wall == i ? YELLOW : wall->color;
+        
+        render_draw_rectangle(render_buffer, wall->bounding_box, color, UNIT, UNTEXTURED);
+    }
+
+    /* NOTE: draw gizmo */
+    if (state->selected_wall != NO_WALL)
+    {
+        u32 texture = state->selection_mode == SELECTION_MODE_MOVE ? 3 : 4;
+        
+        ASSERT(state->selected_wall < state->test_map.wall_count);
+        map_wall *wall = &state->test_map.walls[state->selected_wall];
+
+        f32 max_size = MAX(wall->bounding_box.width, wall->bounding_box.height) * 0.25f;
+        
+        /* NOTE: achive correct aspect ration for the gizmo image 20x100 */
+        const f32 aspect_ratio = 20.0f / 100.0f; 
+
+        /* NOTE: up arrow */
+        f32 other_size = max_size * aspect_ratio;
+        vector2 gizmo_size = v2(other_size, max_size);
+        
+        vector2 gizmo_position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f - gizmo_size.x * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f - gizmo_size.height);
+        render_draw_rectangle(render_buffer, rect(gizmo_position, gizmo_size), WHITE, UNIT, texture);
+
+        /* NOTE: right arrow */
+        gizmo_size = v2(max_size, other_size);
+        gizmo_position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f - gizmo_size.y * 0.5f);
+
+        uv uv = uv_coords(v2(0.0f, 1.0f), v2(0.0f, 0.0f), v2(1.0f, 1.0f), v2(1.0f, 0.0f));        
+        render_draw_rectangle(render_buffer, rect(gizmo_position, gizmo_size), WHITE, uv, texture);
     }
 }
 
@@ -233,6 +314,20 @@ UPDATE_AND_RENDER(update_and_render)
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
+   static const char gizmo_move[] = {
+#embed "../assets/images/gizmo_move.png"
+        };
+
+        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gizmo_move, sizeof(gizmo_move));
+        render_allocate_texture(render_buffer, 3, image.size, image.pixels);
+
+   static const char gizmo_scale[] = {
+#embed "../assets/images/gizmo_scale.png"
+        };
+
+        image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gizmo_scale, sizeof(gizmo_scale));
+        render_allocate_texture(render_buffer, 4, image.size, image.pixels);
+
         /* NOTE: change path of the map to be in assets?
          * im not sure because its right now just for testing
          * so i will keep it here for now */
@@ -243,13 +338,17 @@ UPDATE_AND_RENDER(update_and_render)
         map_load(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, map_data, sizeof(map_data), &state->test_map);
 
         state->game_mode = GAME_MODE_PLAY;
+
+        /* NOTE: GAME_MODE_PLAY */
         state->position = v2(10, 10);
         state->health = 100.0f;
         state->last_hit = 0.0f;
-        state->accumelated_time = 0.0;
-
         state->enemy_count = 0;
 
+        /* NOTE: GAME_MODE_EDITOR */
+        state->selected_wall = NO_WALL;
+        
+        state->accumelated_time = 0.0;
         memory->is_initialized = true;
     }
 
