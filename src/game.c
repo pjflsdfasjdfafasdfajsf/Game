@@ -23,6 +23,7 @@ static void enemy_add(game_state *state, vector2 position, vector2 size)
 
 UPDATE_AND_RENDER(game_mode_play_update_and_render)
 {
+    UNUSED(platform); // for now
     game_state *state = (game_state *)memory->permanent_arena.base_pointer;
     if (!memory->is_initialized)
     {
@@ -54,6 +55,7 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
     if (button_pressed(input->keys[key_code_m]))
     {
         state->game_mode = GAME_MODE_EDITOR;
+        state->test_map = map_create("test.map");
     }
 
     rectangle player = rect(state->position, v2(20.0f, 20.0f));
@@ -63,6 +65,7 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
     vector2 ray_start;
     vector2 ray_end;
     vector2 ray_direction;
+    f32 ray_distance = FLOAT_MAX;
 
     /* NOTE: player collisions with the map */
     for (u32 i = 0; i < state->test_map.wall_count; i++)
@@ -84,7 +87,14 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
         if (ray.is_hitting)
         {
             ray_hit = true;
-            ray_end = ray.hit_position;
+
+            /* NOTE: render the ray on the closest object */
+            f32 distance = vector2_length(vector2_sub(ray.hit_position, ray_start));
+            if (distance < ray_distance)
+            {
+                ray_end = ray.hit_position;
+                ray_distance = distance;
+            }
         }
         ray_direction = direction;
         ray_start = start;
@@ -159,6 +169,8 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
 
 UPDATE_AND_RENDER(game_mode_editor_update_and_render)
 {
+    UNUSED(delta_time); UNUSED(platform);
+
     game_state *state = (game_state *)memory->permanent_arena.base_pointer;
     if (!memory->is_initialized)
     {
@@ -167,8 +179,38 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
     if (button_pressed(input->keys[key_code_m]))
     {
         state->game_mode = GAME_MODE_PLAY;
+        map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &state->test_map);
     }
-    render_draw_rectangle(render_buffer, rect(v2(10, 10), v2(10, 10)), WHITE, UNIT, UNTEXTURED);
+
+    if (button_pressed(input->mouse_buttons[mouse_button_right]))
+    {
+        state->start_press = input->mouse_position;
+        state->rectangle_press = true;
+    }
+    if (button_released(input->mouse_buttons[mouse_button_right]))
+    {
+        state->rectangle_press = false;
+
+        vector2 top_left = v2(MIN(state->start_press.x, input->mouse_position.x), MIN(state->start_press.y, input->mouse_position.y));
+        
+        vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
+        dimensions = vector2_abs(dimensions);
+
+        map_add(&state->test_map, rect(top_left, dimensions), GREEN);
+    }
+
+    if (state->rectangle_press)
+    {
+        vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
+        render_draw_rectangle(render_buffer, rect(state->start_press, dimensions), WHITE, UNIT, UNTEXTURED);
+    }
+
+    /* NOTE: draw map */
+    for (u32 i = 0; i < state->test_map.wall_count; i++)
+    {
+        map_wall *wall = &state->test_map.walls[i];
+        render_draw_rectangle(render_buffer, wall->bounding_box, wall->color, UNIT, UNTEXTURED);
+    }
 }
 
 UPDATE_AND_RENDER(update_and_render)
@@ -190,15 +232,6 @@ UPDATE_AND_RENDER(update_and_render)
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
-
-        /* NOTE: watch out that you embed the correct map when changing the name */
-        map map = map_create("test.map");
-
-        map_add(&map, rect(v2(100, 200), v2(70, 40)), BLUE);
-        map_add(&map, rect(v2(280, 300), v2(70, 40)), BLUE);
-        map_add(&map, rect(v2(400, 800), v2(70, 40)), BLUE);
-
-        map_write(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, platform, &map);
 
         /* NOTE: change path of the map to be in assets?
          * im not sure because its right now just for testing

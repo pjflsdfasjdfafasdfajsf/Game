@@ -19,6 +19,8 @@ typedef enum
 typedef struct
 {
     game_mode game_mode;
+
+    /* NOTE: game */
     vector2 position;
     f32 health;
     f32 last_hit;
@@ -26,9 +28,14 @@ typedef struct
     enemy enemies[4096];
     u32 enemy_count;
 
+    /* NOTE: editor */
+    vector2 start_press;
+    bool rectangle_press;
+
+    /* NOTE: shared */
     map test_map;
 
-    // NOTE: is never resetted
+    /* NOTE: is NEVER resetted */
     f64 accumelated_time;
 } game_state;
 
