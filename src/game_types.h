@@ -195,16 +195,26 @@ typedef struct {
     vector2 top_right;
     vector2 bottom_left;
     vector2 bottom_right;
-} uv;
+} texture_coordinates;
 
-static inline uv uv_coords(vector2 top_left, vector2 top_right, vector2 bottom_left, vector2 bottom_right)
+static inline texture_coordinates texcoords(rectangle rectangle)
 {
-    return (uv){top_left, top_right, bottom_left, bottom_right};
+    return (texture_coordinates){rectangle.min, v2(rectangle.max.x, rectangle.min.y), v2(rectangle.min.x, rectangle.max.y), rectangle.max};
 }
 
-static inline uv uv_from_rect(rectangle rectangle)
+static inline texture_coordinates texcoords_rotate_90_clockwise(texture_coordinates uv)
 {
-    return (uv){rectangle.min, v2(rectangle.max.x, rectangle.min.y), v2(rectangle.min.x, rectangle.max.y), rectangle.max};
+    return (texture_coordinates){uv.bottom_left, uv.top_left, uv.bottom_right, uv.top_right};
 }
 
-#define UNIT uv_from_rect(rect(v2(0.0f, 0.0f), v2(1.0f, 1.0f)))
+static inline texture_coordinates texcoords_rotate_90_counter_clockwise(texture_coordinates uv)
+{
+    return (texture_coordinates){uv.top_left, uv.bottom_left, uv.top_right, uv.bottom_right};
+}
+
+static inline texture_coordinates texcoords_rotate_180(texture_coordinates uv)
+{
+    return texcoords_rotate_90_clockwise(texcoords_rotate_90_clockwise(uv));
+}
+
+#define TEXCOORDS_UNIT texcoords(rect(v2(0.0f, 0.0f), v2(1.0f, 1.0f)))

@@ -24,6 +24,15 @@ typedef enum
     SELECTION_MODE_SCALE,
 } selection_mode;
 
+typedef enum
+{
+    SELECTED_DIRECTION_NONE,
+    SELECTED_DIRECTION_UP,
+    SELECTED_DIRECTION_DOWN,
+    SELECTED_DIRECTION_LEFT,
+    SELECTED_DIRECTION_RIGHT,
+} selected_direction;
+
 typedef struct
 {
     game_mode game_mode;
@@ -40,6 +49,7 @@ typedef struct
     vector2 start_press;
     u32 selected_wall;
     selection_mode selection_mode;
+    selected_direction selected_direction;
     bool rectangle_press;
 
     /* NOTE: shared */

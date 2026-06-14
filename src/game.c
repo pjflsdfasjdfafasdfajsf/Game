@@ -4,6 +4,7 @@
 #include "game_platform.h"
 #include "game_png.h"
 #include "game_types.h"
+#include <SDL3/SDL_pixels.h>
 
 // NOTE: in seconds
 const f32 enemy_hit_cooldown = 1.0f;
@@ -139,23 +140,23 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
     for (u32 i = 0; i < state->test_map.wall_count; i++)
     {
         map_wall *wall = &state->test_map.walls[i];
-        render_draw_rectangle(render_buffer, wall->bounding_box, wall->color, UNIT, UNTEXTURED);
+        render_draw_rectangle(render_buffer, wall->bounding_box, wall->color, TEXCOORDS_UNIT, UNTEXTURED);
     }
 
     for (u32 i = 0; i < state->enemy_count; i++)
     {
         enemy *enemy = &state->enemies[i];
         rectangle enemy_bounds = rect(enemy->position, enemy->size);
-        render_draw_rectangle(render_buffer, enemy_bounds, WHITE, UNIT, 2);
+        render_draw_rectangle(render_buffer, enemy_bounds, WHITE, TEXCOORDS_UNIT, 2);
     }
 
     /* NOTE: player */
-    render_draw_rectangle(render_buffer, player, GREEN, UNIT, UNTEXTURED);
-    render_draw_rectangle(render_buffer, player, WHITE, UNIT, 1);
+    render_draw_rectangle(render_buffer, player, GREEN, TEXCOORDS_UNIT, UNTEXTURED);
+    render_draw_rectangle(render_buffer, player, WHITE, TEXCOORDS_UNIT, 1);
 
     if (state->health < 0.0f || hit)
     {
-        render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, UNIT, UNTEXTURED);
+        render_draw_rectangle(render_buffer, rect(v2(0, 0), v2(10000, 10000)), RED, TEXCOORDS_UNIT, UNTEXTURED);
     }
     if (ray_hit)
     {
@@ -165,6 +166,40 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
     {
         render_draw_line(render_buffer, ray_start, vector2_add(ray_start, vector2_scale(vector2_norm(ray_direction), 3000.0f)), RED);
     }
+}
+
+static void get_gizmo_rectangles(map_wall *wall, rectangle *arrow_up, rectangle *arrow_right, rectangle *arrow_down, rectangle *arrow_left)
+{    
+    const f32 spacing = 20.0f;
+    f32 max_size = MIN(wall->bounding_box.width, wall->bounding_box.height) * 0.25f;
+    
+    /* NOTE: achive correct aspect ration for the gizmo image 20x100 */
+    const f32 aspect_ratio = 20.0f / 100.0f; 
+    f32 other_size = max_size * aspect_ratio;
+
+    if (arrow_up)
+    {
+        arrow_up->dimensions = v2(other_size, max_size);
+        arrow_up->position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f - arrow_up->width * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f - arrow_up->height - spacing);
+    }
+    
+    if (arrow_right)
+    {
+        arrow_right->dimensions = v2(max_size, other_size); 
+        arrow_right->position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f + spacing, wall->bounding_box.y + wall->bounding_box.height * 0.5f - arrow_right->height * 0.5f);
+    }
+
+    if (arrow_down)
+    {
+        arrow_down->dimensions = v2(other_size, max_size);              
+        arrow_down->position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f - arrow_down->width * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f + spacing);
+    }
+
+    if (arrow_left)
+    {
+        arrow_left->dimensions = v2(max_size, other_size);
+        arrow_left->position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f - arrow_left->width - spacing, wall->bounding_box.y + wall->bounding_box.height * 0.5f - arrow_left->height * 0.5f);
+    }   
 }
 
 UPDATE_AND_RENDER(game_mode_editor_update_and_render)
@@ -252,7 +287,7 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
     if (state->rectangle_press)
     {
         vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
-        render_draw_rectangle(render_buffer, rect(state->start_press, dimensions), WHITE, UNIT, UNTEXTURED);
+        render_draw_rectangle(render_buffer, rect(state->start_press, dimensions), WHITE, TEXCOORDS_UNIT, UNTEXTURED);
     }
 
     /* NOTE: draw map */
@@ -262,7 +297,7 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
 
         vector4 color = state->selected_wall == i ? YELLOW : wall->color;
         
-        render_draw_rectangle(render_buffer, wall->bounding_box, color, UNIT, UNTEXTURED);
+        render_draw_rectangle(render_buffer, wall->bounding_box, color, TEXCOORDS_UNIT, UNTEXTURED);
     }
 
     /* NOTE: draw gizmo */
@@ -272,25 +307,21 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
         
         ASSERT(state->selected_wall < state->test_map.wall_count);
         map_wall *wall = &state->test_map.walls[state->selected_wall];
-
-        f32 max_size = MAX(wall->bounding_box.width, wall->bounding_box.height) * 0.25f;
         
-        /* NOTE: achive correct aspect ration for the gizmo image 20x100 */
-        const f32 aspect_ratio = 20.0f / 100.0f; 
+        rectangle arrow_up, arrow_right;
+        get_gizmo_rectangles(wall, &arrow_up, &arrow_right, 0, 0);
 
-        /* NOTE: up arrow */
-        f32 other_size = max_size * aspect_ratio;
-        vector2 gizmo_size = v2(other_size, max_size);
-        
-        vector2 gizmo_position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f - gizmo_size.x * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f - gizmo_size.height);
-        render_draw_rectangle(render_buffer, rect(gizmo_position, gizmo_size), WHITE, UNIT, texture);
+        render_draw_rectangle(render_buffer, arrow_up, WHITE, TEXCOORDS_UNIT, texture);
+        render_draw_rectangle(render_buffer, arrow_right, WHITE, texcoords_rotate_90_clockwise(TEXCOORDS_UNIT), texture);
 
-        /* NOTE: right arrow */
-        gizmo_size = v2(max_size, other_size);
-        gizmo_position = v2(wall->bounding_box.x + wall->bounding_box.width * 0.5f, wall->bounding_box.y + wall->bounding_box.height * 0.5f - gizmo_size.y * 0.5f);
+        if (state->selection_mode == SELECTION_MODE_SCALE)
+        {
+            rectangle arrow_down, arrow_left;
+            get_gizmo_rectangles(wall, 0, 0, &arrow_down, &arrow_left);
 
-        uv uv = uv_coords(v2(0.0f, 1.0f), v2(0.0f, 0.0f), v2(1.0f, 1.0f), v2(1.0f, 0.0f));        
-        render_draw_rectangle(render_buffer, rect(gizmo_position, gizmo_size), WHITE, uv, texture);
+            render_draw_rectangle(render_buffer, arrow_down, WHITE, texcoords_rotate_180(TEXCOORDS_UNIT), texture);
+            render_draw_rectangle(render_buffer, arrow_left, WHITE, texcoords_rotate_90_counter_clockwise(TEXCOORDS_UNIT), texture);
+        }
     }
 }
 
@@ -347,6 +378,7 @@ UPDATE_AND_RENDER(update_and_render)
 
         /* NOTE: GAME_MODE_EDITOR */
         state->selected_wall = NO_WALL;
+        state->selected_direction = SELECTED_DIRECTION_NONE;
         
         state->accumelated_time = 0.0;
         memory->is_initialized = true;

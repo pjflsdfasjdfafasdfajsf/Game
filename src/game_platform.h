@@ -606,7 +606,7 @@ typedef struct
     render_entry_header header;
     rectangle rectangle;
     vector4 color;
-    uv uv;
+    texture_coordinates uv;
     u32 texture;
 } render_entry_draw_rectangle;
 
@@ -695,7 +695,7 @@ static inline void *render_buffer_allocate_bytes(render_buffer *render_buffer, u
 
 #define RENDER_BUFFER_PUSH_COMMAND(buffer, command_name) (render_entry_##command_name *)render_buffer_allocate_bytes((buffer), render_entry_type_##command_name, sizeof(render_entry_##command_name))
 
-static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, uv uv, u32 texture)
+static inline void render_draw_rectangle(render_buffer *render_buffer, rectangle rect, vector4 color, texture_coordinates uv, u32 texture)
 {
     if (!render_buffer)
     {
