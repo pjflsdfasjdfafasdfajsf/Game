@@ -28,9 +28,8 @@ typedef enum
 {
     SELECTED_DIRECTION_NONE,
     SELECTED_DIRECTION_UP,
-    SELECTED_DIRECTION_DOWN,
-    SELECTED_DIRECTION_LEFT,
     SELECTED_DIRECTION_RIGHT,
+    SELECTED_DIRECTION_CENTER,
 } selected_direction;
 
 typedef struct
@@ -51,6 +50,7 @@ typedef struct
     selection_mode selection_mode;
     selected_direction selected_direction;
     bool rectangle_press;
+    bool first_no_selected_direction;
 
     /* NOTE: shared */
     map test_map;

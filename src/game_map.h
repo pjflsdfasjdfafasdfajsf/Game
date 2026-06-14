@@ -29,15 +29,16 @@
  *
  * After that as many as specified walls follow.
  * Each wall consists of conists of the following pattern:
- * [position x, position y, width, height]
- * [color red, color green, color blue, color alpha]
- *
+ * 4 floats representing position (x, y, width, height) 
+ * 4 floats representing color (r, g, b, a)
+ * 1 u32 representing texture id (0 for now texture)
  */
 
 typedef struct
 {
     rectangle bounding_box;
     vector4 color;
+    u32 texture;
 } map_wall;
 
 typedef struct
@@ -51,7 +52,7 @@ typedef struct
 
 map map_create(const char *name);
 
-bool map_add(map *map, rectangle bounding_box, vector4 color);
+bool map_add(map *map, rectangle bounding_box, vector4 color, u32 texture);
 
 bool map_write(memory_arena *permanent_arena, memory_arena *temporary_arena, memory_stream *error_stream, platform *platform, map *map);
 

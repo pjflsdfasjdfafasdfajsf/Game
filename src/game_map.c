@@ -22,7 +22,7 @@ map map_create(const char *name)
     return result;
 }
 
-bool map_add(map *map, rectangle bounding_box, vector4 color)
+bool map_add(map *map, rectangle bounding_box, vector4 color, u32 texture)
 {
     ASSERT(map);
 
@@ -34,6 +34,7 @@ bool map_add(map *map, rectangle bounding_box, vector4 color)
     map->walls[map->wall_count++] = (map_wall){
         .bounding_box = bounding_box,
         .color = color,
+        .texture = texture,
     };
 
     return true;
@@ -78,6 +79,8 @@ bool map_write(memory_arena *permanent_arena, memory_arena *temporary_arena, mem
         memory_stream_write_f32(&map_stream, wall->color.g);
         memory_stream_write_f32(&map_stream, wall->color.b);
         memory_stream_write_f32(&map_stream, wall->color.a);
+
+        memory_stream_write_uint32(&map_stream, wall->texture);
     }
 
     if (!platform->file_save(map->name, map_stream.memory, map_stream.offset))
@@ -140,9 +143,12 @@ bool map_load(memory_arena *permanent_arena, memory_arena *temporary_arena, memo
         color.b = memory_stream_read_f32_little_endian(&map_stream);
         color.a = memory_stream_read_f32_little_endian(&map_stream);
 
+        u32 texture = memory_stream_read_uint32_little_endian(&map_stream);
+
         map_wall wall = {
             .bounding_box = rect(v2(x, y), v2(width, height)),
             .color = color,
+            .texture = texture,
         };
 
         map->walls[map->wall_count++] = wall;
