@@ -26,7 +26,7 @@ typedef enum
 
 typedef enum
 {
-    SELECTED_DIRECTION_NONE,
+    SELECTED_DIRECTION_NONE, /* NOTE: gets used as the state when no gizmo arrow is selected */
     SELECTED_DIRECTION_UP,
     SELECTED_DIRECTION_RIGHT,
     SELECTED_DIRECTION_CENTER,
@@ -46,10 +46,15 @@ typedef struct
 
     /* NOTE: editor */
     vector2 start_press;
+    f32 scale_center_collider_radius;
     u32 selected_wall;
     selection_mode selection_mode;
     selected_direction selected_direction;
+
+    /* NOTE: draws the rectangle when dragging to create new map walls */
     bool rectangle_press;
+
+    /* NOTE: first time the direction got changed to SELECTED_DIRECTION_NONE before it repeats before it repeats */
     bool first_no_selected_direction;
 
     /* NOTE: shared */

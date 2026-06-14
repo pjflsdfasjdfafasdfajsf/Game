@@ -194,7 +194,7 @@ static void get_gizmo_rectangles(map_wall *wall, rectangle *arrow_up, rectangle 
 
     if (center)
     {
-        center->dimensions = v2(spacing, spacing);
+        center->dimensions = v2(spacing * 2.0f, spacing * 2.0f);
         center->position = v2(wall_center.x - center->dimensions.width * 0.5f, wall_center.y - center->dimensions.height * 0.5f);
     }
 }
@@ -245,7 +245,7 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
         vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
         dimensions = vector2_abs(dimensions);
 
-        map_add(&state->test_map, rect(top_left, dimensions), WHITE, 2);
+        map_add(&state->test_map, rect(top_left, dimensions), BLUE, UNTEXTURED);
     }
 
     rectangle gizmo_arrow_up, gizmo_arrow_right, gizmo_center;
@@ -287,6 +287,7 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
             if (collision.is_colliding)
             {
                 state->selected_direction = SELECTED_DIRECTION_CENTER;
+                state->start_press = input->mouse_position;
                 goto end_collision_check;
             }            
         }
@@ -362,10 +363,20 @@ end_collision_check:
             } break;
             case SELECTED_DIRECTION_CENTER:
             {
-                selected_wall->bounding_box.width += mouse_delta.x * 2;
-                selected_wall->bounding_box.x -= mouse_delta.x;
-                selected_wall->bounding_box.height += mouse_delta.y * 2;
-                selected_wall->bounding_box.y -= mouse_delta.y;
+                const vector2 selected_wall_center = vector2_add(selected_wall->bounding_box.position, vector2_scale(selected_wall->bounding_box.dimensions, 0.5f));
+                const f32 center_collider_radius = vector2_length(vector2_sub(state->start_press, selected_wall_center));
+                                                 
+                f32 previous_distance = vector2_length(vector2_sub(selected_wall_center, input->last_mouse_position)) - center_collider_radius;
+                f32 current_distance = vector2_length(vector2_sub(selected_wall_center, input->mouse_position)) - center_collider_radius;
+                f32 distance_delta = current_distance - previous_distance;
+
+                /* NOTE: make it faster to make it smaller */
+                f32 coefficent = current_distance < center_collider_radius ? 5.0f : 1.0f;
+                                
+                selected_wall->bounding_box.width += distance_delta * 2 * coefficent;
+                selected_wall->bounding_box.x -= distance_delta * coefficent;
+                selected_wall->bounding_box.height += distance_delta * 2 * coefficent;
+                selected_wall->bounding_box.y -= distance_delta * coefficent;
             } break;
             default:
             }
