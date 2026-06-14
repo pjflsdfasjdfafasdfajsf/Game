@@ -3,6 +3,7 @@
 #include "game_math.h"
 #include "game_platform.h"
 #include "game_png.h"
+#include "game_ttf.h"
 #include "game_types.h"
 
 // NOTE: in seconds
@@ -19,6 +20,35 @@ static void enemy_add(game_state *state, vector2 position, vector2 size)
         .position = position,
         .size = size,
     };
+}
+
+static void string_draw(render_buffer *render_buffer, const char *text, vector2 position, f32 scale, vector4 color, font font)
+{
+    char *at = (char *)text;
+    rectangle rectangle = rect(position, v2(0, 0));
+
+    while (*at)
+    {
+        char c = *at;
+        if (c < font.start_glyph || c > (char)(font.start_glyph + font.glyph_count))
+        {
+            ++at;
+            continue;
+        }
+
+        true_type_baked_glyph *glyph = &font.glyphs[(u8)c - font.start_glyph];
+        rectangle.dimensions = vector2_scale(glyph->size, scale);
+        rectangle.x += glyph->offset.x * scale;
+        rectangle.y -= glyph->offset.height * scale;
+
+        texture_coordinates uv = texcoords(rect(glyph->uv_min, glyph->uv_max));
+        render_draw_rectangle(render_buffer, rectangle, color, uv, font.atlas_texture);
+
+        rectangle.y = position.y;
+        rectangle.x += rectangle.width;        
+
+        ++at;
+    }
 }
 
 UPDATE_AND_RENDER(game_mode_play_update_and_render)
@@ -165,6 +195,8 @@ UPDATE_AND_RENDER(game_mode_play_update_and_render)
     {
         render_draw_line(render_buffer, ray_start, vector2_add(ray_start, vector2_scale(vector2_norm(ray_direction), 3000.0f)), RED);
     }
+
+    string_draw(render_buffer, "Hello World!", v2(100, 100), 1.0f, WHITE, state->arial);
 }
 
 static void get_gizmo_rectangles(map_wall *wall, rectangle *arrow_up, rectangle *arrow_right, rectangle *center)
@@ -245,9 +277,9 @@ UPDATE_AND_RENDER(game_mode_editor_update_and_render)
         vector2 dimensions = vector2_sub(input->mouse_position, state->start_press);
         dimensions = vector2_abs(dimensions);
 
-        map_add(&state->test_map, rect(top_left, dimensions), BLUE, UNTEXTURED);
+        map_add(&state->test_map, rect(top_left, dimensions), BLUE, 5);
     }
-
+ 
     rectangle gizmo_arrow_up, gizmo_arrow_right, gizmo_center;
 
     /* NOTE: get the gizmo arrow rectangles */
@@ -462,19 +494,33 @@ UPDATE_AND_RENDER(update_and_render)
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gangster, sizeof(gangster));
         render_allocate_texture(render_buffer, 2, image.size, image.pixels);
 
-   static const char gizmo_move[] = {
+       static const char gizmo_move[] = {
 #embed "../assets/images/gizmo_move.png"
         };
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gizmo_move, sizeof(gizmo_move));
         render_allocate_texture(render_buffer, 3, image.size, image.pixels);
 
-   static const char gizmo_scale[] = {
+       static const char gizmo_scale[] = {
 #embed "../assets/images/gizmo_scale.png"
         };
 
         image = image_load_from_png(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, gizmo_scale, sizeof(gizmo_scale));
         render_allocate_texture(render_buffer, 4, image.size, image.pixels);
+
+       static const char arial[] = {
+#embed "../assets/fonts/arial.ttf"
+        };
+
+        true_type_font arial_font = true_type_font_load_from_memory(&memory->permanent_arena, memory->standard_error_stream, arial, sizeof(arial));
+
+        state->arial.start_glyph = 32; /* NOTE: whitespace symbol */
+        state->arial.glyph_count = '~' - state->arial.start_glyph;
+        state->arial.atlas_texture = 5;
+        state->arial.glyphs = MEMORY_ARENA_PUSH_BYTES(&memory->permanent_arena, sizeof(true_type_baked_glyph) * state->arial.glyph_count);
+        image = true_type_font_bake_atlas(&memory->permanent_arena, &memory->temporary_arena, memory->standard_error_stream, &arial_font, 64, 1000, 256, state->arial.start_glyph, state->arial.glyph_count, state->arial.glyphs);
+        render_allocate_texture(render_buffer, 5, image.size, image.pixels);
+        
 
         /* NOTE: change path of the map to be in assets?
          * im not sure because its right now just for testing

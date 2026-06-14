@@ -3,6 +3,7 @@
 #include "game_map.h"
 #include "game_platform.h"
 #include "game_types.h"
+#include "game_ttf.h"
 
 #define NO_WALL UINT32_MAX
 
@@ -34,6 +35,14 @@ typedef enum
 
 typedef struct
 {
+    u32 atlas_texture;
+    u32 glyph_count;
+    char start_glyph;
+    true_type_baked_glyph *glyphs;
+} font;
+
+typedef struct
+{
     game_mode game_mode;
 
     /* NOTE: game */
@@ -59,6 +68,7 @@ typedef struct
 
     /* NOTE: shared */
     map test_map;
+    font arial;
 
     /* NOTE: is NEVER resetted */
     f64 accumelated_time;

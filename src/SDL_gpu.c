@@ -1,4 +1,5 @@
 #include "SDL_gpu.h"
+#include "game_platform.h"
 
 bool gpu_device_initialize(gpu *gpu)
 {
@@ -434,7 +435,7 @@ void gpu_pass_upload(gpu *gpu, render_buffer *render_buffer, SDL_GPUCommandBuffe
             }
         }
         break;
-
+        
         default:
             break;
         }
