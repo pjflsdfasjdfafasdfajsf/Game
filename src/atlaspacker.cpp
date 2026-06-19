@@ -57,8 +57,7 @@ void WriteAtlasData(const char *file_name, AtlasData &data)
     fclose(file);
 }
 
-PackedItem PlaceImage(Image &atlas, Uint32 current_x, Uint32 current_y,
-                      Image &image)
+PackedItem PlaceImage(Image &atlas, Uint32 current_x, Uint32 current_y, Image &image)
 {
     Uint32 src_index = 0;
 
@@ -91,7 +90,7 @@ AtlasData ShelfPack(Image &atlas, Image *images, Uint32 image_count)
 
     Uint32 max_height = 0;
 
-    AtlasData data = {0};
+    AtlasData data = {};
 
     Uint32 items_capacity = 5;
     data.items = (PackedItem *)malloc(sizeof(PackedItem) * items_capacity);
@@ -119,8 +118,7 @@ AtlasData ShelfPack(Image &atlas, Image *images, Uint32 image_count)
         if (data.item_count + 1 > items_capacity)
         {
             Uint32 new_capacity = items_capacity * 2;
-            PackedItem *new_items = (PackedItem *)realloc(
-                data.items, new_capacity * sizeof(PackedItem));
+            PackedItem *new_items = (PackedItem *)realloc(data.items, new_capacity * sizeof(PackedItem));
             if (!new_items)
             {
                 printf("error: failed to reallocate atlas data\n");
@@ -185,8 +183,7 @@ int main(int argc, char **argv)
     }
 
     AtlasData atlas_data = ShelfPack(atlas, images, image_count);
-    stbi_write_png("atlas.png", atlas.width, atlas.height, 4, atlas.pixels,
-                   atlas.width * 4);
+    stbi_write_png("atlas.png", atlas.width, atlas.height, 4, atlas.pixels, atlas.width * 4);
 
     WriteAtlasData("atlas.dat", atlas_data);
 
