@@ -21,28 +21,34 @@
  *
  */
 
-typedef struct
+struct Image
 {
     Uint32 width;
     Uint32 height;
     Uint8 *pixels;
-} Image;
+};
 
-typedef struct
+struct PackedItem
 {
     Uint32 x;
     Uint32 y;
     Uint32 width;
     Uint32 height;
-} PackedItem;
+};
 
-typedef struct
+struct Atlas
 {
     Uint32 item_count;
     PackedItem *items;
-} AtlasData;
 
-void WriteAtlasData(const char *file_name, AtlasData &data)
+    Image image;
+
+    void WriteData(const char *file_name);
+    PackedItem PlaceImage(Uint32 current_x, Uint32 current_y, Image &image);
+    void Pack(Image *images, Uint32 image_count);
+};
+
+void Atlas::WriteData(const char *file_name)
 {
     FILE *file = (FILE *)fopen(file_name, "w");
     if (!file)
@@ -51,60 +57,57 @@ void WriteAtlasData(const char *file_name, AtlasData &data)
         return;
     }
 
-    fwrite(&data.item_count, sizeof(Uint32), 1, file);
-    fwrite(data.items, sizeof(PackedItem), data.item_count, file);
+    fwrite(&this->item_count, sizeof(Uint32), 1, file);
+    fwrite(this->items, sizeof(PackedItem), this->item_count, file);
 
     fclose(file);
 }
 
-PackedItem PlaceImage(Image &atlas, Uint32 current_x, Uint32 current_y, Image &image)
+PackedItem Atlas::PlaceImage(Uint32 current_x, Uint32 current_y, Image &image)
 {
-    Uint32 src_index = 0;
+    Uint32 source_index = 0;
 
-    PackedItem item = {
-        .x = current_x,
-        .y = current_y,
-        .width = image.width,
-        .height = image.height,
-    };
+    PackedItem item;
+    item.x = current_x;
+    item.y = current_y;
+    item.width = image.width;
+    item.height = image.height;
 
     for (Uint32 y = current_y; y < current_y + image.height; y++)
     {
         for (Uint32 x = current_x; x < current_x + image.width; x++)
         {
-            Uint8 *pixel = &atlas.pixels[(y * atlas.width + x) * 4];
-            pixel[0] = image.pixels[src_index++];
-            pixel[1] = image.pixels[src_index++];
-            pixel[2] = image.pixels[src_index++];
-            pixel[3] = image.pixels[src_index++];
+            Uint8 *pixel = &this->image.pixels[(y * this->image.width + x) * 4];
+            pixel[0] = image.pixels[source_index++];
+            pixel[1] = image.pixels[source_index++];
+            pixel[2] = image.pixels[source_index++];
+            pixel[3] = image.pixels[source_index++];
         }
     }
 
     return item;
 }
 
-AtlasData ShelfPack(Image &atlas, Image *images, Uint32 image_count)
+void Atlas::Pack(Image *images, Uint32 image_count)
 {
     Uint32 current_x = 0;
     Uint32 current_y = 0;
 
     Uint32 max_height = 0;
 
-    AtlasData data = {};
-
     Uint32 items_capacity = 5;
-    data.items = (PackedItem *)malloc(sizeof(PackedItem) * items_capacity);
+    this->items = (PackedItem *)malloc(sizeof(PackedItem) * items_capacity);
 
     for (Uint32 i = 0; i < image_count; i++)
     {
         Image &image = images[i];
 
         PackedItem item;
-        if (current_x + image.width <= atlas.width)
+        if (current_x + image.width <= this->image.width)
         {
             max_height = Max(image.height, max_height);
 
-            item = PlaceImage(atlas, current_x, current_y, image);
+            item = this->PlaceImage(current_x, current_y, image);
         }
         else
         {
@@ -112,27 +115,25 @@ AtlasData ShelfPack(Image &atlas, Image *images, Uint32 image_count)
             current_y += max_height;
             max_height = 0;
 
-            item = PlaceImage(atlas, current_x, current_y, image);
+            item = this->PlaceImage(current_x, current_y, image);
         }
 
-        if (data.item_count + 1 > items_capacity)
+        if (this->item_count + 1 > items_capacity)
         {
-            Uint32 new_capacity = items_capacity * 2;
-            PackedItem *new_items = (PackedItem *)realloc(data.items, new_capacity * sizeof(PackedItem));
-            if (!new_items)
+            Uint32 capacity = items_capacity * 2;
+            PackedItem *items = (PackedItem *)realloc(this->items, capacity * sizeof(PackedItem));
+            if (!items)
             {
                 printf("error: failed to reallocate atlas data\n");
                 continue;
             }
 
-            data.items = new_items;
-            items_capacity = new_capacity;
+            this->items = items;
+            items_capacity = capacity;
         }
 
-        data.items[data.item_count++] = item;
+        this->items[this->item_count++] = item;
     }
-
-    return data;
 }
 
 int main(int argc, char **argv)
@@ -160,32 +161,29 @@ int main(int argc, char **argv)
             continue;
         }
 
-        images[image_index++] = {
-            .width = (Uint32)width,
-            .height = (Uint32)height,
-            .pixels = data,
-        };
+        images[image_index++].width = (Uint32)width;
+        images[image_index++].height = (Uint32)height;
+        images[image_index++].pixels = data;
     }
 
-    Image atlas = {
-        .width = 4096,
-        .height = 4096,
-        .pixels = (Uint8 *)malloc(atlas.width * atlas.height * 4),
-    };
+    Atlas atlas = {};
+    atlas.image.width = 4096,
+    atlas.image.height = 4096,
+    atlas.image.pixels = (Uint8 *)malloc(atlas.image.width * atlas.image.height * 4);
 
-    for (Uint32 i = 0; i < atlas.width * atlas.height * 4; i += 4)
+    for (Uint32 i = 0; i < atlas.image.width * atlas.image.height * 4; i += 4)
     {
-        Uint8 *pixel = &atlas.pixels[i];
+        Uint8 *pixel = &atlas.image.pixels[i];
         pixel[0] = 0;
         pixel[1] = 0;
         pixel[2] = 0;
         pixel[3] = 255;
     }
 
-    AtlasData atlas_data = ShelfPack(atlas, images, image_count);
-    stbi_write_png("atlas.png", atlas.width, atlas.height, 4, atlas.pixels, atlas.width * 4);
+    stbi_write_png("atlas.png", atlas.image.width, atlas.image.height, 4, atlas.image.pixels, atlas.image.width * 4);
 
-    WriteAtlasData("atlas.dat", atlas_data);
+    atlas.Pack(images, image_count);
+    atlas.WriteData("atlas.dat");
 
     free(images);
     return 0;
