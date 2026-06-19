@@ -261,7 +261,7 @@ static void UpdatePlayer(State &state)
     // NOTE: Behavior.
     switch (state.player.state)
     {
-    case PLAYER_STATE_NORMAL:
+    case PlayerState_Normal:
     {
         if (state.player.dash_timer > 0.0f)
         {
@@ -309,7 +309,7 @@ static void UpdatePlayer(State &state)
         // NOTE: Dashing.
         if (state.input.dash.is_down && state.player.dash_timer <= 0.0f)
         {
-            state.player.state = PLAYER_STATE_DASH;
+            state.player.state = PlayerState_Dash;
             state.player.dash_timer = PLAYER_DASH_DURATION;
 
             if (horizontal_input != 0.0f)
@@ -325,7 +325,7 @@ static void UpdatePlayer(State &state)
         // NOTE: Slamming.
         if (state.input.slam.is_down && !player::IsOnGround(state))
         {
-            state.player.state = PLAYER_STATE_SLAM;
+            state.player.state = PlayerState_Slam;
             state.player.velocity.x = 0.0f;
             state.player.velocity.y = PLAYER_SLAM_SPEED;
         }
@@ -334,7 +334,7 @@ static void UpdatePlayer(State &state)
         Vector2 nearest_hook = Vector2::Zero();
         if (state.input.hook.is_down && state.player.hook_cooldown <= 0.0f && map::FindNearestHookWithinRadius(state, state.player.position, PLAYER_HOOK_RADIUS, &nearest_hook))
         {
-            state.player.state = PLAYER_STATE_HOOK;
+            state.player.state = PlayerState_Hook;
             state.player.hook_target = nearest_hook;
 
             state.player.hook_rope_length = GetDistance(state.player.position, nearest_hook);
@@ -344,7 +344,7 @@ static void UpdatePlayer(State &state)
         state.player.velocity.y += PLAYER_GRAVITY * state.time.delta;
     }
     break;
-    case PLAYER_STATE_DASH:
+    case PlayerState_Dash:
     {
         state.player.velocity.x = state.player.dash_direction * PLAYER_DASH_SPEED;
         state.player.velocity.y = 0.0f;
@@ -354,36 +354,36 @@ static void UpdatePlayer(State &state)
         bool has_dash_ended = state.player.dash_timer <= 0.0f;
         if (has_dash_ended)
         {
-            state.player.state = PLAYER_STATE_NORMAL;
+            state.player.state = PlayerState_Normal;
             state.player.velocity.x = state.player.dash_direction * PLAYER_MAX_SPEED;
 
             state.player.dash_timer = PLAYER_DASH_COOLDOWN;
         }
     }
     break;
-    case PLAYER_STATE_SLAM:
+    case PlayerState_Slam:
     {
         state.player.velocity.y = PLAYER_SLAM_SPEED;
 
         if (player::IsOnGround(state))
         {
-            state.player.state = PLAYER_STATE_NORMAL;
+            state.player.state = PlayerState_Normal;
         }
     }
     break;
 
-    case PLAYER_STATE_HOOK:
+    case PlayerState_Hook:
     {
         if (!state.input.hook.is_down)
         {
-            state.player.state = PLAYER_STATE_NORMAL;
+            state.player.state = PlayerState_Normal;
             state.player.hook_cooldown = 0.25f;
             break;
         }
 
         if (state.input.jump.pressed)
         {
-            state.player.state = PLAYER_STATE_NORMAL;
+            state.player.state = PlayerState_Normal;
             state.player.hook_cooldown = 0.25f;
             state.player.velocity.y = Min(state.player.velocity.y, -PLAYER_JUMP_SPEED);
             break;
@@ -421,7 +421,7 @@ static void UpdatePlayer(State &state)
         state.player.velocity.y = 0.0f;
     }
 
-    if (state.player.state == PLAYER_STATE_HOOK)
+    if (state.player.state == PlayerState_Hook)
     {
         player::UpdateSwing(state);
     }
@@ -434,7 +434,7 @@ static void DrawPlayer(State &state, RenderCommandBuffer &buffer)
     Rectangle box = Rectangle::GetCentered(state.player.position, V2(PLAYER_SIZE, PLAYER_SIZE));
     buffer.DrawRectangle(Rectangle::FromVectors(state.camera.WorldToScreen(box.position), box.size), RED);
 
-    if (state.player.state == PLAYER_STATE_HOOK)
+    if (state.player.state == PlayerState_Hook)
     {
         buffer.DrawLine(state.camera.WorldToScreen(state.player.position), state.camera.WorldToScreen(state.player.hook_target), WHITE);
     }

@@ -593,10 +593,10 @@ inline void RenderCommandBuffer::DrawLine(Vector2 start, Vector2 end, RGBA color
 
 typedef enum PlayerState
 {
-    PLAYER_STATE_NORMAL,
-    PLAYER_STATE_DASH,
-    PLAYER_STATE_SLAM,
-    PLAYER_STATE_HOOK,
+    PlayerState_Normal,
+    PlayerState_Dash,
+    PlayerState_Slam,
+    PlayerState_Hook,
 } PlayerState;
 
 typedef struct Player
