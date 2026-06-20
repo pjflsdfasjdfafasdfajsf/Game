@@ -9,14 +9,14 @@ comptime {
     _ = sdk;
 }
 
-var miguel: i32 = -1;
+var ziggy: i32 = -1;
 
 pub fn init() !void {
     const metadata: sdk.Metadata = .{ .name = "zig mod", .summary = "a nice zig mod" };
     try metadata.set();
 
-    miguel = sdk.registerAction("miguel");
-    sdk.registerDefaultKey("miguel", "f");
+    ziggy = sdk.registerAction("ziggy");
+    sdk.registerDefaultKey("ziggy", "z");
 }
 
 pub fn update(state: *sdk.State, buffer: *sdk.RenderCommandBuffer) !void {
@@ -28,7 +28,7 @@ pub fn update(state: *sdk.State, buffer: *sdk.RenderCommandBuffer) !void {
         },
     } });
 
-    if (state.input.custom[@intCast(miguel)].pressed) {
+    if (state.input.custom[@intCast(ziggy)].pressed) {
         std.log.info("{any}", .{state.player.position});
     }
 }

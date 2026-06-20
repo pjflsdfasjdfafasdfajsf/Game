@@ -27,9 +27,5 @@ pub fn build(b: *std.Build) void {
     exe.entry = .{ .symbol_name = "guest_initialize" }; // make sure guest_initialize is compiled
     exe.rdynamic = true;
 
-    for (exe.root_module.export_symbol_names) |symbol| {
-        std.log.info("shit: {s}", .{symbol});
-    }
-
     b.installArtifact(exe);
 }
