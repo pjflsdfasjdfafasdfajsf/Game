@@ -1,7 +1,3 @@
-# LSP things
-compile_commands.json
-.cache
-.ignore
-
-# Build output
-build
+.zig-cache
+zig-out
+zig-pkg
