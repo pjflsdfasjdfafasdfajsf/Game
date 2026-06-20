@@ -684,26 +684,12 @@ static inline void Map_Write(Map *map, Platform *platform, const char *path)
 
 inline void Map::Load(Platform &platform, const char *path)
 {
-    Uint32 file_size;
-    void *file_data = platform.FileLoad(path, &file_size);
-
-    if (!file_data)
-    {
-        return;
-    }
-
-    for (Uint32 y = 0; y < MAP_HEIGHT; y++)
-    {
-        for (Uint32 x = 0; x < MAP_WIDTH; x++)
-        {
-            this->grid[y][x] = ((Int32 *)file_data)[y * MAP_WIDTH + x];
-        }
-    }    
+    Map_Load(this, &platform, path);
 }
 
 inline void Map::Write(Platform &platform, const char *path)
 {
-    platform.FileSave(path, this->grid, MAP_HEIGHT * MAP_WIDTH * sizeof(this->grid[0][0]));
+    Map_Write(this, &platform, path);
 }
 
 #endif // CPP
