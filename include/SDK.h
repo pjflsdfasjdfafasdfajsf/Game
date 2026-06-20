@@ -658,12 +658,26 @@ typedef struct Map
 
 static inline void Map_Load(Map *map, Platform *platform, const char *path)
 {
-    
+    Uint32 file_size;
+    void *file_data = platform->FileLoad(path, &file_size);
+
+    if (!file_data)
+    {
+        return;
+    }
+
+    for (Uint32 y = 0; y < MAP_HEIGHT; y++)
+    {
+        for (Uint32 x = 0; x < MAP_WIDTH; x++)
+        {
+            map->grid[y][x] = ((Int32 *)file_data)[y * MAP_WIDTH + x];
+        }
+    }
 }
 
 static inline void Map_Write(Map *map, Platform *platform, const char *path)
 {
-    
+    platform->FileSave(path, map->grid, MAP_HEIGHT * MAP_WIDTH * sizeof(map->grid[0][0]));
 }
 
 #if defined(CPP)
