@@ -1,6 +1,6 @@
 Configure and build:
 
-	cmake -B build && cmake --build build
+	zig build run
 
 It will take some time since it's fetching and building SDL.
 

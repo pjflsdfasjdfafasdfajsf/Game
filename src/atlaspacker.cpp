@@ -4,8 +4,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include "stb/stb_image.h"
-#include "stb/stb_image_write.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 #include "SDK.h"
 
@@ -108,7 +108,7 @@ void Atlas::Pack(Image *images, Uint32 image_count)
             maximum_height = Max(image.height, maximum_height);
 
             item = this->PlaceImage(x, y, image);
-            x+= image.width;
+            x += image.width;
         }
         else
         {
@@ -135,57 +135,4 @@ void Atlas::Pack(Image *images, Uint32 image_count)
 
         this->items[this->item_count++] = item;
     }
-}
-
-int main(int argc, char **argv)
-{
-    if (argc < 2)
-    {
-        printf("USAGE: %s <image1> <image2>\n", argv[0]);
-        printf("Outputs: atlas.png in cwd and atlas.dat\n");
-        return 1;
-    }
-
-    Uint32 image_count = argc - 1;
-    Image *images = (Image *)malloc(sizeof(Image) * image_count);
-
-    Uint32 image_index = 0;
-    for (Int32 i = 1; i < argc; i++)
-    {
-        char *path = argv[i];
-
-        Int32 width, height, channels;
-        Uint8 *data = stbi_load(path, &width, &height, &channels, 4);
-        if (!data)
-        {
-            printf("error: failed to load %s\n", path);
-            continue;
-        }
-
-        images[image_index].width = (Uint32)width;
-        images[image_index].height = (Uint32)height;
-        images[image_index++].pixels = data;
-    }
-
-    Atlas atlas = {};
-    atlas.image.width = 4096,
-    atlas.image.height = 4096,
-    atlas.image.pixels = (Uint8 *)malloc(atlas.image.width * atlas.image.height * 4);
-
-    for (Uint32 i = 0; i < atlas.image.width * atlas.image.height * 4; i += 4)
-    {
-        Uint8 *pixel = &atlas.image.pixels[i];
-        pixel[0] = 0;
-        pixel[1] = 0;
-        pixel[2] = 0;
-        pixel[3] = 255;
-    }
-
-    atlas.Pack(images, image_count);
-    atlas.WriteData("atlas.dat");
-
-    stbi_write_png("atlas.png", atlas.image.width, atlas.image.height, 4, atlas.image.pixels, atlas.image.width * 4);
-
-    free(images);
-    return 0;
 }

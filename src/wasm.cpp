@@ -1,6 +1,8 @@
 #include "wasm.h"
 #include "SDK.h"
 #include "SDL3/SDL_stdinc.h"
+#include "m3_core.h"
+#include "m3_env.h"
 #include "wasm3.h"
 #include <SDL3/SDL.h>
 
@@ -251,7 +253,7 @@ void Context::Update(State &state, RenderCommandBuffer &buffer)
         }
 
         Uint32 memory_size = 0;
-        Uint8 *wasm_memory = m3_GetMemory(module->runtime, &memory_size, 0);
+        Uint8 *wasm_memory = (Uint8 *)m3_GetMemory(module->module, &memory_size, 0);
 
         if (!wasm_memory || memory_size == 0)
         {

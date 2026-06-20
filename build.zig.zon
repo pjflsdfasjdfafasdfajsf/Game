@@ -1,0 +1,25 @@
+.{
+    .name = .tiramisu,
+    .version = "0.0.0",
+    .fingerprint = 0x1b99cbf5c14ce5a7,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .sdl = .{
+            .url = "git+https://github.com/allyourcodebase/SDL3/#2112c226de02434111c8a7337fb83d5e5a270d76",
+            .hash = "sdl-1.0.1+3.4.4-i4QD0YeSqQCDkGoyRgfZH6_05GyutM6wfeECig3-STNj",
+        },
+        .stb = .{
+            .url = "git+https://github.com/nothings/stb#31c1ad37456438565541f4919958214b6e762fb4",
+            .hash = "N-V-__8AAN1DTgAKvlSQnjJwSg4ZY2JP5OHmzKOcA4BewA4Y",
+        },
+        .wasm3 = .{
+            .url = "git+https://github.com/HaraldWik/wasm3#78c7b9f24570743a7d0aa9aa2e669ac000a45096",
+            .hash = "wasm3-0.0.0-SDFSNLhPCQBAX6JLKg4jQummgbI5kmftEopAxRlqw07a",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
