@@ -435,6 +435,29 @@ static inline Vector2 Camera_WorldToScreen(Camera camera, Vector2 world)
 }
 
 //
+// NOTE: Platform
+// 
+
+typedef struct Platform
+{
+    const char *(*GetAbsoultePath)(const char *path);
+    
+    Bool (*FileSave)(const char *file, const void *data, Uint32 size);
+    void *(*FileLoad)(const char *file, Uint32 *out_size);
+    void (*FileFree)(void *file_data);
+
+#if defined(CPP) && defined(INTERNAL)
+    static Platform Initialize();
+#endif // CPP && INTERNAL
+} Platform;
+
+#if defined(INTERNAL)
+
+Platform Platform_Initialize();
+
+#endif // INTERNAL
+
+//
 // NOTE: Rendering.
 //
 
@@ -626,7 +649,50 @@ typedef struct Time
 typedef struct Map
 {
     Int32 grid[MAP_HEIGHT][MAP_WIDTH];
+
+#if defined(CPP)
+    inline void Load(Platform &platform, const char *path);
+    inline void Write(Platform &platform, const char *path);
+#endif // CPP
 } Map;
+
+static inline void Map_Load(Map *map, Platform *platform, const char *path)
+{
+    
+}
+
+static inline void Map_Write(Map *map, Platform *platform, const char *path)
+{
+    
+}
+
+#if defined(CPP)
+
+inline void Map::Load(Platform &platform, const char *path)
+{
+    Uint32 file_size;
+    void *file_data = platform.FileLoad(path, &file_size);
+
+    if (!file_data)
+    {
+        return;
+    }
+
+    for (Uint32 y = 0; y < MAP_HEIGHT; y++)
+    {
+        for (Uint32 x = 0; x < MAP_WIDTH; x++)
+        {
+            this->grid[y][x] = ((Int32 *)file_data)[y * MAP_WIDTH + x];
+        }
+    }    
+}
+
+inline void Map::Write(Platform &platform, const char *path)
+{
+    platform.FileSave(path, this->grid, MAP_HEIGHT * MAP_WIDTH * sizeof(this->grid[0][0]));
+}
+
+#endif // CPP
 
 typedef struct Action
 {
@@ -634,7 +700,8 @@ typedef struct Action
     Bool pressed;
     Bool released;
 } Action;
- typedef struct Input
+
+typedef struct Input
 {
     Action jump;
     Action dash;
@@ -653,25 +720,26 @@ typedef struct State
     Time time;
     Map map;
     Input input;
+    Platform platform;
 
     Bool ok;
 
 #if defined(CPP) && defined(INTERNAL)
 
-    static State Initialize();
+    static State Initialize(Platform &platform);
 
-    void Draw(RenderCommandBuffer &buffer);
-    void Update();
+    void Draw(RenderCommandBuffer &buffer, Platform &platform);
+    void Update(Platform &platform);
 
 #endif // CPP
 } State;
 
 #if defined(INTERNAL)
 
-State State_Initialize();
+State State_Initialize(Platform *platform);
 
-void State_Draw(State *state, RenderCommandBuffer *buffer);
-void State_Update(State *state);
+void State_Draw(State *state, RenderCommandBuffer *buffer, Platform *platform);
+void State_Update(State *state, Platform *platform);
 
 #endif // INTERNAL
 
@@ -734,3 +802,4 @@ void RegisterDefaultKey(const char *action, const char *key);
 #endif // __wasm__
 
 #endif
+

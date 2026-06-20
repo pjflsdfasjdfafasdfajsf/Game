@@ -217,6 +217,30 @@ static Bool AppendMissingBinding(SDL_IOStream **stream, inputmap::Bindings *user
     return true;
 }
 
+// Platform Api Functions
+
+Bool FileSave(const char *file, const void *data, Uint32 size)
+{
+    return SDL_SaveFile(file, data, size);
+}
+
+void *FileLoad(const char* file, Uint32 *out_size)
+{
+    Usize size = 0;
+    void *data = SDL_LoadFile(file, &size);
+    return data;    
+}
+
+void FileFree(void *data)
+{
+    if (data)
+    {
+        SDL_free(data);
+    }
+}
+
+/////////////////////////////
+
 App App::Initialize()
 {
     App app = {};
@@ -255,7 +279,12 @@ App App::Initialize()
         return app;
     }
 
-    app.state = State::Initialize();
+    app.platform.GetAbsoultePath = GetAbsolutePath;
+    app.platform.FileSave = FileSave;
+    app.platform.FileLoad = FileLoad;
+    app.platform.FileFree = FileFree;
+
+    app.state = State::Initialize(app.platform);
     if (!app.state.ok)
     {
         return app;
@@ -500,10 +529,10 @@ int main()
     while (app.PollEvents())
     {
         app.Update();
-        app.state.Update();
+        app.state.Update(app.platform);
         app.Draw();
 
-        app.state.Draw(app.buffer);
+        app.state.Draw(app.buffer, app.platform);
         app.wasm->Update(app.state, app.buffer);
     }
 

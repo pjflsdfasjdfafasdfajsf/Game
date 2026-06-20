@@ -15,6 +15,8 @@ struct App
     SDL_Renderer *renderer;
     RenderCommandBuffer buffer;
 
+    Platform platform;
+
     wasm::Context *wasm;
     State state;
     /// Was this structure initialized succesfully.

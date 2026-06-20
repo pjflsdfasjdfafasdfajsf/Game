@@ -506,8 +506,6 @@ static void UpdateEnemy(State &state, Enemy *enemies, Int32 count)
     }
 }
 
-//
-
 static void DrawEnemy(State &state, RenderCommandBuffer &buffer, Enemy *enemies, Int32 count)
 {
     for (Int32 i = 0; i < count; i++)
@@ -517,10 +515,11 @@ static void DrawEnemy(State &state, RenderCommandBuffer &buffer, Enemy *enemies,
     }
 }
 
-State State::Initialize()
+State State::Initialize(Platform &platform)
 {
     State state = {};
 
+    /* NOTE: fallback if map disappears
     state.map = (Map){
         {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -533,13 +532,17 @@ State State::Initialize()
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1},
             {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
         }};
+        */
+
+    state.map.Load(platform, platform.GetAbsoultePath("test.map"));
+    state.map.Write(platform, platform.GetAbsoultePath("test.map"));
 
     state.ok = true;
 
     return state;
 }
 
-void State::Draw(RenderCommandBuffer &buffer)
+void State::Draw(RenderCommandBuffer &buffer, Platform &platform)
 {
     buffer.ClearScreen(BLACK);
 
@@ -548,7 +551,7 @@ void State::Draw(RenderCommandBuffer &buffer)
     DrawEnemy(*this, buffer, enemy::enemies, enemy::enemy_count);
 }
 
-void State::Update()
+void State::Update(Platform &platform)
 {
     UpdatePlayer(*this);
     UpdateEnemy(*this, enemy::enemies, enemy::enemy_count);
