@@ -1,14 +1,6 @@
 const std = @import("std");
 const sdk = @import("sdk");
 
-pub const std_options: std.Options = .{
-    .logFn = sdk.log,
-};
-
-comptime {
-    _ = sdk;
-}
-
 var ziggy: i32 = -1;
 
 pub fn init() !void {
@@ -30,5 +22,6 @@ pub fn update(state: *sdk.State, buffer: *sdk.RenderCommandBuffer) !void {
 
     if (state.input.custom[@intCast(ziggy)].pressed) {
         std.log.info("{any}", .{state.player.position});
+        state.player.position = .{ .x = 0.0, .y = 0.0 };
     }
 }

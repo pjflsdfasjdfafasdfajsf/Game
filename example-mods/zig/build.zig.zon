@@ -5,8 +5,12 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .sdk = .{
-            .path = "../../sdk/",
+            .url = "git+https://github.com/pjflsdfasjdfafasdfajsf/zig-SDK#8b61a0db81a1dc8eed43642c0a0839d3bbc77e16",
+            .hash = "sdk-0.0.0-lbcniMccAADjCYvu3evicSfgDi9telQQvcjSz00a-JnX",
         },
+        // .sdk = .{
+        //     .path = "../../../zig-SDK/",
+        // },
     },
     .paths = .{
         "build.zig",

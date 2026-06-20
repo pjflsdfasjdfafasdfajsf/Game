@@ -6,26 +6,17 @@ pub fn build(b: *std.Build) void {
 
     const sdk = b.dependency("sdk", .{ .target = target, .optimize = optimize });
 
-    const sdk_mod = b.createModule(.{
-        .root_source_file = sdk.path("sdk.zig"),
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "sdk", .module = sdk.module("sdk") },
+        },
     });
 
-    const exe = b.addExecutable(.{
-        .name = "zig",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/root.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "sdk", .module = sdk_mod },
-            },
-            .pic = true,
-        }),
-    });
-    exe.entry = .{ .symbol_name = "guest_initialize" }; // make sure guest_initialize is compiled
-    exe.rdynamic = true;
+    const exe = sdk.artifact("mod");
+    exe.root_module.addImport("mod", mod);
 
     b.installArtifact(exe);
 }
