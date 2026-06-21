@@ -146,7 +146,7 @@ static inline Void CodeReload(Code *Code, const char *Path, const char *TempPath
             }
             else
             {
-                SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError());
+                LogCritical("%s", SDL_GetError());
             }
         }
     }
@@ -184,7 +184,7 @@ Void Render(SDL *SDL)
         case RenderCommand_None:
         default:
         {
-            SDL_LogCritical(SDL_LOG_CATEGORY_RENDER, "Unrecognized or not implemented render command (%d)", Cmd->Type);
+            LogCritical("Unrecognized or not implemented render command (%d)", Cmd->Type);
             Assert(0);
         }
         break;
