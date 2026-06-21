@@ -3,8 +3,8 @@
 
 #include "wasm3.h"
 
-#include "Render.h"
 #include "Types.h"
+#include "SDK.h"
 
 typedef struct {
   IM3Environment Env;
@@ -12,11 +12,13 @@ typedef struct {
   IM3Module Module;
 
   IM3Function UpdateAndRender;
+  IM3Function GetExtraMem;
   IM3Function GetState;
   IM3Function GetRenderBuf;
 
   // NOTE: NOT REAL HOST POINTERS!!!!
   Uint32 State;
+  Uint32 ExtraMem;
   Uint32 RenderBuf;
 
   void *Bytes;
@@ -28,6 +30,6 @@ Host HostInit(Void);
 
 Bool HostLoadOne(Host *Host, const char *File);
 
-Bool HostUpdate(Host *Host, RenderBuf *RenderBuf);
+Bool HostUpdate(Host *Host, State *State, RenderBuf *RenderBuf);
 
 #endif

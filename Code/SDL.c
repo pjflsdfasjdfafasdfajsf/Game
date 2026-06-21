@@ -1,9 +1,5 @@
 #include "SDL.h"
-#include "Host.h"
-#include "Mem.h"
-#include "Render.h"
-#include "Shared.h"
-#include "Types.h"
+#include "SDK.h"
 
 #if defined(_WIN32)
 #define DynamicLibrarySuffix ".dll"
@@ -18,7 +14,7 @@
 #define DynamicLibraryTempSuffix "_Temp"
 
 #define DynamicLibraryFullName DynamicLibraryName DynamicLibrarySuffix
-#define DynamicLibraryFullTempName DynamicLibraryName DynamicLibrarySuffix DynamicLibraryTempSuffix
+#define DynamicLibraryFullTempName DynamicLibraryName DynamicLibraryTempSuffix DynamicLibrarySuffix 
 
 //
 // NOTE: Intenral
@@ -216,10 +212,10 @@ Void Update(SDL *SDL)
 
     if (SDL->Code.AppUpdateAndRender)
     {
-        SDL->Code.AppUpdateAndRender(0, &SDL->RenderBuf);
+        SDL->Code.AppUpdateAndRender(&SDL->State, SDL->ExtraMem, &SDL->RenderBuf);
     }
 
-    if (!HostUpdate(&SDL->Host, &SDL->RenderBuf))
+    if (!HostUpdate(&SDL->Host, &SDL->State, &SDL->RenderBuf))
     {
         Assert(0);
     }
@@ -251,11 +247,16 @@ SDL Init()
     {
         Assert(0);
     }
-
     Result.MemAlloc = MemAllocInit(Mem, Kb(64));
 
     Result.RenderBuf = RenderBufInit(&Result.MemAlloc, Kb(32));
     if (!Result.RenderBuf.IsValid)
+    {
+        Assert(0);
+    }
+
+    Result.ExtraMem = SDL_calloc(1, Kb(16));
+    if (!Result.ExtraMem)
     {
         Assert(0);
     }

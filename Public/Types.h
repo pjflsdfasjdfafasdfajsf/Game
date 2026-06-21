@@ -38,7 +38,7 @@ typedef size_t Usize;
 
 //
 // NOTE: Platforms.
-// 
+//
 
 #if defined(__wasm__)
 #define WASM
@@ -82,6 +82,19 @@ typedef size_t Usize;
 #define IsPow2(X) (((X) != 0) && (((X) & ((X) - 1)) == 0))
 //  `Align` must be a power of 2.
 #define AlignUp(Val, Align) (((Val) + ((Align) - 1)) & ~((Align) - 1))
+
+static inline Uint32 StrLen(const char *Str)
+{
+    Assert(Str);
+
+    Uint32 Len = 0;
+    while (Str[Len])
+    {
+        Len++;
+    }
+
+    return Len;
+}
 
 //
 // NOTE: Structures.

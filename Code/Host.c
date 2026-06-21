@@ -8,6 +8,29 @@
 #include "Types.h"
 #include "wasm3.h"
 
+//
+// NOTE: Host-provided funcs.
+//
+
+m3ApiRawFunction(Print)
+{
+    m3ApiGetArgMem(const char *, Ptr);
+    m3ApiGetArg(Uint32, Len);
+
+    m3ApiCheckMem(Ptr, Len);
+
+    if (Ptr && Len > 0)
+    {
+        SDL_Log("%.*s\n", (Int32)Len, Ptr);
+    }
+
+    m3ApiSuccess();
+}
+
+//
+// NOTE: Implementation.
+//
+
 Host HostInit(Void)
 {
     Host Result = {0};
@@ -68,38 +91,39 @@ Bool HostLoadOne(Host *Host, const char *Path)
     }
 
     //
-    // NOTE: Functions.
+    // NOTE: Exports.
     //
 
-    Result = m3_FindFunction(&Host->UpdateAndRender, Host->Runtime, "UpdateAndRender");
-    if (Result)
+    Result = m3_LinkRawFunction(Host->Module, "env", "Print", "v(ii)", &Print);
+    // NOTE: functionLookupFailed here for some reason can happen if the module does not import it.
+    if (Result && Result != m3Err_functionLookupFailed)
     {
-        LogCritical("m3_FindFunction: %s\n"
-                    "NOTE: Host expects 'Void UpdateAndRender(*State, *RenderBuf)' to be exported.\n",
-                    Result);
+        LogCritical("m3_LinkRawFunction  ('Print'): %s\n", Result);
 
         return False;
     }
 
-    Result = m3_FindFunction(&Host->GetState, Host->Runtime, "GetState");
-    if (Result)
-    {
-        LogCritical("m3_FindFunction: %s\n"
-                    "NOTE: Host expects 'State *GetState(Void)' to be exported.\n",
-                    Result);
+    //
+    // NOTE: Imports.
+    //
 
-        return False;
+#define Function(Name, Signature)                                \
+    Result = m3_FindFunction(&Host->Name, Host->Runtime, #Name); \
+    if (Result)                                                  \
+    {                                                            \
+        LogCritical("m3_FindFunction: %s\n"                      \
+                    "NOTE: Host expects '%s' to be exported.\n", \
+                    Result, #Signature);                         \
+                                                                 \
+        return False;                                            \
     }
 
-    Result = m3_FindFunction(&Host->GetRenderBuf, Host->Runtime, "GetRenderBuf");
-    if (Result)
-    {
-        LogCritical("m3_FindFunction: %s\n"
-                    "NOTE: Host expects 'RenderBuf *GetRenderBuf(Void)' to be exported.\n",
-                    Result);
+    Function(UpdateAndRender, Void UpdateAndRender(*State, *RenderBuf));
+    Function(GetState, State * GetState(Void));
+    Function(GetExtraMem, Void * GetExtraMem(Void));
+    Function(GetRenderBuf, RenderBuf * GetRenderBuf(Void));
 
-        return False;
-    }
+#undef Function
 
     if (m3_CallV(Host->GetState) == m3Err_none)
     {
@@ -109,16 +133,43 @@ Bool HostLoadOne(Host *Host, const char *Path)
     {
         m3_GetResultsV(Host->GetRenderBuf, &Host->RenderBuf);
     }
+    if (m3_CallV(Host->GetExtraMem) == m3Err_none)
+    {
+        m3_GetResultsV(Host->GetExtraMem, &Host->ExtraMem);
+    }
 
     return True;
 }
 
-Bool HostUpdate(Host *Host, RenderBuf *RenderBuf)
+Bool HostUpdate(Host *Host, State *State, RenderBuf *RenderBuf)
 {
     Assert(Host);
     Assert(Host->UpdateAndRender);
 
-    M3Result Result = m3_CallV(Host->UpdateAndRender, Host->State, Host->RenderBuf);
+    Uint32 TotalMemSize = 0;
+    Uint8 *TotalMem = m3_GetMemory(Host->Runtime, &TotalMemSize, 0);
+    if (!TotalMem)
+    {
+        LogCritical("m3_GetMemory\n");
+
+        return False;
+    }
+
+    // NOTE: Coyp in.
+
+    if (Host->State + sizeof(*State) <= TotalMemSize)
+    {
+        SDL_memcpy(TotalMem + Host->State, State, sizeof(*State));
+    }
+
+    if (Host->RenderBuf + 16 > TotalMemSize)
+    {
+        LogCritical("RenderBuf is out of bounds.\n");
+
+        return False;
+    }
+
+    M3Result Result = m3_CallV(Host->UpdateAndRender, Host->State, Host->ExtraMem, Host->RenderBuf);
     if (Result)
     {
         M3ErrorInfo Info;
@@ -138,20 +189,11 @@ Bool HostUpdate(Host *Host, RenderBuf *RenderBuf)
         return False;
     }
 
-    Uint32 TotalMemSize = 0;
-    Uint8 *TotalMem = m3_GetMemory(Host->Runtime, &TotalMemSize, 0);
-    if (!TotalMem)
+    // NOTE: Copy out.
+
+    if (Host->State + sizeof(*State) <= TotalMemSize)
     {
-        LogCritical("m3_GetMemory\n");
-
-        return False;
-    }
-
-    if (Host->RenderBuf + 16 > TotalMemSize)
-    {
-        LogCritical("RenderBuf is out of bounds.\n");
-
-        return False;
+        SDL_memcpy(State, TotalMem + Host->State, sizeof(*State));
     }
 
     // typedef struct
@@ -181,6 +223,7 @@ Bool HostUpdate(Host *Host, RenderBuf *RenderBuf)
     if (Dest)
     {
         SDL_memcpy(Dest, TotalMem + RenderBufMem, RenderBufSize);
+        *(Uint32 *)(TotalMem + Host->RenderBuf + 4) = 0;
     }
     else
     {

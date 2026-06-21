@@ -2,7 +2,7 @@
 // NOTE: Main game file.
 //
 #include "Render.h"
-#include "Shared.h"
+#include "SDK.h"
 
 UpdateAndRender(UpdateAndRender)
 {

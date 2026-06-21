@@ -4,9 +4,7 @@
 #include <SDL3/SDL.h>
 
 #include "Host.h"
-#include "Render.h"
-#include "Shared.h"
-#include "Types.h"
+#include "SDK.h"
 
 typedef struct
 {
@@ -23,9 +21,11 @@ typedef struct
     Host Host;
     MemAlloc MemAlloc;
     RenderBuf RenderBuf;
-
     // NOTE: The loaded application DLL.
     Code Code;
+    // NOTE: Memory.
+    State State;
+    Void *ExtraMem;
 } SDL;
 
 // NOTE: On any failures all of these function just traps the process.
