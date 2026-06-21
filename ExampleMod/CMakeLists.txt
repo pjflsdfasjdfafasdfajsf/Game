@@ -4,7 +4,7 @@ project(ExampleMod C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(ExampleMod Source/Main.c)
+add_executable(ExampleMod Source/Main.c ../Public/Init.c)
 
 set_target_properties(ExampleMod PROPERTIES SUFFIX ".wasm")
 target_compile_options(ExampleMod PRIVATE -nostdlib)
