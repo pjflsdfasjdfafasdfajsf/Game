@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(App C CXX)
+project(App C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -47,6 +47,25 @@ set_target_properties(Game PROPERTIES
 )
 
 target_link_libraries(Game PRIVATE CommonOptions)
+
+###############################################
+# Watch
+###############################################
+
+add_executable(WatchExe
+    Code/Watch.c
+)
+
+target_link_libraries(WatchExe PRIVATE CommonOptions)
+
+add_custom_target(Watch
+    COMMAND $<TARGET_FILE:WatchExe> 
+            "${CMAKE_CURRENT_SOURCE_DIR}/Code" 
+            "${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --target Game"
+    DEPENDS WatchExe
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    USES_TERMINAL 
+)
 
 ###############################################
 # Executable

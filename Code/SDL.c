@@ -1,6 +1,7 @@
 #include "SDL.h"
 #include "Mem.h"
 #include "Render.h"
+#include "SDL3/SDL_filesystem.h"
 #include "Shared.h"
 
 #if defined(_WIN32)
@@ -32,8 +33,11 @@ static inline Int64 GetFileModTime(const char *Path)
     return 0;
 }
 
+// NOTE: Usually I don't free anything but it makes sense to do it here as this is called on every hot reload.
 static inline Bool CopyFile(const char *From, const char *To)
 {
+    SDL_RemovePath(To);
+
     Usize Size = 0;
     Void *Data = SDL_LoadFile(From, &Size);
     if (!Data)
@@ -45,11 +49,15 @@ static inline Bool CopyFile(const char *From, const char *To)
     SDL_IOStream *Out = SDL_IOFromFile(To, "wb");
     if (!Out)
     {
+        SDL_free(Data);
+
         return False;
     }
 
     Usize Written = SDL_WriteIO(Out, Data, Size);
     SDL_CloseIO(Out);
+
+    SDL_free(Data);
 
     return Written == Size;
 }
@@ -83,7 +91,6 @@ static inline Void CodeUnload(Code *Code)
     if (Code->Handle)
     {
         SDL_UnloadObject(Code->Handle);
-
         Code->Handle = 0;
         Code->AppUpdateAndRender = 0;
     }
@@ -109,10 +116,12 @@ static inline Void CodeReload(Code *Code, const char *Path, const char *TempPath
 
     if (CurrentTime > Code->LastWriteTime && CurrentTime)
     {
+        CodeUnload(Code);
+        // NOTE: Just in case.
+        SDL_Delay(50);
+
         if (CopyFile(Path, TempPath))
         {
-            CodeUnload(Code);
-
             Code->Handle = SDL_LoadObject(TempPath);
             if (Code->Handle)
             {
