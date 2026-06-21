@@ -20,7 +20,7 @@
 // NOTE: Intenral
 //
 
-// TODO: Maybe we could reduce code duplication if internal functions use proper error handling?
+// TODO: @ttchef Maybe we could reduce code duplication if internal functions use proper error handling?
 
 static inline Int64 GetFileModTime(const char *Path)
 {

@@ -1,5 +1,7 @@
 #include "SDK.h"
 
+// TODO: @ttche Document this.
+
 typedef struct
 {
     Bool IsInitialized;
