@@ -3,23 +3,10 @@
 
 #include <SDL3/SDL.h>
 
+#include "Host.h"
 #include "Render.h"
 #include "Shared.h"
 #include "Types.h"
-
-#define CheckReturnBool(Function)                                            \
-    if (!(Function))                                                         \
-    {                                                                        \
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError()); \
-        Assert(0)                                                            \
-    }
-
-#define CheckReturnPtr(Ptr)                                                  \
-    if (!(Ptr))                                                              \
-    {                                                                        \
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError()); \
-        Assert(0)                                                            \
-    }
 
 typedef struct
 {
@@ -33,6 +20,7 @@ typedef struct
     SDL_Window *Window;
     SDL_Renderer *Renderer;
 
+    Host Host;
     MemAlloc MemAlloc;
     RenderBuf RenderBuf;
 
@@ -49,5 +37,7 @@ Bool Poll();
 Void Update(SDL *SDL);
 
 Void Render(SDL *SDL);
+
+#define LogCritical(Message, ...) SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, Message, ##__VA_ARGS__)
 
 #endif

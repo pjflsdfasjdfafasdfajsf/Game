@@ -1,7 +1,9 @@
 #include "SDL.h"
+#include "Host.h"
 #include "Mem.h"
 #include "Render.h"
 #include "Shared.h"
+#include "Types.h"
 
 #if defined(_WIN32)
 #define DynamicLibrarySuffix ".dll"
@@ -14,6 +16,9 @@
 #endif
 #define DynamicLibraryName "Game"
 #define DynamicLibraryTempSuffix "_Temp"
+
+#define DynamicLibraryFullName DynamicLibraryName DynamicLibrarySuffix
+#define DynamicLibraryFullTempName DynamicLibraryName DynamicLibrarySuffix DynamicLibraryTempSuffix
 
 //
 // NOTE: Intenral
@@ -63,9 +68,10 @@ static inline Bool CopyFile(const char *From, const char *To)
 
 // NOTE: This is needed so it does not matter where you launch the game from and
 // it still finds the lib.
-static inline Bool GetLibAbsPath(char *Buf, Usize Size, const char *Name)
+static inline Bool GetAbsPath(char *Buf, Usize Size, const char *Name)
 {
     Assert(Buf);
+    Assert(Name);
     Assert(Size > 0);
 
     const char *BasePath = SDL_GetBasePath();
@@ -74,7 +80,7 @@ static inline Bool GetLibAbsPath(char *Buf, Usize Size, const char *Name)
         return False;
     }
 
-    Int32 PathLen = SDL_snprintf(Buf, Size, "%s%s%s", BasePath, Name, DynamicLibrarySuffix);
+    Int32 PathLen = SDL_snprintf(Buf, Size, "%s%s", BasePath, Name);
     if (PathLen < 0 || (Usize)PathLen >= Size)
     {
         return False;
@@ -99,10 +105,25 @@ static inline Code CodeLoad(const char *Path, const char *TempPath)
 {
     Code Result = {0};
 
-    CheckReturnBool(CopyFile(Path, TempPath));
+    if (!CopyFile(Path, TempPath))
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
 
-    CheckReturnPtr(Result.Handle = SDL_LoadObject(TempPath));
-    CheckReturnPtr(Result.AppUpdateAndRender = (UpdateAndRenderFunction *)SDL_LoadFunction(Result.Handle, "UpdateAndRender"));
+    Result.Handle = SDL_LoadObject(TempPath);
+    if (!Result.Handle)
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
+
+    Result.AppUpdateAndRender = (UpdateAndRenderFunction *)SDL_LoadFunction(Result.Handle, "UpdateAndRender");
+    if (!Result.AppUpdateAndRender)
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
 
     Result.LastWriteTime = GetFileModTime(Path);
 
@@ -151,8 +172,16 @@ Void Render(SDL *SDL)
         {
             RenderClear *Clear = (RenderClear *)Cmd;
 
-            CheckReturnBool(SDL_SetRenderDrawColor(SDL->Renderer, Clear->Col.R, Clear->Col.G, Clear->Col.B, Clear->Col.A));
-            CheckReturnBool(SDL_RenderClear(SDL->Renderer));
+            if (!SDL_SetRenderDrawColor(SDL->Renderer, Clear->Col.R, Clear->Col.G, Clear->Col.B, Clear->Col.A))
+            {
+                LogCritical("%s", SDL_GetError());
+                Assert(0);
+            }
+            if (!SDL_RenderClear(SDL->Renderer))
+            {
+                LogCritical("%s", SDL_GetError());
+                Assert(0);
+            }
         }
         break;
 
@@ -174,17 +203,25 @@ Void Update(SDL *SDL)
 {
     Assert(SDL);
 
-    char Path[1024];
-    char TempPath[1024];
-
-    if (GetLibAbsPath(Path, sizeof(Path), DynamicLibraryName) && GetLibAbsPath(TempPath, sizeof(TempPath), DynamicLibraryName DynamicLibraryTempSuffix))
     {
-        CodeReload(&SDL->Code, Path, TempPath);
+        char Path[1024];
+        char TempPath[1024];
+
+        if (GetAbsPath(Path, sizeof(Path), DynamicLibraryFullName) &&
+            GetAbsPath(TempPath, sizeof(TempPath), DynamicLibraryFullTempName))
+        {
+            CodeReload(&SDL->Code, Path, TempPath);
+        }
     }
 
     if (SDL->Code.AppUpdateAndRender)
     {
         SDL->Code.AppUpdateAndRender(0, &SDL->RenderBuf);
+    }
+
+    if (!HostUpdate(&SDL->Host, &SDL->RenderBuf))
+    {
+        Assert(0);
     }
 }
 
@@ -192,15 +229,26 @@ SDL Init()
 {
     SDL Result = {0};
 
-    CheckReturnBool(SDL_Init(SDL_INIT_VIDEO));
-    CheckReturnBool(SDL_CreateWindowAndRenderer("Game", 1280, 720, 0, &Result.Window, &Result.Renderer));
+    if (!SDL_Init(SDL_INIT_VIDEO))
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
+    if (!SDL_CreateWindowAndRenderer("Game", 1280, 720, 0, &Result.Window, &Result.Renderer))
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
 
-    CheckReturnBool(SDL_SetRenderLogicalPresentation(Result.Renderer, 1280, 720, SDL_LOGICAL_PRESENTATION_LETTERBOX));
+    if (!SDL_SetRenderLogicalPresentation(Result.Renderer, 1280, 720, SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
 
     Void *Mem = SDL_malloc(Kb(64));
     if (!Mem)
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Out of memory\n");
         Assert(0);
     }
 
@@ -209,19 +257,48 @@ SDL Init()
     Result.RenderBuf = RenderBufInit(&Result.MemAlloc, Kb(32));
     if (!Result.RenderBuf.IsValid)
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Could not initialize Render Buffer\n");
         Assert(0);
     }
 
-    char Path[1024];
-    char TempPath[1024];
+    {
+        char Path[1024];
+        char TempPath[1024];
 
-    CheckReturnBool(GetLibAbsPath(Path, sizeof(Path), DynamicLibraryName));
-    CheckReturnBool(GetLibAbsPath(TempPath, sizeof(TempPath), DynamicLibraryName DynamicLibraryTempSuffix));
+        if (!GetAbsPath(Path, sizeof(Path), DynamicLibraryFullName))
+        {
+            LogCritical("%s", SDL_GetError());
+            Assert(0);
+        }
+        if (!GetAbsPath(TempPath, sizeof(TempPath), DynamicLibraryFullTempName))
+        {
+            LogCritical("%s", SDL_GetError());
+            Assert(0);
+        }
 
-    SDL_Log("Dynamic library path is: %s (Temp: %s)\n", Path, TempPath);
+        SDL_Log("Dynamic library path is: %s (Temp: %s)\n", Path, TempPath);
+        Result.Code = CodeLoad(Path, TempPath);
+    }
 
-    Result.Code = CodeLoad(Path, TempPath);
+    Result.Host = HostInit();
+    if (!Result.Host.IsValid)
+    {
+        Assert(0);
+    }
+
+    {
+        char Path[1024];
+
+        if (!GetAbsPath(Path, sizeof(Path), "ExampleMod.wasm"))
+        {
+            LogCritical("%s", SDL_GetError());
+            Assert(0);
+        }
+
+        if (!HostLoadOne(&Result.Host, Path))
+        {
+            Assert(0);
+        }
+    }
 
     return Result;
 }
