@@ -20,8 +20,6 @@
 // NOTE: Intenral
 //
 
-// TODO: @ttchef Maybe we could reduce code duplication if internal functions use proper error handling?
-
 // static inline Int64 GetFileModTime(const char *Path)
 // {
 //     SDL_PathInfo Info;
@@ -72,51 +70,51 @@ static inline Bool GetAbsPath(char *Buf, Usize Size, const char *Name)
 // {
 //     Code Result = {0};
 
-    if (!SDL_CopyFile(Path, TempPath))
-    {
-        LogCritical("%s", SDL_GetError());
-        return Result;
-    }
+//     if (!SDL_CopyFile(Path, TempPath))
+//     {
+//         LogCritical("%s", SDL_GetError());
+//         return Result;
+//     }
 
-    Result.Handle = SDL_LoadObject(TempPath);
-    if (!Result.Handle)
-    {
-        LogCritical("%s", SDL_GetError());
-        return Result;
-    }
+//     Result.Handle = SDL_LoadObject(TempPath);
+//     if (!Result.Handle)
+//     {
+//         LogCritical("%s", SDL_GetError());
+//         return Result;
+//     }
 
-    Result.AppUpdateAndRender = (UpdateAndRenderFunction *)SDL_LoadFunction(Result.Handle, "UpdateAndRender");
-    if (!Result.AppUpdateAndRender)
-    {
-        LogCritical("%s", SDL_GetError());
-        return Result;
-    }
+//     Result.AppUpdateAndRender = (UpdateAndRenderFunction *)SDL_LoadFunction(Result.Handle, "UpdateAndRender");
+//     if (!Result.AppUpdateAndRender)
+//     {
+//         LogCritical("%s", SDL_GetError());
+//         return Result;
+//     }
 
-    Result.LastWriteTime = GetFileModTime(Path);
-    Result.IsValid = True;
+//     Result.LastWriteTime = GetFileModTime(Path);
+//     Result.IsValid = True;
 
 //     return Result;
 // }
 
-static inline Void CodeReload(Code *OldCode, const char *Path, const char *TempPath)
-{
-    Int64 CurrentTime = GetFileModTime(Path);
+// static inline Void CodeReload(Code *OldCode, const char *Path, const char *TempPath)
+// {
+//     Int64 CurrentTime = GetFileModTime(Path);
 
-    if (CurrentTime > OldCode->LastWriteTime && CurrentTime)
-    {
-        CodeUnload(OldCode);
-        // NOTE: Just in case.
-        SDL_Delay(50);
+//     if (CurrentTime > OldCode->LastWriteTime && CurrentTime)
+//     {
+//         CodeUnload(OldCode);
+//         // NOTE: Just in case.
+//         SDL_Delay(50);
 
-        Code NewCode = CodeLoad(Path, TempPath);
-        if (!NewCode.IsValid)
-        {
-            return;
-        }
+//         Code NewCode = CodeLoad(Path, TempPath);
+//         if (!NewCode.IsValid)
+//         {
+//             return;
+//         }
 
-        *OldCode = NewCode;
-    }
-}
+//         *OldCode = NewCode;
+//     }
+// }
 
 //
 // NOTE: SDL
