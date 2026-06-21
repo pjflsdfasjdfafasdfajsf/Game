@@ -14,7 +14,7 @@ typedef int64_t Int64;
 typedef uint8_t Uint8;
 typedef uint32_t Uint32;
 typedef uint64_t Uint64;
-//
+// NOTE: Other.
 typedef Int32 Bool;
 typedef void Void;
 typedef float Float32;

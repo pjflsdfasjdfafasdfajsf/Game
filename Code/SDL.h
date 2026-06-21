@@ -7,10 +7,25 @@
 #include "Shared.h"
 #include "Types.h"
 
+#define CheckReturnBool(Function)                                            \
+    if (!(Function))                                                         \
+    {                                                                        \
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError()); \
+        Assert(0)                                                            \
+    }
+
+#define CheckReturnPtr(Ptr)                                                  \
+    if (!(Ptr))                                                              \
+    {                                                                        \
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError()); \
+        Assert(0)                                                            \
+    }
+
 typedef struct
 {
     SDL_SharedObject *Handle;
     UpdateAndRenderFunction *AppUpdateAndRender;
+    Int64 LastWriteTime;
 } Code;
 
 typedef struct
