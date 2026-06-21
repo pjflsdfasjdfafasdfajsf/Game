@@ -1,7 +1,6 @@
 #include "SDL.h"
 #include "Mem.h"
 #include "Render.h"
-#include "SDL3/SDL_filesystem.h"
 #include "Shared.h"
 
 #if defined(_WIN32)
