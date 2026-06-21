@@ -37,6 +37,14 @@ typedef size_t Usize;
 #endif
 
 //
+// NOTE: Platforms.
+// 
+
+#if defined(__wasm__)
+#define WASM
+#endif
+
+//
 // NOTE: Macros.
 //
 
