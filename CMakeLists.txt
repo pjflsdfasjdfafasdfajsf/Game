@@ -21,5 +21,4 @@ ExternalProject_Add(Game
 )
 
 add_subdirectory(Code/Host)
-
 add_dependencies(App Game)

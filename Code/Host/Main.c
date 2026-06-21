@@ -2,11 +2,11 @@
 
 Int32 main()
 {
-    SDL SDL = Init();
+    SDL App = Init();
 
     while (Poll())
     {
-        Update(&SDL);
-        Render(&SDL);
+        Update(&App);
+        Render(&App);
     }
 }

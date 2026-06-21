@@ -3,32 +3,37 @@
 
 #include <SDL3/SDL.h>
 
-#include "Host.h"
-#include "SDK.h"
+#include "Runtime.h"
 
 typedef struct
 {
-    SDL_SharedObject *Handle;
-    UpdateAndRenderFunction *AppUpdateAndRender;
+    Runtime Rt;
+    char Path[1024];
     Int64 LastWriteTime;
-    Bool IsValid;
-} Code;
+    Void *ExtraMem;
+} Mod;
 
 typedef struct
 {
     SDL_Window *Window;
     SDL_Renderer *Renderer;
+    // NOTE: The game loading logic is basically the same as mods except for
+    // the file that is being loaded. If all regular mods are loaded from Mods
+    // directory the game is just hardcoded to be loaded from Game.wasm. Since
+    // game is considered a mod too, Mods[0] will be always occupied by the
+    // game. So the structure of game is something like:
+    // Game/
+    //     Game.exe
+    //     Game.wasm
+    //     Mods/
+    //         ExampleMod.wasm
+    Mod Mods[512];
+    Uint32 ModCount;
 
-    Host Host;
     MemAlloc MemAlloc;
     RenderBuf RenderBuf;
 
-    // // NOTE: The loaded application DLL.
-    // Code Code;
-
-    // NOTE: Memory.
     State State;
-    Void *ExtraMem;
 } SDL;
 
 // NOTE: On any failures all of these function just traps the process.
@@ -37,9 +42,9 @@ SDL Init();
 
 Bool Poll();
 
-Void Update(SDL *SDL);
+Void Update(SDL *App);
 
-Void Render(SDL *SDL);
+Void Render(SDL *App);
 
 #define LogCritical(Message, ...) SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, Message, ##__VA_ARGS__)
 

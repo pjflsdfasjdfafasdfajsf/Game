@@ -27,17 +27,17 @@ UpdateAndRender(UpdateAndRender)
     // Don't forget to set IsInitialized to true though!
     if (!ExampleMod->IsInitialized)
     {
-        // The PrintStr function does not prefix your logs with anything, and
+        // The Print function does not prefix your logs with anything, and
         // that's the exact reason why you should prepend some prefix to your logs.
         // You can go even further and prepend the logging level:
-        // PrintStr("(Example Mod): INFO: Initialized")
+        // Print("(Example Mod): INFO: Initialized")
         // You don't need to include the newline, it's already appended for you.
-        PrintStr("(Example Mod): Initialized");
+        Print("(Example Mod): Initialized");
         ExampleMod->IsInitialized = True;
     }
     // The Renderer API should be pretty self-explanatory. If you're wondering
     // how it works you can look at Render.h SDK header.
     // Everything else that isn't there (where 'everything else' is just
     // command execution) is hidden in our engine.
-    RenderBufClear(RenderBuf, Color3(55, 222, 225));
+    RenderBufClear(RenderBuf, Color3(0, 0, 0));
 }

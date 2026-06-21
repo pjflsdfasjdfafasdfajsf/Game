@@ -25,14 +25,13 @@ typedef struct
     void *Bytes;
 
     Bool IsValid;
-    Int64 LastWriteTime;
-} Host;
+} Runtime;
 
-Host HostInit(Void);
-Void HostDeinit(Host *Host);
+Runtime RtInit(Void);
+Void RtDeinit(Runtime *Rt);
 
-Bool HostLoadOne(Host *Host, const char *File);
+Bool RtLoadOne(Runtime *Rt, const char *File);
 
-Bool HostUpdate(Host *Host, State *HostState, RenderBuf *HostRenderBuf);
+Bool RtUpdate(Runtime *Rt, State *RuntimeState, RenderBuf *RuntimeRenderBuf);
 
 #endif

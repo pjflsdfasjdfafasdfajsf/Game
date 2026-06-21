@@ -4,11 +4,11 @@ project(ExampleMod C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(ExampleMod Code/Main.c ../Public/Init.c)
+add_executable(ExampleMod Code/Main.c ../../Code/Public/Init.c)
 
 set_target_properties(ExampleMod PROPERTIES SUFFIX ".wasm")
 target_compile_options(ExampleMod PRIVATE -nostdlib)
-target_include_directories(ExampleMod PRIVATE ../Public)
+target_include_directories(ExampleMod PRIVATE ../../Code/Public)
 target_link_options(ExampleMod PRIVATE
     -nostdlib
     -fuse-ld=lld

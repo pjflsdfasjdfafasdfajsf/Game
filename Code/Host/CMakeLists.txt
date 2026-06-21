@@ -27,17 +27,16 @@ set(WAMR_BUILD_SIMD 0 CACHE BOOL "Disable SIMD" FORCE)
 
 FetchContent_MakeAvailable(SDL3 WAMR)
 
+
 ###############################################
 # Watch
 ###############################################
 
-set(GAME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Game")
-
 add_custom_target(Copy
-    COMMAND ${CMAKE_COMMAND} --build "${GAME_DIR}/build" --target Game
+    COMMAND ${CMAKE_COMMAND} --build "${GAME_BINARY_DIR}" --target Game
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${GAME_DIR}/build/Game.wasm"
-            "${CMAKE_CURRENT_BINARY_DIR}/Game.wasm"
+            "${GAME_BINARY_DIR}/Game.wasm"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Game.wasm"
 )
 
 ###
@@ -50,10 +49,10 @@ target_include_directories(Watcher PRIVATE ../Public)
 
 add_custom_target(Watch
     COMMAND $<TARGET_FILE:Watcher>
-            "${GAME_DIR}"
-            "${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --target Copy"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Game"
+            "${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target Copy"
     DEPENDS Watcher
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     USES_TERMINAL 
 )
 
@@ -64,7 +63,7 @@ add_custom_target(Watch
 add_executable(App
     Main.c
     SDL.c
-    Host.c
+    Runtime.c
 )
 
 target_include_directories(App PRIVATE
@@ -86,4 +85,8 @@ target_link_options(App PRIVATE
 )
 
 target_link_libraries(App PRIVATE SDL3::SDL3 vmlib m)
-
+add_custom_command(TARGET App POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${GAME_BINARY_DIR}/Game.wasm"
+        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Game.wasm"
+)

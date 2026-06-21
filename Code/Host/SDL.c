@@ -1,8 +1,9 @@
 #include "SDL.h"
-#include "Host.h"
+#include "Runtime.h"
+#include "Types.h"
 
 //
-// NOTE: Intenral
+// NOTE: Internal
 //
 
 #define GAME_WASM_FILE "Game.wasm"
@@ -41,15 +42,53 @@ static inline Bool GetAbsPath(char *Buf, Usize Size, const char *Name)
     return True;
 }
 
+// NOTE: UserData -- *SDL
+static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(Void *UserData, const char *DirName, const char *FileName)
+{
+    SDL *App = (SDL *)UserData;
+
+    if (App->ModCount >= ArrayCount(App->Mods))
+    {
+        return SDL_ENUM_FAILURE;
+    }
+
+    Usize Len = SDL_strlen(FileName);
+    if (Len > 5 && SDL_strcmp(FileName + Len - 5, ".wasm") == 0)
+    {
+        Mod *Mod = &App->Mods[App->ModCount];
+
+        SDL_snprintf(Mod->Path, sizeof(Mod->Path), "%s%s", DirName, FileName);
+
+        Mod->Rt = RtInit();
+        if (Mod->Rt.IsValid && RtLoadOne(&Mod->Rt, Mod->Path))
+        {
+            Mod->LastWriteTime = GetFileModTime(Mod->Path);
+            Mod->ExtraMem = SDL_calloc(1, Kb(16));
+
+            if (Mod->ExtraMem)
+            {
+                App->ModCount++;
+                SDL_Log("Loaded: %s\n", Mod->Path);
+            }
+            else
+            {
+                LogCritical("Out of memory!\n");
+            }
+        }
+    }
+
+    return SDL_ENUM_CONTINUE;
+}
+
 //
 // NOTE: SDL
 //
 
-Void Render(SDL *SDL)
+Void Render(SDL *App)
 {
-    Assert(SDL);
+    Assert(App);
 
-    RenderBufIterate(&SDL->RenderBuf, Cmd)
+    RenderBufIterate(&App->RenderBuf, Cmd)
     {
         switch (Cmd->Type)
         {
@@ -57,12 +96,12 @@ Void Render(SDL *SDL)
         {
             RenderClear *Clear = (RenderClear *)Cmd;
 
-            if (!SDL_SetRenderDrawColor(SDL->Renderer, Clear->Col.R, Clear->Col.G, Clear->Col.B, Clear->Col.A))
+            if (!SDL_SetRenderDrawColor(App->Renderer, Clear->Col.R, Clear->Col.G, Clear->Col.B, Clear->Col.A))
             {
                 LogCritical("%s", SDL_GetError());
                 Assert(0);
             }
-            if (!SDL_RenderClear(SDL->Renderer))
+            if (!SDL_RenderClear(App->Renderer))
             {
                 LogCritical("%s", SDL_GetError());
                 Assert(0);
@@ -80,55 +119,59 @@ Void Render(SDL *SDL)
         }
     }
 
-    SDL_RenderPresent(SDL->Renderer);
-    RenderBufReset(&SDL->RenderBuf);
+    SDL_RenderPresent(App->Renderer);
+    RenderBufReset(&App->RenderBuf);
 }
 
-Void Update(SDL *SDL)
+Void Update(SDL *App)
 {
-    Assert(SDL);
+    Assert(App);
 
-    char Path[1024];
-    if (GetAbsPath(Path, sizeof(Path), GAME_WASM_FILE))
+    for (Uint32 I = 0; I < App->ModCount; ++I)
     {
-        Int64 CurrentTime = GetFileModTime(Path);
-        if (CurrentTime > SDL->Host.LastWriteTime && CurrentTime)
+        Mod *Mod = &App->Mods[I];
+        Int64 CurrentTime = GetFileModTime(Mod->Path);
+
+        if (CurrentTime > Mod->LastWriteTime && CurrentTime)
         {
             SDL_Delay(50);
-            SDL_Log("Reload\n");
+            SDL_Log("Reloading: %s\n", Mod->Path);
 
             // NOTE: Need to save ExtraMem since that's where state is stored
-            if (SDL->Host.ModuleInst && SDL->Host.ExtraMem)
+            if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
             {
-                Void *NativeExtraMem = wasm_runtime_addr_app_to_native(SDL->Host.ModuleInst, SDL->Host.ExtraMem);
+                Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                 if (NativeExtraMem)
                 {
-                    SDL_memcpy(SDL->ExtraMem, NativeExtraMem, Kb(16));
+                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, Kb(16));
                 }
             }
-            HostDeinit(&SDL->Host);
-            if (HostLoadOne(&SDL->Host, Path))
+
+            RtDeinit(&Mod->Rt);
+            Mod->Rt = RtInit();
+
+            if (RtLoadOne(&Mod->Rt, Mod->Path))
             {
-                SDL->Host.LastWriteTime = CurrentTime;
+                Mod->LastWriteTime = CurrentTime;
 
                 // NOTE: And restore the saved ExtraMem
-                if (SDL->Host.ModuleInst && SDL->Host.ExtraMem)
+                if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
                 {
-                    Void *NativeExtraMem = wasm_runtime_addr_app_to_native(SDL->Host.ModuleInst, SDL->Host.ExtraMem);
+                    Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                     if (NativeExtraMem)
                     {
-                        SDL_memcpy(NativeExtraMem, SDL->ExtraMem, Kb(16));
+                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, Kb(16));
                     }
                 }
             }
         }
-    }
-    // NOTE: This handles the case where you got an error on compilation
-    if (SDL->Host.IsValid)
-    {
-        if (!HostUpdate(&SDL->Host, &SDL->State, &SDL->RenderBuf))
+        // NOTE: This handles the case where you got an error on compilation
+        if (Mod->Rt.IsValid)
         {
-            Assert(0);
+            if (!RtUpdate(&Mod->Rt, &App->State, &App->RenderBuf))
+            {
+                Assert(0);
+            }
         }
     }
 }
@@ -167,33 +210,45 @@ SDL Init()
         Assert(0);
     }
 
-    Result.ExtraMem = SDL_calloc(1, Kb(16));
-    if (!Result.ExtraMem)
+    //
+    // NOTE: Game loading.
+    //
+    Mod *Game = &Result.Mods[0];
+    if (!GetAbsPath(Game->Path, sizeof(Game->Path), GAME_WASM_FILE))
     {
         Assert(0);
     }
 
-    Result.Host = HostInit();
-    if (!Result.Host.IsValid)
+    Game->Rt = RtInit();
+    if (!Game->Rt.IsValid || !RtLoadOne(&Game->Rt, Game->Path))
     {
         Assert(0);
     }
 
+    Game->LastWriteTime = GetFileModTime(Game->Path);
+    Game->ExtraMem = SDL_calloc(1, Kb(16));
+    if (!Game->ExtraMem)
     {
-        char Path[1024];
+        Assert(0);
+    }
+    Result.ModCount = 1;
 
-        if (!GetAbsPath(Path, sizeof(Path), GAME_WASM_FILE))
+    //
+    // NOTE: Mod loading.
+    //
+
+    char ModsDir[1024];
+    if (GetAbsPath(ModsDir, sizeof(ModsDir), "Mods/"))
+    {
+        SDL_CreateDirectory(ModsDir);
+        if (!SDL_EnumerateDirectory(ModsDir, EnumerateDirectoryCallback, &Result))
         {
             LogCritical("%s", SDL_GetError());
-            Assert(0);
         }
-
-        if (!HostLoadOne(&Result.Host, Path))
-        {
-            Assert(0);
-        }
-
-        Result.Host.LastWriteTime = GetFileModTime(Path);
+    }
+    else
+    {
+        Assert(0);
     }
 
     return Result;
