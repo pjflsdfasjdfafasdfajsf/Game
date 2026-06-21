@@ -87,9 +87,16 @@ static void MoveAndCollide(State &state, Vector2 &position, Vector2 size, Vector
         position.x = position_before_moving_x;
 
         Float direction = CopySign(1.0f, move.x);
+
+        Float vel = state.player.velocity.x;
+
+        state.player.velocity.x = 0;
+
         while (!IsOverlappingSolidTile(state, Rectangle::GetCentered(V2(position.x + direction, position.y), size)))
         {
             position.x += direction;
+            
+            state.player.velocity.x = vel; // If player isn't blocked, they keep their velocity, otherwise they loose it.
         }
     }
 
