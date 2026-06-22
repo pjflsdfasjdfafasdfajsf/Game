@@ -15,7 +15,11 @@
 
 typedef struct State
 {
-    TexHandle SpriteAtlas;
+    MemAlloc PermanentAlloc;
+
+    TexHandle SpriteAtlasTex;
+    Atlas SpriteAtlas;
+
     Bool IsInitialized;
 } State;
 
@@ -25,7 +29,7 @@ typedef Void UpdateAndRenderFunction(State *State, RenderBuf *RenderBuf, Void *E
 
 //
 // NOTE: Imports.
-// 
+//
 
 Import("PrintLine") Void PrintLine(const char *Ptr, Uint32 Len);
 static inline Void PrintCStr(const char *Str)
@@ -45,7 +49,7 @@ static inline Void PrintCStr(const char *Str)
 // NOTE: It is highly recommend to minimize calls to this function. One of the
 // ways you could do that is texture atlases, the whole Renderer API is pretty
 // much built around it already. You can look in Example Mod for details.
-// 
+//
 // Supported image formats: PNG, JPEG, TGA, BMP, PSD, GIF, HDR, PIC.
 Import("AllocTexture") TexHandle AllocTexture(const char *Path);
 

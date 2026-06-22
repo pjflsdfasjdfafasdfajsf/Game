@@ -426,7 +426,7 @@ SDL Init()
     }
 
     Game->LastWriteTime = GetFileModTime(Game->Path);
-    Game->ExtraMem = SDL_calloc(1, Kb(16));
+    Game->ExtraMem = SDL_calloc(1, Mb(2));
     if (!Game->ExtraMem)
     {
         Assert(0);

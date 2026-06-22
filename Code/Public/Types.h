@@ -49,6 +49,7 @@ typedef size_t Usize;
 //
 
 #define Kb(X) ((X) * 1024)
+#define Mb(X) ((Kb(X)) * 1024)
 
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 #define StaticAssert(Cond) typedef char static_assertion_at_line_##__LINE__[(Cond) ? 1 : -1]

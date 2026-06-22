@@ -99,19 +99,80 @@ static inline Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size)
     }
 }
 
-static inline Void MemNullTerminate(char *Buffer, Usize Cap, Usize Len)
+static inline Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
 {
-    Assert(Buffer);
+    Assert(Buf);
     Assert(Cap > 0);
 
     if (Len < Cap)
     {
-        Buffer[Len] = '\0';
+        Buf[Len] = '\0';
     }
     else
     {
-        Buffer[Cap - 1] = '\0';
+        Buf[Cap - 1] = '\0';
     }
+}
+
+static inline Uint32 MemReadUint(const char **CurInit)
+{
+    Uint32 Result = 0;
+
+    const char *Cur = *CurInit;
+    while (*Cur == ' ' || *Cur == '\t')
+    {
+        Cur++;
+    }
+
+    while (*Cur >= '0' && *Cur <= '9')
+    {
+        Result = Result * 10 + (*Cur - '0');
+        Cur++;
+    }
+
+    *CurInit = Cur;
+    return Result;
+}
+
+static inline Void MemAdvanceToNextLine(const char **CurInit, const char *End)
+{
+    Assert(CurInit);
+    Assert(*CurInit);
+    Assert(End);
+
+    const char *Cur = *CurInit;
+
+    while (Cur < End && *Cur != '\n')
+    {
+        Cur++;
+    }
+
+    if (Cur < End && *Cur == '\n')
+    {
+        Cur++;
+    }
+
+    *CurInit = Cur;
+}
+
+//
+// NOTE: Misc
+//
+
+// NOTE: From a path 'Foo/Bar/Baz.png' returns 'Baz.png'.
+static inline const char *GetBaseName(const char *Path, Uint32 Len)
+{
+    const char *Result = Path;
+
+    for (Uint32 I = 0; I < Len; ++I)
+    {
+        if (Path[I] == '/' || Path[I] == '\\')
+        {
+            Result = Path + I + 1;
+        }
+    }
+
+    return Result;
 }
 
 #endif
