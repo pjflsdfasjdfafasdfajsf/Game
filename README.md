@@ -1,9 +1,11 @@
 This repository contains all the code for my game.
 
-Configure and build:
+Clone & Build (Linux only currently):
 ```sh
-cmake -B build
-cmake --build build
-```
+git clone https://github.com/pjflsdfasjdfafasdfajsf/Game.git -B Refactor
+cd Game
 
-After that the final executable will be available in `build/bin`.
+chmod +x ./Build.sh
+./Build.sh
+```
+The final executable will be available in `Build` directory.
