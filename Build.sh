@@ -61,18 +61,6 @@ if [ ${ShouldPack} -eq 1 ]; then
 fi
 
 #
-# NOTE: Compressor
-#
-
-printf ${Align} "Compressor"
-SimpleCompressSrc="Code/Host/SimpleCompress.c"
-SimpleCompressTarget="${BuildDir}/SimpleCompress"
-SimpleCompressFlags="${CommonCompilerFlags} -O3 -march=native"
-
-${Compiler} ${SimpleCompressFlags} ${SimpleCompressSrc} -o ${SimpleCompressTarget}
-printf "Done\n"
-
-#
 # NOTE: Host
 #
 
