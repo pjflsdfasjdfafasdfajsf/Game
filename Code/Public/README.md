@@ -5,3 +5,5 @@ bindings here are all of them:
 * [Zig](https://github.com/pjflsdfasjdfafasdfajsf/Zig-SDK) by [HaraldWik](https://github.com/HaraldWik)
 
 Feel free to create a PR contributing yourself to the list.
+
+Besides that, it also includes the C implementation of libSDK.
