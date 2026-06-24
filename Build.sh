@@ -9,9 +9,13 @@ set -e
 AssetsDir="Assets"
 BuildDir="Build"
 ToolsDir="${BuildDir}/Tools"
+TestDir="${BuildDir}/Test"
+TestDataDir="${TestDir}/Data"
 
-mkdir -p ${BuildDir} \
-         ${ToolsDir}
+mkdir -p ${BuildDir}    \
+         ${ToolsDir}    \
+         ${TestDir}     \
+         ${TestDataDir}
 
 # NOTE: This is for printing.
 Align="%-15s"
@@ -114,3 +118,43 @@ GameFlags="${CommonCompilerFlags} --target=wasm32 -nostdlib -Wl,--no-entry -Wl,-
 
 ${Compiler} ${GameFlags} ${GameSrc} -Wl,--whole-archive ${SDKWasmTarget} -Wl,--no-whole-archive -o ${GameTarget}
 printf "Done\n"
+
+#
+# NOTE: Tests
+#
+
+ShouldTest=0
+
+if [ "$1" = "Test" ]; then
+    ShouldTest=1
+fi
+
+if [ ${ShouldTest} -eq 1 ]; then
+    printf ${Align} "Tests"
+
+    # NOTE: ZIP
+    if ! command -v zip > /dev/null 2>&1; then
+        echo "Your system is missing 'zip' for the ZIP test."
+        exit 1
+    fi
+
+    Uncompressed="${TestDataDir}/Archive"
+    mkdir -p ${Uncompressed}
+    echo "Hi i love u <3" > ${Uncompressed}/Hello.txt
+    echo "Imagine this is a cool binary" > ${Uncompressed}/SomeAsset.bin
+
+    Compressed="${Uncompressed}.zip"
+    rm -f ${Compressed}
+    zip -0 -r ${Compressed} ${Uncompressed} >/dev/null
+
+    ZipTestSrc="Code/Host/Zip_Test.c \
+                Code/Host/Zip.c      \
+               "
+    ZipTestTarget="${TestDir}/Zip"
+    # TODO: Check for C23 support? Or perhaps just make AtlasPack more generic.
+    ZipTestFlags="${CommonCompilerFlags} -std=c23 --embed-dir=${TestDataDir}"
+
+    ${Compiler} ${ZipTestFlags} ${ZipTestSrc} ${SDKTarget} -o ${ZipTestTarget}
+
+    printf "Done\n"
+fi
