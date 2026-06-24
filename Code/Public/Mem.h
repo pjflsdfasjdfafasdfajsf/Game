@@ -38,12 +38,12 @@ typedef struct
 
 MemReader MemReaderInit(const Uint8 *Mem, Usize Size);
 
-Void MemReaderSeek(MemReader *Reader, Usize Pos);
-Void MemReaderSkip(MemReader *Reader, Usize Bytes);
+Void MemReaderSeek(MemReader *R, Usize Pos);
+Void MemReaderSkip(MemReader *R, Usize Bytes);
 
-Uint16 MemReaderReadU16LE(MemReader *Reader);
-Uint32 MemReaderReadU32LE(MemReader *Reader);
-const Uint8 *MemReaderReadBytes(MemReader *Reader, Usize Bytes);
+Uint16 MemReaderReadU16LE(MemReader *R);
+Uint32 MemReaderReadU32LE(MemReader *R);
+const Uint8 *MemReaderReadBytes(MemReader *R, Usize Bytes);
 
 //
 // NOTE: String utilities
