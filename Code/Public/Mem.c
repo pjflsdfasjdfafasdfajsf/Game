@@ -47,6 +47,124 @@ Void MemAllocClear(MemAlloc *MemAlloc)
 }
 
 //
+// NOTE: Memory Reader
+//
+
+MemReader MemReaderInit(const Uint8 *Mem, Usize Size)
+{
+    MemReader Result = {};
+
+    Result.Base = Mem;
+    Result.Size = Size;
+    Result.HasError = (Mem == 0);
+
+    return Result;
+}
+
+Void MemReaderSeek(MemReader *R, Usize Pos)
+{
+    Assert(R);
+    if (R->HasError)
+    {
+        return;
+    }
+
+    if (Pos > R->Size)
+    {
+        R->HasError = True;
+        return;
+    }
+
+    R->Pos = Pos;
+
+    R->BitBuf = 0;
+    R->BitCount = 0;
+}
+
+Void MemReaderSkip(MemReader *R, Usize Bytes)
+{
+    Assert(R);
+    if (R->HasError)
+    {
+        return;
+    }
+
+    if (R->Pos + Bytes > R->Size)
+    {
+        R->HasError = True;
+        return;
+    }
+
+    R->Pos += Bytes;
+}
+
+Uint16 MemReaderReadU16LE(MemReader *R)
+{
+    Assert(R);
+    if (R->HasError)
+    {
+        return 0;
+    }
+
+    if (R->Pos + 2 > R->Size)
+    {
+        R->HasError = True;
+        return 0;
+    }
+
+    const Uint8 *Val = R->Base + R->Pos;
+    Uint16 Result = (Uint16)Val[0] |
+                    ((Uint16)Val[1] << 8);
+
+    R->Pos += 2;
+    return Result;
+}
+
+Uint32 MemReaderReadU32LE(MemReader *R)
+{
+    Assert(R);
+    if (R->HasError)
+    {
+        return 0;
+    }
+
+    if (R->Pos + 4 > R->Size)
+    {
+        R->HasError = True;
+        return 0;
+    }
+
+    const Uint8 *Val = R->Base + R->Pos;
+    Uint32 Result = (Uint32)Val[0] |
+                    ((Uint32)Val[1] << 8) |
+                    ((Uint32)Val[2] << 16) |
+                    ((Uint32)Val[3] << 24);
+
+    R->Pos += 4;
+    return Result;
+}
+
+const Uint8 *MemReaderReadBytes(MemReader *R, Usize Bytes)
+{
+    Assert(R);
+    if (R->HasError)
+    {
+        return 0;
+    }
+
+    if (R->Pos + Bytes > R->Size)
+    {
+        R->HasError = True;
+        return 0;
+    }
+
+    const Uint8 *Result = R->Base + R->Pos;
+    R->Pos += Bytes;
+
+    return Result;
+}
+
+//
 // NOTE: String utilities
 //
 

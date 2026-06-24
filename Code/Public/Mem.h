@@ -19,6 +19,31 @@ MemAlloc MemAllocInit(void *Mem, Uint32 Cap);
 Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align);
 Void MemAllocClear(MemAlloc *MemAlloc);
 
+//
+// NOTE: Memory Reader
+//
+
+typedef struct
+{
+    const Uint8 *Base;
+    Usize Size;
+    Usize Pos;
+
+    // NOTE: Not used yet
+    Uint32 BitBuf;
+    Uint32 BitCount;
+
+    Bool HasError;
+} MemReader;
+
+MemReader MemReaderInit(const Uint8 *Mem, Usize Size);
+
+Void MemReaderSeek(MemReader *Reader, Usize Pos);
+Void MemReaderSkip(MemReader *Reader, Usize Bytes);
+
+Uint16 MemReaderReadU16LE(MemReader *Reader);
+Uint32 MemReaderReadU32LE(MemReader *Reader);
+const Uint8 *MemReaderReadBytes(MemReader *Reader, Usize Bytes);
 
 //
 // NOTE: String utilities
@@ -33,6 +58,7 @@ Uint32 CStrLen(const char *CStr);
 Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size);
 Void MemNullTerminate(char *Buf, Usize Cap, Usize Len);
 
+// TODO: Remove this (Atlas thingy needs to migrate to MemReader)
 Uint32 MemReadUint(const char **CurInit);
 
 Void MemAdvanceToNextLine(const char **CurInit, const char *End);

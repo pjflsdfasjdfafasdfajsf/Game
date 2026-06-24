@@ -12,41 +12,6 @@
 // NOTE: No compression
 #define CompressionStore 0
 
-// NOTE: These are currently used only here and don't really deserve their
-// place in Mem.h. Maybe put them out later when we have multiple formats.
-
-static inline Bool ReadU16LE(const Uint8 *Mem, Usize Size, Usize Offset, Uint16 *OutVal)
-{
-    Assert(Mem);
-    Assert(OutVal);
-
-    if (Offset + 2 > Size)
-    {
-        return False;
-    }
-
-    *OutVal = (Uint16)Mem[Offset] |
-              ((Uint16)Mem[Offset + 1] << 8);
-    return True;
-}
-
-static inline Bool ReadU32LE(const Uint8 *Mem, Usize Size, Usize Offset, Uint32 *OutVal)
-{
-    Assert(Mem);
-    Assert(OutVal);
-
-    if (Offset + 4 > Size)
-    {
-        return False;
-    }
-
-    *OutVal = (Uint32)Mem[Offset] |
-              ((Uint32)Mem[Offset + 1] << 8) |
-              ((Uint32)Mem[Offset + 2] << 16) |
-              ((Uint32)Mem[Offset + 3] << 24);
-    return True;
-}
-
 static inline Bool NameMatches(const Uint8 *NamePtr, Uint16 NameLen, const char *File)
 {
     Assert(NamePtr);
@@ -91,11 +56,14 @@ static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
     Usize MinOffset = (Size > SearchLimit) ? (Size - SearchLimit) : 0;
     Usize MaxOffset = Size - 22;
 
+    MemReader R = MemReaderInit(Mem, Size);
+
     for (Usize I = MaxOffset; I >= MinOffset; I--)
     {
-        Uint32 Sig;
+        MemReaderSeek(&R, I);
+        Uint32 Sig = MemReaderReadU32LE(&R);
 
-        if (ReadU32LE(Mem, Size, I, &Sig) && Sig == SigEOCD)
+        if (!R.HasError && Sig == SigEOCD)
         {
             *OutEOCD = I;
 
@@ -111,69 +79,54 @@ static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
     return False;
 }
 
-static inline ZipEntry ParseCDEntry(const ZipArchive *Zip, Usize Offset, Usize *OutNextOffset)
+static inline ZipEntry ParseCDEntry(MemReader *R)
 {
-    Assert(Zip);
-    Assert(OutNextOffset);
+    Assert(R);
 
     ZipEntry Result = {0};
 
-    const Uint8 *Mem = Zip->Mem;
-    Usize Size = Zip->Size;
-
-    Uint32 Sig;
-    if (!ReadU32LE(Mem, Size, Offset, &Sig))
-    {
-        // NOTE: OOB
-        return Result;
-    }
-
+    Uint32 Sig = MemReaderReadU32LE(R);
     if (Sig != SigCDHeader)
     {
+        R->HasError = True;
         // NOTE: Corrupt CD
         return Result;
     }
 
-    Uint16 CompressionMethod;
-    Uint32 Crc32;
-    Uint32 CompressedSize;
-    Uint32 UncompressedSize;
-    Uint16 NameLen;
-    Uint16 ExtraLen;
-    Uint16 CommentLen;
-    Uint32 LocalHeaderOffset;
+    // NOTE: VersionMadeBy (2), VersionNeeded(2), BitFlag(2)
+    MemReaderSkip(R, 6);
+    Uint16 CompressionMethod = MemReaderReadU16LE(R);
+    // NOTE: ModTime (2), ModDate(2)
+    MemReaderSkip(R, 4);
 
-    if (!ReadU16LE(Mem, Size, Offset + 10, &CompressionMethod) ||
-        !ReadU32LE(Mem, Size, Offset + 16, &Crc32) ||
-        !ReadU32LE(Mem, Size, Offset + 20, &CompressedSize) ||
-        !ReadU32LE(Mem, Size, Offset + 24, &UncompressedSize) ||
-        !ReadU16LE(Mem, Size, Offset + 28, &NameLen) ||
-        !ReadU16LE(Mem, Size, Offset + 30, &ExtraLen) ||
-        !ReadU16LE(Mem, Size, Offset + 32, &CommentLen) ||
-        !ReadU32LE(Mem, Size, Offset + 42, &LocalHeaderOffset))
+    Uint32 Crc32 = MemReaderReadU32LE(R);
+    Uint32 CompressedSize = MemReaderReadU32LE(R);
+    Uint32 UncompressedSize = MemReaderReadU32LE(R);
+    Uint16 NameLen = MemReaderReadU16LE(R);
+    Uint16 ExtraLen = MemReaderReadU16LE(R);
+    Uint16 CommentLen = MemReaderReadU16LE(R);
+    // NOTE: DiskNumStart (2), IntFileAttr (2), ExtFileAttr (4)
+    MemReaderSkip(R, 8);
+
+    Uint32 LocalHeaderOffset = MemReaderReadU32LE(R);
+
+    const Uint8 *NamePtr = MemReaderReadBytes(R, NameLen);
+    MemReaderSkip(R, ExtraLen + CommentLen);
+
+    if (R->HasError)
     {
-        // NOTE: Corrupt CD
         return Result;
     }
 
-    Usize VarDataOffset = Offset + 46;
-    if (VarDataOffset + NameLen + ExtraLen + CommentLen > Size)
-    {
-        // NOTE: OOB
-        return Result;
-    }
-
-    Result.NamePtr = Mem + VarDataOffset;
+    Result.NamePtr = NamePtr;
     Result.NameLen = NameLen;
     Result.CompressionMethod = CompressionMethod;
     Result.CompressedSize = CompressedSize;
     Result.UncompressedSize = UncompressedSize;
     Result.LocalHeaderOffset = LocalHeaderOffset;
     Result.Crc32 = Crc32;
-
-    *OutNextOffset = VarDataOffset + NameLen + ExtraLen + CommentLen;
-
     Result.IsValid = True;
+
     return Result;
 }
 
@@ -189,21 +142,18 @@ ZipArchive ZipOpen(const Uint8 *Mem, Usize Size)
         return Result;
     }
 
-    uint16_t DiskNum;
-    uint16_t CdDiskNum;
-    uint16_t DiskEntries;
-    uint16_t TotalEntries;
-    uint32_t CdSize;
-    uint32_t CdOffset;
-    uint16_t CommentLen;
+    MemReader R = MemReaderInit(Mem, Size);
+    MemReaderSeek(&R, EOCDOffset + 4);
 
-    if (!ReadU16LE(Mem, Size, EOCDOffset + 4, &DiskNum) ||
-        !ReadU16LE(Mem, Size, EOCDOffset + 6, &CdDiskNum) ||
-        !ReadU16LE(Mem, Size, EOCDOffset + 8, &DiskEntries) ||
-        !ReadU16LE(Mem, Size, EOCDOffset + 10, &TotalEntries) ||
-        !ReadU32LE(Mem, Size, EOCDOffset + 12, &CdSize) ||
-        !ReadU32LE(Mem, Size, EOCDOffset + 16, &CdOffset) ||
-        !ReadU16LE(Mem, Size, EOCDOffset + 20, &CommentLen))
+    Uint16 DiskNum = MemReaderReadU16LE(&R);
+    Uint16 CdDiskNum = MemReaderReadU16LE(&R);
+    Uint16 DiskEntries = MemReaderReadU16LE(&R);
+    Uint16 TotalEntries = MemReaderReadU16LE(&R);
+    Uint32 CdSize = MemReaderReadU32LE(&R);
+    Uint32 CdOffset = MemReaderReadU32LE(&R);
+    Uint16 CommentLen = MemReaderReadU16LE(&R);
+
+    if (R.HasError)
     {
         // NOTE: Corrupt EOCD
         return Result;
@@ -249,12 +199,12 @@ ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index)
         return Result;
     }
 
-    Usize CurOffset = Zip->CdOffset;
+    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
+    MemReaderSeek(&R, Zip->CdOffset);
+
     for (Uint32 I = 0; I <= Index; I++)
     {
-        Usize NextOffset = 0;
-
-        Result = ParseCDEntry(Zip, CurOffset, &NextOffset);
+        Result = ParseCDEntry(&R);
         if (!Result.IsValid)
         {
             return Result;
@@ -265,8 +215,6 @@ ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index)
             Result.IsValid = True;
             return Result;
         }
-
-        CurOffset = NextOffset;
     }
     // NOTE: OOB
     // NOTE: Need to set this explicitly since it was set in the loop above so
@@ -282,12 +230,12 @@ ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File)
 
     ZipEntry Result = {0};
 
-    Usize CurOffset = Zip->CdOffset;
+    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
+    MemReaderSeek(&R, Zip->CdOffset);
+
     for (Uint32 I = 0; I < Zip->Count; I++)
     {
-        Usize NextOffset = 0;
-
-        Result = ParseCDEntry(Zip, CurOffset, &NextOffset);
+        Result = ParseCDEntry(&R);
         if (!Result.IsValid)
         {
             return Result;
@@ -298,8 +246,6 @@ ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File)
             Result.IsValid = True;
             return Result;
         }
-
-        CurOffset = NextOffset;
     }
     // NOTE: Not found
     // NOTE: Need to set this explicitly since it was set in the loop above so
@@ -325,34 +271,30 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
         return False;
     }
 
-    const Uint8 *Mem = Zip->Mem;
-    Usize Size = Zip->Size;
-    Usize LFHOffset = Ent->LocalHeaderOffset;
+    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
+    MemReaderSeek(&R, Ent->LocalHeaderOffset);
 
-    Uint32 Sig;
-    if (!ReadU32LE(Mem, Size, LFHOffset, &Sig))
-    {
-        // NOTE: OOB
-        return False;
-    }
-
+    Uint32 Sig = MemReaderReadU32LE(&R);
     if (Sig != SigLocalHeader)
     {
         // NOTE: Corrupt local header
         return False;
     }
 
-    Uint16 NameLen;
-    Uint16 ExtraLen;
-    if (!ReadU16LE(Mem, Size, LFHOffset + 26, &NameLen) ||
-        !ReadU16LE(Mem, Size, LFHOffset + 28, &ExtraLen))
+    // NOTE: Version (2), Flag (2), Compression (2), ModTime (2), ModDate (2), CRC (4), CompressedSize (4), UncompressedSize (4)
+    MemReaderSkip(&R, 22);
+
+    Uint16 NameLen = MemReaderReadU16LE(&R);
+    Uint16 ExtraLen = MemReaderReadU16LE(&R);
+    if (R.HasError)
     {
         // NOTE: Corrupt local header
         return False;
     }
 
-    Usize PayloadOffset = LFHOffset + 30 + NameLen + ExtraLen;
-    if (PayloadOffset + Ent->UncompressedSize > Size)
+    MemReaderSkip(&R, NameLen + ExtraLen);
+    const Uint8 *Payload = MemReaderReadBytes(&R, Ent->UncompressedSize);
+    if (R.HasError)
     {
         // NOTE: OOB
         return False;
@@ -360,7 +302,7 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
 
     if (Buf && Ent->UncompressedSize > 0)
     {
-        MemCopy(Buf, Mem + PayloadOffset, Ent->UncompressedSize);
+        MemCopy(Buf, Payload, Ent->UncompressedSize);
     }
 
     return True;
