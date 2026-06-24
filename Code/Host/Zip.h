@@ -1,6 +1,8 @@
 //
 // NOTE: ZIP archive reader. Used for mods.
 //
+#if !defined(ZIP_H)
+#define ZIP_H
 
 #include "Types.h"
 
@@ -39,3 +41,5 @@ ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index);
 ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File);
 
 Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize BufSize);
+
+#endif
