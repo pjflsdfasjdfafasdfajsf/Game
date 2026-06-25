@@ -13,6 +13,8 @@
 #define Import(Name)
 #endif
 
+#define ExtraMemSize Mb(2)
+
 typedef struct State
 {
     MemAlloc PermanentAlloc;

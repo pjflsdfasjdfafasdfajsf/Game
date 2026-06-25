@@ -6,7 +6,7 @@
 
 static State _State = {0};
 
-static Uint8 _ExtraMem[Mb(64)];
+static Uint8 _ExtraMem[ExtraMemSize];
 
 static Uint8 _RenderMem[Kb(64)];
 static RenderBuf _RenderBuf = {_RenderMem, 0, sizeof(_RenderMem), True};

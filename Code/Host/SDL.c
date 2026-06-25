@@ -1,6 +1,7 @@
 #include "SDL.h"
 #include "KeyValue.h"
 #include "Render.h"
+#include "Runtime.h"
 #include "STB.h"
 #include "wasm_export.h"
 
@@ -424,7 +425,7 @@ static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(Void *UserData, 
         if (Mod->Rt.IsValid && LoadOneMod(Mod, Mod->Path))
         {
             Mod->LastWriteTime = GetFileModTime(Mod->Path);
-            Mod->ExtraMem = SDL_calloc(1, Kb(16));
+            Mod->ExtraMem = SDL_calloc(1, ExtraMemSize);
 
             if (Mod->ExtraMem)
             {
@@ -599,7 +600,7 @@ Void Update(SDL *App)
                 Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                 if (NativeExtraMem)
                 {
-                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, Kb(16));
+                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, ExtraMemSize);
                 }
             }
 
@@ -616,7 +617,7 @@ Void Update(SDL *App)
                     Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                     if (NativeExtraMem)
                     {
-                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, Kb(16));
+                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, ExtraMemSize);
                     }
                 }
             }
@@ -705,7 +706,7 @@ SDL Init()
     }
 
     Game->LastWriteTime = GetFileModTime(Game->Path);
-    Game->ExtraMem = SDL_calloc(1, Mb(2));
+    Game->ExtraMem = SDL_calloc(1, ExtraMemSize);
     if (!Game->ExtraMem)
     {
         Assert(0);
