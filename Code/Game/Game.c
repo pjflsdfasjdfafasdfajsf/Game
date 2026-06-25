@@ -1,7 +1,6 @@
 //
 // NOTE: Main game file.
 //
-#include "Render.h"
 #include <SDK.h>
 
 UpdateAndRender(UpdateAndRender)
