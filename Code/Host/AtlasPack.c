@@ -6,11 +6,6 @@
 // <image_path> <x_position> <y_position> <width> <height>
 //
 
-// TODO: Don't emit a header file, it's probably better to emit just raw files
-// as it was before, but now it would make more sense as:
-// 1) Game is packaged into a .zip anyways
-// 2) You could WAY more easily inspect the output
-
 #include "STB.h"
 #include "Types.h"
 
@@ -27,67 +22,6 @@ typedef struct
     Int32 Height;
     Int32 Channels;
 } Image;
-
-typedef struct
-{
-    FILE *File;
-    Int32 Col;
-    Uint32 TotalBytes;
-} WriteCtx;
-
-static void WriteCallback(void *Context, void *Data, int Size)
-{
-    WriteCtx *Ctx = (WriteCtx *)Context;
-
-    const Uint8 *Bytes = (const Uint8 *)Data;
-    for (int I = 0; I < Size; ++I)
-    {
-        fprintf(Ctx->File, "0x%02X,", Bytes[I]);
-        Ctx->TotalBytes++;
-        Ctx->Col++;
-
-        if (Ctx->Col >= 16)
-        {
-            fprintf(Ctx->File, "\n    ");
-            Ctx->Col = 0;
-        }
-        else
-        {
-            fprintf(Ctx->File, " ");
-        }
-    }
-}
-
-static void ToValidCIdentifier(char *Dest, const char *Src, Usize DestSize)
-{
-    const char *Base = Src;
-    for (const char *Path = Src; *Path != '\0'; ++Path)
-    {
-        if (*Path == '/' || *Path == '\\')
-        {
-            Base = Path + 1;
-        }
-    }
-
-    Usize J = 0;
-    if (Base[0] >= '0' && Base[0] <= '9' && DestSize > 1)
-    {
-        Dest[J++] = '_';
-    }
-    for (Usize I = 0; Base[I] != '\0' && J < DestSize - 1; ++I)
-    {
-        char C = Base[I];
-        if ((C >= 'a' && C <= 'z') || (C >= 'A' && C <= 'Z') || (C >= '0' && C <= '9'))
-        {
-            Dest[J++] = C;
-        }
-        else
-        {
-            Dest[J++] = '_';
-        }
-    }
-    Dest[J] = '\0';
-}
 
 // NOTE:
 // Arguments:
@@ -174,62 +108,25 @@ Int32 main(Int32 Argc, char **Argv)
         }
     }
 
-    char OutputHeaderPath[512];
-    snprintf(OutputHeaderPath, sizeof(OutputHeaderPath), "%s.h", OutputPrefix);
+    char OutputPngPath[512];
+    snprintf(OutputPngPath, sizeof(OutputPngPath), "%s.png", OutputPrefix);
+    if (!stbi_write_png(OutputPngPath, AtlasSize, AtlasSize, 4, AtlasPixels, AtlasSize * 4))
+    {
+        return 1;
+    }
 
-    FILE *File = fopen(OutputHeaderPath, "w");
+    char OutputTxtPath[512];
+    snprintf(OutputTxtPath, sizeof(OutputTxtPath), "%s.txt", OutputPrefix);
+    FILE *File = fopen(OutputTxtPath, "w");
     if (!File)
     {
         return 1;
     }
 
-    char CIdentifier[256];
-    ToValidCIdentifier(CIdentifier, OutputPrefix, sizeof(CIdentifier));
-
-    fprintf(File, "#if !defined(%s)\n", CIdentifier);
-    fprintf(File, "#define %s\n\n", CIdentifier);
-    fprintf(File, "const unsigned char Gen%s[] = {\n    ", CIdentifier);
-
-    WriteCtx Ctx = {File, 0, 0};
-    if (!stbi_write_png_to_func(WriteCallback, &Ctx, AtlasSize, AtlasSize, 4, AtlasPixels, AtlasSize * 4))
-    {
-        fclose(File);
-        return 1;
-    }
-
-    fprintf(File, "\n};\n");
-    fprintf(File, "const unsigned int Gen%sLen = %u;\n\n", CIdentifier, Ctx.TotalBytes);
-
-    fprintf(File, "const char Gen%sMeta[] = {\n    ", CIdentifier);
-
-    Int32 MetaCol = 0;
-    Uint32 MetaLen = 0;
     for (Int32 I = 0; I < ImageCount; ++I)
     {
-        char Line[1024];
-        Int32 LineLen = snprintf(Line, sizeof(Line), "%s %d %d %d %d\n", Images[I].Path, Rects[I].x, Rects[I].y, Rects[I].w, Rects[I].h);
-
-        for (Int32 J = 0; J < LineLen; ++J)
-        {
-            fprintf(File, "0x%02X,", (Uint8)Line[J]);
-
-            MetaLen++;
-            MetaCol++;
-
-            if (MetaCol >= 16)
-            {
-                fprintf(File, "\n    ");
-                MetaCol = 0;
-            }
-            else
-            {
-                fprintf(File, " ");
-            }
-        }
+        fprintf(File, "%s %d %d %d %d\n", Images[I].Path, Rects[I].x, Rects[I].y, Rects[I].w, Rects[I].h);
     }
-    fprintf(File, "0x00\n};\n");
-    fprintf(File, "const unsigned int Gen%sMetaLen = %u;\n", CIdentifier, MetaLen);
-    fprintf(File, "#endif");
 
     fclose(File);
 

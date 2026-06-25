@@ -1,5 +1,8 @@
 # LSP things
 compile_commands.json
 .cache
+.ignore
 # Build output
 Build
+# Symlink'd Makefile
+Makefile
