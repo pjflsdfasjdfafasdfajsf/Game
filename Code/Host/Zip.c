@@ -962,3 +962,23 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
 
     return True;
 }
+
+Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix)
+{
+    Usize SuffixLen = SDL_strlen(Suffix);
+    if (Ent->NameLen < SuffixLen)
+    {
+        return False;
+    }
+
+    const Uint8 *EndPtr = Ent->NamePtr + Ent->NameLen - SuffixLen;
+    for (Usize I = 0; I < SuffixLen; ++I)
+    {
+        if (EndPtr[I] != (Uint8)Suffix[I])
+        {
+            return False;
+        }
+    }
+
+    return True;
+}

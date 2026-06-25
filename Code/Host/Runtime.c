@@ -174,7 +174,6 @@ Bool RtUpdate(Runtime *Rt, State *HostState, RenderBuf *HostRenderBuf)
     if (!wasm_runtime_call_wasm(Rt->ExecEnv, Rt->UpdateAndRender, 3, Args))
     {
         LogCritical("wasm_runtime_call_wasm  (runtime error): %s\n", wasm_runtime_get_exception(Rt->ModuleInst));
-
         return False;
     }
 
@@ -201,7 +200,6 @@ Bool RtUpdate(Runtime *Rt, State *HostState, RenderBuf *HostRenderBuf)
     if (!wasm_runtime_validate_app_addr(Rt->ModuleInst, RenderBufMemOffset, RenderBufSizeOffset))
     {
         LogCritical("RenderBuf memory is out of bounds.\n");
-
         return False;
     }
 
@@ -216,7 +214,6 @@ Bool RtUpdate(Runtime *Rt, State *HostState, RenderBuf *HostRenderBuf)
     else
     {
         LogCritical("Out of memory.\n");
-
         return False;
     }
 

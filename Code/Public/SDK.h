@@ -50,5 +50,19 @@ static inline Void PrintCStr(const char *Str)
 //
 // Supported image formats: PNG, JPEG, TGA, BMP, PSD, GIF, HDR, PIC.
 Import("AllocTexture") TexHandle AllocTexture(const Void *Mem, Uint32 Size);
+// NOTE: If DstPtr or DstSize is 0 this returns the files uncompressed size.
+// Otherwise it returns the number of bytes read.
+Import("ReadFile") Uint32 ReadFile(const char *PathPtr, Uint32 PathLen, Void *DstPtr, Uint32 DstSize);
+static inline Uint32 ReadFileCStr(const char *Path, Void *Buf, Uint32 BufSize)
+{
+    Assert(Path);
+
+    if (!Path)
+    {
+        return 0;
+    }
+
+    return ReadFile(Path, CStrLen(Path), Buf, BufSize);
+}
 
 #endif

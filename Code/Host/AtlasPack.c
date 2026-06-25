@@ -6,6 +6,11 @@
 // <image_path> <x_position> <y_position> <width> <height>
 //
 
+// TODO: Don't emit a header file, it's probably better to emit just raw files
+// as it was before, but now it would make more sense as:
+// 1) Game is packaged into a .zip anyways
+// 2) You could WAY more easily inspect the output
+
 #include "STB.h"
 #include "Types.h"
 

@@ -24,12 +24,19 @@ Align="%-15s"
 
 Compiler="clang"
 Ar="ar"
+Zip="zip"
 CommonCompilerFlags="-ICode/Public -I${BuildDir}"
 
 VendorLibs="Ext/SDL3/Bin/Linux/libSDL3.a Ext/WAMR/Bin/Linux/libiwasm.a"
 SystemLibs="-lm -lpthread -ldl -lrt -lstdc++"
 
 LinkerFlags="${VendorLibs} ${SystemLibs}"
+
+# TODO: Have our own Zip packaging tool
+if ! command -v ${Zip} > /dev/null 2>&1; then
+    echo "Your system is missing 'zip' for game packaging."
+    exit 1
+fi
 
 #
 # NOTE: Atlas
@@ -99,7 +106,8 @@ printf ${Align} "Host"
 HostSrc="Code/Host/Main.c    \
          Code/Host/Runtime.c \
          Code/Host/STB.c     \
-         Code/Host/SDL.c
+         Code/Host/SDL.c     \
+         Code/Host/Zip.c
         "
 HostTarget="${BuildDir}/Game"
 HostFlags="${CommonCompilerFlags} -IExt/WAMR/Include -IExt/SDL3/Include -IExt/STB"
@@ -113,10 +121,15 @@ printf "Done\n"
 
 printf ${Align} "Game"
 GameSrc="Code/Game/Game.c"
-GameTarget="${BuildDir}/Game.wasm"
+GameUncompressedTarget="${BuildDir}/Game.wasm"
+GameCompressedTarget="${BuildDir}/Game.zip"
 GameFlags="${CommonCompilerFlags} --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined"
 
-${Compiler} ${GameFlags} ${GameSrc} -Wl,--whole-archive ${SDKWasmTarget} -Wl,--no-whole-archive -o ${GameTarget}
+${Compiler} ${GameFlags} ${GameSrc} -Wl,--whole-archive ${SDKWasmTarget} -Wl,--no-whole-archive -o ${GameUncompressedTarget}
+${Zip} -9 -r ${GameCompressedTarget} ${GameUncompressedTarget} >/dev/null
+
+rm -f ${GameUncompressedTarget}
+
 printf "Done\n"
 
 #
@@ -132,12 +145,6 @@ fi
 if [ ${ShouldTest} -eq 1 ]; then
     printf ${Align} "Tests"
 
-    # NOTE: ZIP
-    if ! command -v zip > /dev/null 2>&1; then
-        echo "Your system is missing 'zip' for the ZIP test."
-        exit 1
-    fi
-
     Uncompressed="${TestDataDir}/Archive"
     mkdir -p ${Uncompressed}
     echo "Hi i love u <3 AAAAAAANBBBBBCBCCCBCBCABAAAABCBCBCBABA" > ${Uncompressed}/Hello.txt
@@ -145,7 +152,7 @@ if [ ${ShouldTest} -eq 1 ]; then
 
     Compressed="${Uncompressed}.zip"
     rm -f ${Compressed}
-    zip -9 -r ${Compressed} ${Uncompressed} >/dev/null
+    ${Zip} -9 -r ${Compressed} ${Uncompressed} >/dev/null
 
     ZipTestSrc="Code/Host/Zip_Test.c \
                 Code/Host/Zip.c      \
