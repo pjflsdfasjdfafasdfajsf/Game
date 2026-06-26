@@ -1,9 +1,9 @@
 #include "SDL.h"
 #include "KeyValue.h"
+#include "Math.h"
 #include "Render.h"
 #include "Runtime.h"
 #include "STB.h"
-#include "wasm_export.h"
 
 #define GameZip "Game.zip"
 
@@ -485,10 +485,8 @@ Void Render(SDL *App)
                 Assert(0);
             }
 
-            float TargetX = DrawDebugText->Pos.X / DrawDebugText->Scale.X;
-            float TargetY = DrawDebugText->Pos.Y / DrawDebugText->Scale.Y;
-
-            if (!SDL_RenderDebugText(App->Renderer, TargetX, TargetY, DrawDebugText->Str))
+            V2 Target = V2Div(DrawDebugText->Pos, DrawDebugText->Scale);
+            if (!SDL_RenderDebugText(App->Renderer, Target.X, Target.Y, DrawDebugText->Str))
             {
                 LogCritical("%s", SDL_GetError());
                 Assert(0);
@@ -743,8 +741,12 @@ SDL Init()
     return Result;
 }
 
-Bool Poll()
+Bool Poll(SDL *App)
 {
+    Assert(App);
+
+    App->State.Input.MouseClicked = False;
+
     SDL_Event Ev;
     while (SDL_PollEvent(&Ev))
     {
@@ -755,6 +757,40 @@ Bool Poll()
             return False;
         }
         break;
+
+        case SDL_EVENT_MOUSE_MOTION:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            App->State.Input.MousePos.X = Ev.motion.x;
+            App->State.Input.MousePos.Y = Ev.motion.y;
+        }
+        break;
+
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            if (Ev.button.button == SDL_BUTTON_LEFT)
+            {
+                App->State.Input.MouseDown = True;
+                App->State.Input.MouseClicked = True;
+            }
+        }
+        break;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            if (Ev.button.button == SDL_BUTTON_LEFT)
+            {
+                App->State.Input.MouseDown = False;
+            }
+        }
+        break;
+
+        default:
+        {
+            break;
+        }
         }
     }
 

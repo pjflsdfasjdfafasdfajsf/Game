@@ -11,6 +11,11 @@ V2 V2Make(Float32 X, Float32 Y)
     return (V2){{{X, Y}}};
 }
 
+V2 V2Div(V2 X, V2 Y)
+{
+    return V2Make(X.X / Y.X, X.Y / Y.Y);
+}
+
 Rect RectMake(Float32 X, Float32 Y, Float32 W, Float32 H)
 {
     return (Rect){V2Make(X, Y), V2Make(W, H)};
