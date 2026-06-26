@@ -26,8 +26,8 @@ Compiler="clang"
 Ar="ar"
 CommonCompilerFlags="-ICode/Public -I${BuildDir}"
 
-VendorLibs="Ext/SDL3/Bin/Linux/libSDL3.a Ext/WAMR/Bin/Linux/libiwasm.a"
-SystemLibs="-lm -lpthread -ldl -lrt -lstdc++"
+VendorLibs="Ext/WAMR/Bin/Linux/libiwasm.a"
+SystemLibs="-lm -lpthread -ldl -lrt -lstdc++ -lSDL3"
 
 LinkerFlags="${VendorLibs} ${SystemLibs}"
 

@@ -455,7 +455,7 @@ SDL Init()
     return Result;
 }
 
-Bool Poll()
+Bool Poll(SDL *SDL)
 {
     SDL_Event Ev;
     while (SDL_PollEvent(&Ev))
@@ -467,6 +467,15 @@ Bool Poll()
             return False;
         }
         break;
+        case SDL_EVENT_KEY_DOWN:
+        {
+            if (Ev.key.repeat)
+            {
+                break;
+            }
+
+            SDL_Scancode Scancode = Ev.key.scancode;
+        } break;
         }
     }
 

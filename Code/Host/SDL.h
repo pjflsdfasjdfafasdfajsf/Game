@@ -44,7 +44,7 @@ typedef struct
 
 SDL Init();
 
-Bool Poll();
+Bool Poll(SDL *App);
 
 Void Update(SDL *App);
 
