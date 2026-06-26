@@ -49,6 +49,8 @@ typedef struct
 } Rect;
 
 Rect RectMake(Float32 X, Float32 Y, Float32 W, Float32 H);
+// NOTE: Points exactly on the right (Pos.X + Size.W) or bottom (Pos.Y + Size.H)
+// borders are considered outside!
 Bool RectContainsV2(Rect Rect, V2 Point);
 
 #define RectZero RectMake(0.0f, 0.0f, 0.0f, 0.0f)
