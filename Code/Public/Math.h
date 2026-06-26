@@ -69,4 +69,12 @@ V2 RectGetCenteredPos(Rect Rect, V2 Size);
 
 #define RectZero RectMake(0.0f, 0.0f, 0.0f, 0.0f)
 
+//
+// NOTE: Hashing.
+//
+
+// NOTE: FNV-1a.
+Uint32 HashCStr(const char *CStr);
+Uint32 HashCombine(Uint32 Parent, Uint32 Child);
+
 #endif

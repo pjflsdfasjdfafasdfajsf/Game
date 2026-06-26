@@ -1,17 +1,12 @@
 //
 // NOTE: Main game file.
 //
-#include "Math.h"
 #include "Mem.h"
-#include "Render.h"
-#include "Types.h"
 #include <SDK.h>
 
 // TODO: Put this in SDK
 
 #define UIID Uint32
-// TODO: Something more portable across languages.
-#define UIGetQuickID ((UIID)__LINE__)
 
 typedef struct
 {
@@ -21,7 +16,20 @@ typedef struct
     UIID Active;
     // NOTE: Feedback count
     Uint32 Count;
+
+    UIID Stack[32];
+    Uint32 Depth;
 } UIContext;
+
+static inline UIID UIGetCurrentID(UIContext *UI, UIID BaseID)
+{
+    UIID Result = BaseID;
+    for (Uint32 i = 0; i < UI->Depth; i++)
+    {
+        Result = HashCombine(Result, UI->Stack[i]);
+    }
+    return Result;
+}
 
 typedef struct
 {
@@ -69,8 +77,11 @@ static inline Rect UILayoutNext(UILayout *Layout)
     return Result;
 }
 
-static inline Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, UIID ID, Rect Bounds, const char *Text)
+static inline Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, Rect Bounds, const char *CStr)
 {
+    UIID BaseID = HashCStr(CStr);
+    UIID ID = UIGetCurrentID(UI, BaseID);
+
     Bool Clicked = False;
     Bool Hovered = RectContainsV2(Bounds, State->Input.MousePos);
 
@@ -99,8 +110,8 @@ static inline Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, U
         UI->Active = ID;
     }
 
-    V2 Pos = RectGetCenteredPos(Bounds, V2Make((Float32)CStrLen(Text) * 16.0f, 16.0f));
-    RenderBufDrawCStr(RenderBuf, White, Pos, V2Splat(2.0f), Text);
+    V2 Pos = RectGetCenteredPos(Bounds, V2Make((Float32)CStrLen(CStr) * 16.0f, 16.0f));
+    RenderBufDrawCStr(RenderBuf, White, Pos, V2Splat(2.0f), CStr);
 
     return Clicked;
 }
@@ -131,15 +142,15 @@ UpdateAndRender(UpdateAndRender)
     static UIContext UI = {0};
 
     UILayout Layout = UILayoutBeginCenteredVertical(&UI, ScreenCenter, V2Make(180.0f, 32.0f), 10.0f);
-    if (UIButton(RenderBuf, &UI, State, UIGetQuickID, UILayoutNext(&Layout), "Play"))
+    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Play"))
     {
         PrintCStr("Hi :)");
     }
-    if (UIButton(RenderBuf, &UI, State, UIGetQuickID, UILayoutNext(&Layout), "Mods"))
+    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Mods"))
     {
         PrintCStr("Hi :)");
     }
-    if (UIButton(RenderBuf, &UI, State, UIGetQuickID, UILayoutNext(&Layout), "Quit"))
+    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Quit"))
     {
         PrintCStr("Hi :)");
     }

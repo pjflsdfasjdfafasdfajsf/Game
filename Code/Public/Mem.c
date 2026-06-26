@@ -314,6 +314,20 @@ Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size)
     }
 }
 
+Bool MemEql(const Void *A, const Void *B, Usize Size)
+{
+    const Uint8 *ByteA = (const Uint8 *)A;
+    const Uint8 *ByteB = (const Uint8 *)B;
+    for (Usize I = 0; I < Size; ++I)
+    {
+        if (ByteA[I] != ByteB[I])
+        {
+            return False;
+        }
+    }
+    return True;
+}
+
 Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
 {
     Assert(Buf);

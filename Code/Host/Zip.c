@@ -627,7 +627,6 @@ static inline Bool DecompressDeflate(Uint8 *Buf, Usize BufSize, const Uint8 *Pay
 // NOTE: Internal
 //
 
-
 static inline Bool NameMatches(const Uint8 *NamePtr, Uint16 NameLen, const char *File)
 {
     Assert(NamePtr);
@@ -640,12 +639,9 @@ static inline Bool NameMatches(const Uint8 *NamePtr, Uint16 NameLen, const char 
     }
 
     const Uint8 *StartPtr = NamePtr + NameLen - TargetLen;
-    for (Usize I = 0; I < TargetLen; ++I)
+    if (!MemEql(StartPtr, File, TargetLen))
     {
-        if (StartPtr[I] != (Uint8)File[I])
-        {
-            return False;
-        }
+        return False;
     }
 
     if (NameLen == TargetLen)
@@ -654,12 +650,7 @@ static inline Bool NameMatches(const Uint8 *NamePtr, Uint16 NameLen, const char 
     }
 
     Uint8 PrevChar = *(StartPtr - 1);
-    if (PrevChar == '/' || PrevChar == '\\')
-    {
-        return True;
-    }
-
-    return False;
+    return (PrevChar == '/' || PrevChar == '\\');
 }
 
 static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
@@ -971,14 +962,5 @@ Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix)
         return False;
     }
 
-    const Uint8 *EndPtr = Ent->NamePtr + Ent->NameLen - SuffixLen;
-    for (Usize I = 0; I < SuffixLen; ++I)
-    {
-        if (EndPtr[I] != (Uint8)Suffix[I])
-        {
-            return False;
-        }
-    }
-
-    return True;
+    return MemEql(Ent->NamePtr + Ent->NameLen - SuffixLen, Suffix, SuffixLen);
 }

@@ -52,7 +52,7 @@ typedef size_t Usize;
 #define Kb(X) ((X) * 1024)
 #define Mb(X) ((Kb(X)) * 1024)
 
-#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 #define StaticAssert(Cond) typedef char static_assertion_at_line_##__LINE__[(Cond) ? 1 : -1]
 
 #if defined(MSVC)
@@ -84,5 +84,9 @@ typedef size_t Usize;
 #define IsPow2(X) (((X) != 0) && (((X) & ((X) - 1)) == 0))
 //  `Align` must be a power of 2.
 #define AlignUp(Val, Align) (((Val) + ((Align) - 1)) & ~((Align) - 1))
+
+#define Min(A, B) ((A) < (B) ? (A) : (B))
+#define Max(A, B) ((A) > (B) ? (A) : (B))
+#define Clamp(MinVal, Val, MaxVal) Max(MinVal, Min(Val, MaxVal))
 
 #endif

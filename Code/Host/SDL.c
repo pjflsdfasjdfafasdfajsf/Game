@@ -4,7 +4,6 @@
 #include "Render.h"
 #include "Runtime.h"
 #include "STB.h"
-#include <SDL3/SDL_video.h>
 
 #define GameZip "Game.zip"
 
@@ -134,7 +133,7 @@ static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32
     {
         PathBuf[I] = (Path[I] == '\\') ? '/' : Path[I];
     }
-    PathBuf[PathLen] = '\0';
+    MemNullTerminate(PathBuf, sizeof(PathBuf), PathLen);
 
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
@@ -379,7 +378,7 @@ static Bool LoadOneMod(Mod *Mod, const char *ZipPath)
     if (PathLen > 4 && SDL_strcmp(ZipPath + PathLen - 4, ".zip") == 0)
     {
         SDL_memcpy(PathBuf, ZipPath, PathLen - 4);
-        PathBuf[PathLen - 4] = '\0';
+        MemNullTerminate(PathBuf, sizeof(PathBuf), PathLen - 4);
     }
     else
     {
@@ -693,7 +692,7 @@ SDL Init()
         {"PrintLine", (void *)HostPrintLine, "(ii)", 0},
         {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0},
         {"ReadFile", (void *)HostReadFile, "(iiii)i", 0}};
-    if (!wasm_runtime_register_natives("env", Natives, sizeof(Natives) / sizeof(Natives[0])))
+    if (!wasm_runtime_register_natives("env", Natives, ArrayCount(Natives)))
     {
         Assert(0);
     }

@@ -77,3 +77,33 @@ V2 RectGetCenteredPos(Rect R, V2 Size)
     V2 Rect = V2Make(R.Size.W, R.Size.H);
     return V2Add(R.Pos, V2Scale(V2Sub(Rect, Size), 0.5f));
 }
+
+//
+// NOTE: Hashing
+//
+
+#define HashInitial 2166136261u
+#define HashPrime 16777619u
+
+Uint32 HashCStr(const char *CStr)
+{
+    Uint32 Result = HashInitial;
+
+    while (*CStr)
+    {
+        Result ^= (Uint32)(*CStr++);
+        Result *= HashPrime;
+    }
+
+    return Result;
+}
+
+Uint32 HashCombine(Uint32 Parent, Uint32 Child)
+{
+    Uint32 Result = Parent;
+
+    Result ^= Child;
+    Result *= HashPrime;
+
+    return Result;
+}

@@ -65,6 +65,7 @@ Uint32 CStrLen(const char *CStr);
 //
 
 Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size);
+Bool MemEql(const Void *A, const Void *B, Usize Size);
 Void MemNullTerminate(char *Buf, Usize Cap, Usize Len);
 
 const char *MemFindChar(const char *Start, const char *End, char Target);

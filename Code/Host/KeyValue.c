@@ -35,18 +35,6 @@ static Void TrimString(const char *StartInit, const char *EndInit, const char **
     *OutLen = (Uint32)(End - Start);
 }
 
-static Bool KeysMatch(const char *A, const char *B, Uint32 Len)
-{
-    for (Uint32 I = 0; I < Len; ++I)
-    {
-        if (A[I] != B[I])
-        {
-            return False;
-        }
-    }
-    return True;
-}
-
 static Uint32 ParsePass(KeyValuePair *OutPairs, Uint32 MaxCount, Bool *OutHasError, const char *Src, Uint32 SrcLen)
 {
     Assert(OutHasError);
@@ -159,7 +147,7 @@ KeyValuePair KeyValueListFind(KeyValueList List, const char *Key, Uint32 KeyLen)
     {
         KeyValuePair Pair = List.Pairs[I];
 
-        if (Pair.KeyLen == KeyLen && KeysMatch(Pair.Key, Key, KeyLen))
+        if (Pair.KeyLen == KeyLen && MemEql(Pair.Key, Key, KeyLen))
         {
             return Pair;
         }
