@@ -82,5 +82,9 @@ static inline Uint32 ReadFileCStr(const char *Path, Void *Buf, Uint32 BufSize)
 
     return ReadFile(Path, CStrLen(Path), Buf, BufSize);
 }
+static inline Uint32 GetFileSize(const char *Path)
+{
+    return ReadFileCStr(Path, 0, 0);
+}
 
 #endif
