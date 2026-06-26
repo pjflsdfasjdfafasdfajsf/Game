@@ -248,11 +248,7 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
         return False;
     }
 
-    Uint8 Lengths[DeflateNumLiteralSymbols + DeflateNumDistanceSymbols];
-    for (Uint32 I = 0; I < DeflateNumLiteralSymbols + DeflateNumDistanceSymbols; ++I)
-    {
-        Lengths[I] = 0;
-    }
+    Uint8 Lengths[DeflateNumLiteralSymbols + DeflateNumDistanceSymbols] = {0};
 
     static const Uint8 ClcIndex[DeflateNumCodeLengthSymbols] = {
         16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
@@ -272,11 +268,7 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
         return False;
     }
 
-    Uint8 CodeLengths[DeflateNumCodeLengthSymbols];
-    for (Uint32 I = 0; I < DeflateNumCodeLengthSymbols; ++I)
-    {
-        CodeLengths[I] = 0;
-    }
+    Uint8 CodeLengths[DeflateNumCodeLengthSymbols] = {0};
 
     for (Uint32 I = 0; I < Hclen; ++I)
     {
@@ -640,26 +632,25 @@ static inline Bool NameMatches(const Uint8 *NamePtr, Uint16 NameLen, const char 
     Assert(NamePtr);
     Assert(File);
 
-    Usize TargetLen = 0;
-    while (File[TargetLen] != '\0')
-    {
-        TargetLen++;
-    }
-
-    if (TargetLen != NameLen)
+    Usize TargetLen = CStrLen(File);
+    if (NameLen < TargetLen)
     {
         return False;
     }
 
-    for (Uint16 I = 0; I < NameLen; I++)
+    const Uint8 *StartPtr = NamePtr + NameLen - TargetLen;
+    if (!MemEql(StartPtr, File, TargetLen))
     {
-        if (NamePtr[I] != (Uint8)File[I])
-        {
-            return False;
-        }
+        return False;
     }
 
-    return True;
+    if (NameLen == TargetLen)
+    {
+        return True;
+    }
+
+    Uint8 PrevChar = *(StartPtr - 1);
+    return (PrevChar == '/' || PrevChar == '\\');
 }
 
 static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
@@ -961,4 +952,15 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
     }
 
     return True;
+}
+
+Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix)
+{
+    Usize SuffixLen = SDL_strlen(Suffix);
+    if (Ent->NameLen < SuffixLen)
+    {
+        return False;
+    }
+
+    return MemEql(Ent->NamePtr + Ent->NameLen - SuffixLen, Suffix, SuffixLen);
 }

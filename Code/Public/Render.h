@@ -1,19 +1,21 @@
 #if !defined(RENDER_H)
 #define RENDER_H
 
-#include "Mem.h"
 #include "Math.h"
+#include "Mem.h"
 #include "Types.h"
 
-#define BUF_ALIGN 4
-StaticAssert(IsPow2(BUF_ALIGN));
+#define BufAlign 4
+StaticAssert(IsPow2(BufAlign));
 
-#define BufAlign(Value) AlignUp(Value, BUF_ALIGN)
+#define BufAlignUp(Value) AlignUp(Value, BufAlign)
+
+#define InternalRes V2Make(1280.0f, 720.0f)
+#define ScreenCenter V2Unscale(InternalRes, 2.0f)
 
 // NOTE:
 // 1. All positions are in pixels, with origin for everyone being the top-left.
 // 2. Intenally renderer uses letterboxing with the resolution of 1280x720
-// TODO: Probably will have more to say later
 
 typedef Uint32 TexHandle;
 #define TexHandleInvalid 0xFFFFFFFF
@@ -42,6 +44,8 @@ typedef struct
     Color Color;
 } RenderClear;
 
+// NOTE: Character size for the debug font.
+#define DebugTextCharSize 8
 // NOTE: There's a reason why this command is called 'draw DEBUG' text and
 // that reason is that the implementation of it just uses SDL built-in
 // SDL_RenderDebugText function, which provides just simple bitmap

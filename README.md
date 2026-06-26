@@ -5,8 +5,8 @@ Clone & Build (Linux only currently):
 git clone https://github.com/pjflsdfasjdfafasdfajsf/Game.git -B Refactor
 cd Game
 
-chmod +x ./Build.sh
-./Build.sh
+make -f Linux.make
+# this creates a symlink, if you ever need to run make again you can run just `make`
 ```
 The final executable will be available in `Build` directory.
 

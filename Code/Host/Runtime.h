@@ -2,6 +2,7 @@
 #define HOST_H
 
 #include "SDK.h"
+
 #include <wasm_export.h>
 
 typedef struct

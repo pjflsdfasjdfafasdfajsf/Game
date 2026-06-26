@@ -5,6 +5,8 @@
 // NOTE: MemAlloc
 //
 
+#define MemAllocDefaultAlign 4
+
 MemAlloc MemAllocInit(void *Mem, Uint32 Cap)
 {
     MemAlloc Result = {};
@@ -19,7 +21,7 @@ MemAlloc MemAllocInit(void *Mem, Uint32 Cap)
     return Result;
 }
 
-Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align)
+Void *MemAllocPushEx(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align)
 {
     Assert(Bytes > 0);
     Assert(IsPow2(Align));
@@ -39,6 +41,11 @@ Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align)
     }
 
     return 0;
+}
+
+Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes)
+{
+    return MemAllocPushEx(MemAlloc, Bytes, MemAllocDefaultAlign);
 }
 
 Void MemAllocClear(MemAlloc *MemAlloc)
@@ -307,6 +314,20 @@ Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size)
     }
 }
 
+Bool MemEql(const Void *A, const Void *B, Usize Size)
+{
+    const Uint8 *ByteA = (const Uint8 *)A;
+    const Uint8 *ByteB = (const Uint8 *)B;
+    for (Usize I = 0; I < Size; ++I)
+    {
+        if (ByteA[I] != ByteB[I])
+        {
+            return False;
+        }
+    }
+    return True;
+}
+
 Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
 {
     Assert(Buf);
@@ -322,7 +343,22 @@ Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
     }
 }
 
-Uint32 MemReadUint(const char **CurInit)
+const char *MemFindChar(const char *Start, const char *End, char Target)
+{
+    Assert(Start);
+    Assert(End >= Start);
+
+    for (const char *Scan = Start; Scan < End; ++Scan)
+    {
+        if (*Scan == Target)
+        {
+            return Scan;
+        }
+    }
+    return 0;
+}
+
+Uint32 MemParseUint(const char **CurInit)
 {
     Uint32 Result = 0;
 

@@ -41,5 +41,7 @@ ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index);
 ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File);
 
 Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize BufSize);
+// NOTE: Returns true if Ent name ends with Suffix
+Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix);
 
 #endif

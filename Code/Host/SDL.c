@@ -1,9 +1,11 @@
 #include "SDL.h"
+#include "KeyValue.h"
+#include "Math.h"
 #include "Render.h"
+#include "Runtime.h"
 #include "STB.h"
-#include "wasm_export.h"
 
-#define GAME_WASM_FILE "Game.wasm"
+#define GameZip "Game.zip"
 
 //
 // NOTE: Host-provided funcs.
@@ -29,7 +31,7 @@ static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uin
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
 
-    if (!wasm_runtime_validate_app_str_addr(ModuleInst, PtrOffset))
+    if (!wasm_runtime_validate_app_addr(ModuleInst, PtrOffset, Size))
     {
         LogCritical("Memory bounds violation.\n");
 
@@ -92,6 +94,101 @@ static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uin
     return Handle;
 }
 
+static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32 PathLen, Uint32 DstPtrOffset, Uint32 DstSize)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+
+    if (!wasm_runtime_validate_app_str_addr(ModuleInst, PathPtrOffset))
+    {
+        LogCritical("Path memory bounds violation.\n");
+        return 0;
+    }
+
+    Bool QuerySizeOnly = (DstPtrOffset == 0 || DstSize == 0);
+    if (!QuerySizeOnly)
+    {
+        if (!wasm_runtime_validate_app_addr(ModuleInst, DstPtrOffset, DstSize))
+        {
+            LogCritical("Buffer memory bounds violation.\n");
+            return 0;
+        }
+    }
+
+    const char *Path = (const char *)wasm_runtime_addr_app_to_native(ModuleInst, PathPtrOffset);
+    Uint8 *Dst = QuerySizeOnly ? 0 : (Uint8 *)wasm_runtime_addr_app_to_native(ModuleInst, DstPtrOffset);
+
+    if (!Path || PathLen == 0)
+    {
+        LogCritical("Invalid path pointer or length.\n");
+        return 0;
+    }
+
+    char PathBuf[256];
+    if (PathLen >= sizeof(PathBuf))
+    {
+        LogCritical("Path too long.\n");
+        return 0;
+    }
+    for (Uint32 I = 0; I < PathLen; ++I)
+    {
+        PathBuf[I] = (Path[I] == '\\') ? '/' : Path[I];
+    }
+    MemNullTerminate(PathBuf, sizeof(PathBuf), PathLen);
+
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    Mod *Mod = 0;
+    for (Uint32 I = 0; I < App->ModCount; ++I)
+    {
+        if (App->Mods[I].Rt.ModuleInst == ModuleInst)
+        {
+            Mod = &App->Mods[I];
+            break;
+        }
+    }
+
+    if (!Mod)
+    {
+        LogCritical("Could not identify calling mod.\n");
+        return 0;
+    }
+
+    if (!Mod->Archive.IsValid)
+    {
+        LogCritical("Calling mod is not a valid ZIP archive.\n");
+        return 0;
+    }
+
+    SDL_Log("'%s' requested %s\n", Mod->Path, PathBuf);
+
+    ZipEntry Ent = ZipGetEntByName(&Mod->Archive, PathBuf);
+    if (!Ent.IsValid)
+    {
+        LogCritical("'%s' not found.\n", PathBuf);
+        return 0;
+    }
+
+    if (QuerySizeOnly)
+    {
+        return Ent.UncompressedSize;
+    }
+
+    if (DstSize < Ent.UncompressedSize)
+    {
+        LogCritical("Buffer too small: target needs %u bytes, got %u.\n", Ent.UncompressedSize, DstSize);
+        return 0;
+    }
+
+    if (!ZipReadEnt(&Mod->Archive, &Ent, Dst, DstSize))
+    {
+        LogCritical("Failed to read decompressed data from ZIP: %s\n", PathBuf);
+        return 0;
+    }
+
+    return Ent.UncompressedSize;
+}
+
 //
 // NOTE: Internal
 //
@@ -130,6 +227,183 @@ static inline Bool GetAbsPath(char *Buf, Usize Size, const char *Name)
     return True;
 }
 
+static Bool ReadManifest(ZipArchive *Archive, const char *Path)
+{
+    Assert(Archive);
+    Assert(Path);
+
+    ZipEntry Manifest = ZipGetEntByName(Archive, "Manifest.txt");
+    if (!Manifest.IsValid)
+    {
+        LogCritical("%s is missing Manifest.txt.\n", Path);
+        return False;
+    }
+
+    char *Buf = (char *)SDL_malloc(Manifest.UncompressedSize);
+    if (!Buf)
+    {
+        LogCritical("Failed to allocate memory for manifest buffer.\n");
+        return False;
+    }
+
+    if (!ZipReadEnt(Archive, &Manifest, (Uint8 *)Buf, Manifest.UncompressedSize))
+    {
+        LogCritical("Failed to read Manifest.txt from archive.\n");
+        return False;
+    }
+
+    Uint8 Mem[1024];
+    MemAlloc Alloc = MemAllocInit(Mem, sizeof(Mem));
+
+    KeyValueList List = KeyValueParse(&Alloc, Buf, Manifest.UncompressedSize);
+    if (List.HasError)
+    {
+        LogCritical("Failed to parse Manifest.txt in %s.\n", Path);
+        return False;
+    }
+
+#define ReqField(Field)                                                                       \
+    KeyValuePair Field##Pair = KeyValueListFind(List, #Field, sizeof(#Field) - 1);            \
+    if (Field##Pair.KeyLen == 0)                                                              \
+    {                                                                                         \
+        LogCritical("Invalid manifest in %s. Missing required field: '%s'.\n", Path, #Field); \
+        return False;                                                                         \
+    }
+
+#define OptField(Field) \
+    KeyValuePair Field##Pair = KeyValueListFind(List, #Field, sizeof(#Field) - 1);
+
+    ReqField(Name);
+    ReqField(Version);
+
+    OptField(Author);
+    OptField(Summary);
+
+#undef ReqField
+#undef OptField
+
+    if (AuthorPair.KeyLen > 0)
+    {
+        SDL_Log("%s: %.*s %.*s by %.*s\n", Path,
+                (Int32)NamePair.ValueLen, NamePair.Value,
+                (Int32)VersionPair.ValueLen, VersionPair.Value,
+                (Int32)AuthorPair.ValueLen, AuthorPair.Value);
+    }
+    else
+    {
+        SDL_Log("%s: %.*s %.*s\n", Path,
+                (Int32)NamePair.ValueLen, NamePair.Value,
+                (Int32)VersionPair.ValueLen, VersionPair.Value);
+    }
+
+    if (SummaryPair.KeyLen > 0)
+    {
+        SDL_Log("%.*s\n", (Int32)SummaryPair.ValueLen, SummaryPair.Value);
+    }
+
+    SDL_free(Buf);
+    return True;
+}
+
+static Bool LoadOneMod(Mod *Mod, const char *ZipPath)
+{
+    Assert(Mod);
+    Assert(ZipPath);
+
+    if (Mod->Mem)
+    {
+        SDL_free((void *)Mod->Mem);
+        Mod->Mem = 0;
+        Mod->Size = 0;
+        SDL_memset(&Mod->Archive, 0, sizeof(Mod->Archive));
+    }
+
+    size_t Size = 0;
+    void *File = SDL_LoadFile(ZipPath, &Size);
+    if (!File)
+    {
+        LogCritical("Failed to load ZIP file: %s\n", ZipPath);
+        return False;
+    }
+
+    Mod->Mem = (const Uint8 *)File;
+    Mod->Size = Size;
+
+    Mod->Archive = ZipOpen(Mod->Mem, Mod->Size);
+    if (!Mod->Archive.IsValid)
+    {
+        LogCritical("Failed to parse ZIP archive: %s\n", ZipPath);
+        return False;
+    }
+
+    if (!ReadManifest(&Mod->Archive, ZipPath))
+    {
+        LogCritical("Failed to read manifest.\n");
+        return False;
+    }
+
+    ZipEntry Wasm = {0};
+    for (Uint32 I = 0; I < Mod->Archive.Count; ++I)
+    {
+        ZipEntry Ent = ZipGetEntByIndex(&Mod->Archive, I);
+        if (Ent.IsValid && ZipEntEndsWith(&Ent, ".wasm"))
+        {
+            Wasm = Ent;
+            break;
+        }
+    }
+
+    if (!Wasm.IsValid)
+    {
+        LogCritical("No .wasm file found in zip archive %s\n", ZipPath);
+        return False;
+    }
+
+    Uint8 *WasmBuf = (Uint8 *)SDL_malloc(Wasm.UncompressedSize);
+    if (!WasmBuf)
+    {
+        LogCritical("Failed to allocate memory for decompressed wasm.\n");
+        return False;
+    }
+
+    if (!ZipReadEnt(&Mod->Archive, &Wasm, WasmBuf, Wasm.UncompressedSize))
+    {
+        LogCritical("Failed to decompress wasm from zip %s\n", ZipPath);
+        SDL_free(WasmBuf);
+        return False;
+    }
+
+    char PathBuf[1024];
+    Usize PathLen = SDL_strlen(ZipPath);
+    if (PathLen > 4 && SDL_strcmp(ZipPath + PathLen - 4, ".zip") == 0)
+    {
+        SDL_memcpy(PathBuf, ZipPath, PathLen - 4);
+        MemNullTerminate(PathBuf, sizeof(PathBuf), PathLen - 4);
+    }
+    else
+    {
+        SDL_snprintf(PathBuf, sizeof(PathBuf), "%s", ZipPath);
+    }
+    SDL_strlcat(PathBuf, "_Extracted.wasm", sizeof(PathBuf));
+
+    if (!SDL_SaveFile(PathBuf, WasmBuf, Wasm.UncompressedSize))
+    {
+        LogCritical("Failed to write extracted wasm to %s: %s\n", PathBuf, SDL_GetError());
+        SDL_free(WasmBuf);
+        return False;
+    }
+
+    SDL_free(WasmBuf);
+
+    if (!RtLoadOne(&Mod->Rt, PathBuf))
+    {
+        LogCritical("RtLoadOne failed on extracted wasm: %s\n", PathBuf);
+        return False;
+    }
+
+    return True;
+}
+
 // NOTE: UserData -- *SDL
 static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(Void *UserData, const char *DirName, const char *FileName)
 {
@@ -141,22 +415,21 @@ static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(Void *UserData, 
     }
 
     Usize Len = SDL_strlen(FileName);
-    if (Len > 5 && SDL_strcmp(FileName + Len - 5, ".wasm") == 0)
+    if (Len > 4 && SDL_strcmp(FileName + Len - 4, ".zip") == 0)
     {
         Mod *Mod = &App->Mods[App->ModCount];
 
         SDL_snprintf(Mod->Path, sizeof(Mod->Path), "%s%s", DirName, FileName);
 
         Mod->Rt = RtInit();
-        if (Mod->Rt.IsValid && RtLoadOne(&Mod->Rt, Mod->Path))
+        if (Mod->Rt.IsValid && LoadOneMod(Mod, Mod->Path))
         {
             Mod->LastWriteTime = GetFileModTime(Mod->Path);
-            Mod->ExtraMem = SDL_calloc(1, Kb(16));
+            Mod->ExtraMem = SDL_calloc(1, ExtraMemSize);
 
             if (Mod->ExtraMem)
             {
                 App->ModCount++;
-                SDL_Log("Loaded: %s\n", Mod->Path);
             }
             else
             {
@@ -212,7 +485,14 @@ Void Render(SDL *App)
                 Assert(0);
             }
 
-            if (!SDL_RenderDebugText(App->Renderer, DrawDebugText->Pos.X, DrawDebugText->Pos.Y, DrawDebugText->Str))
+            V2 Target = V2Div(DrawDebugText->Pos, DrawDebugText->Scale);
+            if (!SDL_RenderDebugText(App->Renderer, Target.X, Target.Y, DrawDebugText->Str))
+            {
+                LogCritical("%s", SDL_GetError());
+                Assert(0);
+            }
+
+            if (!SDL_SetRenderScale(App->Renderer, 1.0f, 1.0f))
             {
                 LogCritical("%s", SDL_GetError());
                 Assert(0);
@@ -327,14 +607,14 @@ Void Update(SDL *App)
                 Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                 if (NativeExtraMem)
                 {
-                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, Kb(16));
+                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, ExtraMemSize);
                 }
             }
 
             RtDeinit(&Mod->Rt);
             Mod->Rt = RtInit();
 
-            if (RtLoadOne(&Mod->Rt, Mod->Path))
+            if (LoadOneMod(Mod, Mod->Path))
             {
                 Mod->LastWriteTime = CurrentTime;
 
@@ -344,7 +624,7 @@ Void Update(SDL *App)
                     Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
                     if (NativeExtraMem)
                     {
-                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, Kb(16));
+                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, ExtraMemSize);
                     }
                 }
             }
@@ -369,13 +649,13 @@ SDL Init()
         LogCritical("%s", SDL_GetError());
         Assert(0);
     }
-    if (!SDL_CreateWindowAndRenderer("Game", 1280, 720, 0, &Result.Window, &Result.Renderer))
+    if (!SDL_CreateWindowAndRenderer("Game", InternalRes.W, InternalRes.H, SDL_WINDOW_RESIZABLE, &Result.Window, &Result.Renderer))
     {
         LogCritical("%s", SDL_GetError());
         Assert(0);
     }
 
-    if (!SDL_SetRenderLogicalPresentation(Result.Renderer, 1280, 720, SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    if (!SDL_SetRenderLogicalPresentation(Result.Renderer, InternalRes.W, InternalRes.H, SDL_LOGICAL_PRESENTATION_LETTERBOX))
     {
         LogCritical("%s", SDL_GetError());
         Assert(0);
@@ -403,10 +683,16 @@ SDL Init()
     // NOTE: Natives.
     //
 
-    NativeSymbol Natives[] = {
+    // NOTE: I never wish to experience this to anyone, but this MUST be static.
+    // You don't realize through how many hours of debugging I went through not
+    // understading why on reloads the game would just hang, and all because
+    // THIS fucking array was not static. This was just IMPOSSIBLE to fucking
+    // debug as all it was just a HANG.
+    static NativeSymbol Natives[] = {
         {"PrintLine", (void *)HostPrintLine, "(ii)", 0},
-        {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0}};
-    if (!wasm_runtime_register_natives("env", Natives, sizeof(Natives) / sizeof(Natives[0])))
+        {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0},
+        {"ReadFile", (void *)HostReadFile, "(iiii)i", 0}};
+    if (!wasm_runtime_register_natives("env", Natives, ArrayCount(Natives)))
     {
         Assert(0);
     }
@@ -415,19 +701,19 @@ SDL Init()
     // NOTE: Game loading.
     //
     Mod *Game = &Result.Mods[0];
-    if (!GetAbsPath(Game->Path, sizeof(Game->Path), GAME_WASM_FILE))
+    if (!GetAbsPath(Game->Path, sizeof(Game->Path), GameZip))
     {
         Assert(0);
     }
 
     Game->Rt = RtInit();
-    if (!Game->Rt.IsValid || !RtLoadOne(&Game->Rt, Game->Path))
+    if (!Game->Rt.IsValid || !LoadOneMod(Game, Game->Path))
     {
         Assert(0);
     }
 
     Game->LastWriteTime = GetFileModTime(Game->Path);
-    Game->ExtraMem = SDL_calloc(1, Mb(2));
+    Game->ExtraMem = SDL_calloc(1, ExtraMemSize);
     if (!Game->ExtraMem)
     {
         Assert(0);
@@ -455,8 +741,12 @@ SDL Init()
     return Result;
 }
 
-Bool Poll(SDL *SDL)
+Bool Poll(SDL *App)
 {
+    Assert(App);
+
+    App->State.Input.MouseClicked = False;
+
     SDL_Event Ev;
     while (SDL_PollEvent(&Ev))
     {
@@ -476,6 +766,40 @@ Bool Poll(SDL *SDL)
 
             SDL_Scancode Scancode = Ev.key.scancode;
         } break;
+
+        case SDL_EVENT_MOUSE_MOTION:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            App->State.Input.MousePos.X = Ev.motion.x;
+            App->State.Input.MousePos.Y = Ev.motion.y;
+        }
+        break;
+
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            if (Ev.button.button == SDL_BUTTON_LEFT)
+            {
+                App->State.Input.MouseDown = True;
+                App->State.Input.MouseClicked = True;
+            }
+        }
+        break;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+        {
+            SDL_ConvertEventToRenderCoordinates(App->Renderer, &Ev);
+            if (Ev.button.button == SDL_BUTTON_LEFT)
+            {
+                App->State.Input.MouseDown = False;
+            }
+        }
+        break;
+
+        default:
+        {
+            break;
+        }
         }
     }
 

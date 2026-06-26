@@ -16,7 +16,11 @@ typedef struct
 
 MemAlloc MemAllocInit(void *Mem, Uint32 Cap);
 
-Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align);
+// NOTE: If you stumbled upont this accidentally -- use MemAllocPush. This
+// function is for more complex usecases where you need alignment.
+Void *MemAllocPushEx(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align);
+Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes);
+
 Void MemAllocClear(MemAlloc *MemAlloc);
 
 //
@@ -61,10 +65,11 @@ Uint32 CStrLen(const char *CStr);
 //
 
 Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size);
+Bool MemEql(const Void *A, const Void *B, Usize Size);
 Void MemNullTerminate(char *Buf, Usize Cap, Usize Len);
 
-// TODO: Remove this (Atlas thingy needs to migrate to MemReader)
-Uint32 MemReadUint(const char **CurInit);
+const char *MemFindChar(const char *Start, const char *End, char Target);
+Uint32 MemParseUint(const char **CurInit);
 
 Void MemAdvanceToNextLine(const char **CurInit, const char *End);
 

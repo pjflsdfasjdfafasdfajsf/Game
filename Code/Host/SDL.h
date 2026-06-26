@@ -3,14 +3,21 @@
 
 #include <SDL3/SDL.h>
 
+#include "Zip.h"
 #include "Runtime.h"
 
 typedef struct
 {
     Runtime Rt;
+
     char Path[1024];
+
     Int64 LastWriteTime;
     Void *ExtraMem;
+
+    const Uint8 *Mem;
+    Usize Size;
+    ZipArchive Archive;
 } Mod;
 
 typedef struct

@@ -116,10 +116,17 @@ UpdateAndRender(UpdateAndRender)
 {
     if (!State->IsInitialized)
     {
-        State->PermanentAlloc = MemAllocInit(ExtraMem, Kb(32));
+        State->PermanentAlloc = MemAllocInit(ExtraMem, Mb(2));
 
-        State->SpriteAtlasTex = AllocTexture(GenGameAtlas, GenGameAtlasLen);
-        State->SpriteAtlas = AtlasInit(&State->PermanentAlloc, State->SpriteAtlasTex, GenGameAtlasMeta, GenGameAtlasMetaLen);
+        Uint32 Size = GetFileSize("GameAtlas.png");
+        Void *Buf = MemAllocPush(&State->PermanentAlloc, Size);
+        ReadFileCStr("GameAtlas.png", Buf, Size);
+        State->SpriteAtlasTex = AllocTexture(Buf, Size);
+
+        Size = GetFileSize("GameAtlas.txt");
+        Buf = MemAllocPush(&State->PermanentAlloc, Size + 1);
+        ReadFileCStr("GameAtlas.txt", Buf, Size);
+        State->SpriteAtlas = AtlasInit(&State->PermanentAlloc, State->SpriteAtlasTex, Buf, Size);
 
         State->Map = MapInitialize();
 
@@ -131,5 +138,20 @@ UpdateAndRender(UpdateAndRender)
     MapDraw(&State->Map, RenderBuf);
     RenderBufDrawCStr(RenderBuf, White, V2Make(10.0f, 10.0f), V2Make(2.0f, 2.0f), "Hello, World!\n");
 
-    RenderBufDrawRect(RenderBuf, State->SpriteAtlasTex, RectMake(100.0f, 100.0f, 100.0f, 100.0f), AtlasGetRect(&State->SpriteAtlas, "ExcitedMan.png"), White);
+    // TODO: Put in state
+    static UIContext UI = {0};
+
+    UILayout Layout = UILayoutBeginCenteredVertical(&UI, ScreenCenter, V2Make(180.0f, 32.0f), 10.0f);
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Play"))
+    {
+        PrintCStr("Hi :)");
+    }
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Mods"))
+    {
+        PrintCStr("Hi :)");
+    }
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Quit"))
+    {
+        PrintCStr("Hi :)");
+    }
 }
