@@ -56,13 +56,13 @@ Rect UILayoutNext(UILayout *Layout)
     return Result;
 }
 
-Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, Rect Bounds, const char *CStr)
+Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, Input *Input, Rect Bounds, const char *CStr)
 {
     UIID BaseID = HashCStr(CStr);
     UIID ID = UIGetCurrentID(UI, BaseID);
 
     Bool Clicked = False;
-    Bool Hovered = RectContainsV2(Bounds, State->Input.MousePos);
+    Bool Hovered = RectContainsV2(Bounds, Input->MousePos);
 
     if (Hovered)
     {
@@ -75,7 +75,7 @@ Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, Rect Bounds, co
 
     if (UI->Active == ID)
     {
-        if (!State->Input.MouseDown)
+        if (!Input->MouseDown)
         {
             if (UI->Hot == ID)
             {
@@ -84,7 +84,7 @@ Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, Rect Bounds, co
             UI->Active = 0;
         }
     }
-    else if (UI->Hot == ID && State->Input.MouseClicked)
+    else if (UI->Hot == ID && Input->MouseClicked)
     {
         UI->Active = ID;
     }

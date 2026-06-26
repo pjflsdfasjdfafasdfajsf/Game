@@ -29,15 +29,15 @@ UpdateAndRender(UpdateAndRender)
     static UIContext UI = {0};
 
     UILayout Layout = UILayoutBeginCenteredVertical(&UI, ScreenCenter, V2Make(180.0f, 32.0f), 10.0f);
-    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Play"))
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Play"))
     {
         PrintCStr("Hi :)");
     }
-    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Mods"))
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Mods"))
     {
         PrintCStr("Hi :)");
     }
-    if (UIButton(RenderBuf, &UI, State, UILayoutNext(&Layout), "Quit"))
+    if (UIButton(RenderBuf, &UI, &State->Input, UILayoutNext(&Layout), "Quit"))
     {
         PrintCStr("Hi :)");
     }

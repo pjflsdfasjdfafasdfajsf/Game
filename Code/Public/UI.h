@@ -37,6 +37,6 @@ UILayout UILayoutBeginCenteredVertical(UIContext *UI, V2 Center, V2 ItemSize, Fl
 
 Rect UILayoutNext(UILayout *Layout);
 
-Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, State *State, Rect Bounds, const char *CStr);
+Bool UIButton(RenderBuf *RenderBuf, UIContext *UI, Input *Input, Rect Bounds, const char *CStr);
 
 #endif
