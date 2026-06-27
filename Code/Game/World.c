@@ -61,7 +61,7 @@ static inline Void MapDraw(RenderBuf *RenderBuf, State *State)
             }
 
             Rect Tile = RectMake(X * MapTileSize, Y * MapTileSize, MapTileSize, MapTileSize);
-            Tile.Pos = CameraWorldToScreen(World->Camera, Tile.Pos);
+            Tile.Pos = ToScreen(World->Camera, Tile.Pos);
 
             Color Color = Black;
 
@@ -473,12 +473,12 @@ static void PlayerDraw(RenderBuf *RenderBuf, State *State)
 
     Player *Player = &State->World.Player;
 
-    Rect Centered = RectGetCentered(CameraWorldToScreen(State->World.Camera, Player->Pos), GetParamV2(Player->Params.Size));
+    Rect Centered = RectGetCentered(ToScreen(State->World.Camera, Player->Pos), GetParamV2(Player->Params.Size));
     RenderBufDrawRect(RenderBuf, TexHandleInvalid, Centered, RectZero, Red, Filled);
 
     if (Player->State == PlayerState_Hook)
     {
-        RenderBufDrawLine(RenderBuf, CameraWorldToScreen(State->World.Camera, Player->Pos), CameraWorldToScreen(State->World.Camera, Player->Hook.Target), White);
+        RenderBufDrawLine(RenderBuf, ToScreen(State->World.Camera, Player->Pos), ToScreen(State->World.Camera, Player->Hook.Target), White);
     }
 }
 

@@ -22,18 +22,6 @@ typedef struct Time
     Float32 Delta;
 } Time;
 
-// TODO: Put this in Math.h
-typedef struct Camera
-{
-    V2 Pos;
-    V2I Viewport;
-} Camera;
-
-static inline V2 CameraWorldToScreen(Camera Camera, V2 World)
-{
-    return V2Sub(World, Camera.Pos);
-}
-
 // TODO: temporary
 #define MapHeight 9
 #define MapWidth 30

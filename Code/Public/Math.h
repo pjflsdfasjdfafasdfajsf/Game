@@ -108,13 +108,29 @@ Bool RectContainsV2(Rect Rect, V2 Point);
 Bool RectContainsRect(Rect X, Rect Y);
 
 // NOTE: DO NOT MESS UP THESE TWO!!
+
 // NOTE: Returns V2 indicating where the top-left corner of the inner object should
-//  be placed so that it is centered inside the container
+// be placed so that it is centered inside the container
 V2 RectGetCenteredPos(Rect Rect, V2 Size);
 // NOTE: Returns a Rect of that size, centered precisely on that coordinate
 Rect RectGetCentered(V2 Pos, V2 Size);
 
 #define RectZero RectMake(0.0f, 0.0f, 0.0f, 0.0f)
+
+//
+// NOTE: Camera.
+// 
+
+typedef struct Camera
+{
+    V2 Pos;
+    // NOTE: Usually is InternalRes.
+    V2I Viewport;
+} Camera;
+
+// NOTE: Keep everything in world space and use this only when you need to pass
+// coordinates to the draw call.
+V2 ToScreen(Camera Camera, V2 World);
 
 //
 // NOTE: Hashing.
