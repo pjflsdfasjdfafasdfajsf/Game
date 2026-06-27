@@ -18,6 +18,7 @@ Color ColorMakeNoA(Uint8 R, Uint8 G, Uint8 B);
 #define White ColorMakeNoA(255, 255, 255)
 #define Black ColorMakeNoA(0, 0, 0)
 #define Red ColorMakeNoA(255, 0, 0)
+#define Green ColorMakeNoA(0, 255, 0)
 #define Blue ColorMakeNoA(0, 0, 255)
 
 typedef struct
@@ -83,8 +84,9 @@ typedef struct
     };
 } V2I;
 
+// NOTE: Imagine NAMING your things in a SELF-DOCUMENTING way??
 V2I V2IMake(Int32 X, Int32 Y);
-V2I V2IFromV2(V2 X);
+V2I V2IMake2(V2 X);
 
 // NOTE: Scalar ops.
 
