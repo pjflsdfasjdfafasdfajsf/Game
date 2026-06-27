@@ -41,6 +41,11 @@ V2 V2Sub(V2 X, V2 Y)
     return V2Make(X.X - Y.X, X.Y - Y.Y);
 }
 
+V2 V2Mul(V2 X, V2 Y)
+{
+    return V2Make(X.X * Y.X, X.Y * Y.Y);
+}
+
 Float32 V2Dot(V2 X, V2 Y)
 {
     return X.X * Y.X + X.Y * Y.Y;

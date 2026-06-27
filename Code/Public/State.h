@@ -9,6 +9,15 @@
 #include "Render.h"
 #include "Types.h"
 
+#define Param(Type, Name) \
+    struct                \
+    {                     \
+        Type Value;       \
+        Type Multiplier;  \
+    } Name
+#define GetParam(Param) ((Param).Value * (Param).Multiplier)
+#define GetParamV2(Param) V2Mul((Param).Value, (Param).Multiplier)
+
 typedef struct Action
 {
     Bool IsDown;
@@ -31,6 +40,7 @@ typedef struct Input
     Action Right;
 } Input;
 
+// TODO: Put this in Math.h
 typedef struct Camera
 {
     V2 Pos;
@@ -65,14 +75,43 @@ typedef struct Player
     V2 Vel;
     PlayerState State;
 
-    Float32 DashTimer;
-    Float32 DashDirection;
+    struct {
+        Float32 Timer;
+        Float32 Direction;
+    } Dash;
 
-    V2 HookTarget;
-    Float32 HookRopeLength;
-    Float32 HookCooldown; // we are cool
+    struct {
+        // NOTE: Position of the hook target players hooking on
+        V2 Target;
+        // NOTE: Length of the 'rope'
+        Float32 Len;
+        Float32 Cooldown;
+    } Hook;
 
     Float32 JumpBufferTimer;
+    // NOTE: This exists primarily for modders. It is very important that if
+    // you want your mod to have basic compatability with other mods you set
+    // MULTIPLIERS of parameters, not their VALUES.
+    struct
+    {
+        Param(V2, Size);
+        Param(Float32, HookRadius);
+        Param(Float32, HookForce);
+        Param(Float32, MaxSpeed);
+        Param(Float32, DashSpeed);
+        Param(Float32, JumpSpeed);
+        Param(Float32, SlamSpeed);
+        Param(Float32, Acceleration);
+        Param(Float32, Friction);
+        Param(Float32, Gravity);
+        Param(Float32, ApexThreshold);
+        Param(Float32, ApexGravityMultiplier);
+        Param(Float32, ApexControlMultiplier);
+        Param(Float32, DashDuration);
+        Param(Float32, DashCooldown);
+        Param(Float32, JumpBufferDuration);
+        Param(Float32, HookCooldown);
+    } Params;
 } Player;
 
 typedef struct Time

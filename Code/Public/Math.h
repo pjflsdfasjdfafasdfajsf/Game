@@ -49,6 +49,7 @@ V2 V2Splat(Float32 X);
 V2 V2Div(V2 X, V2 Y);
 V2 V2Add(V2 X, V2 Y);
 V2 V2Sub(V2 X, V2 Y);
+V2 V2Mul(V2 X, V2 Y);
 Float32 V2Dot(V2 X, V2 Y);
 Float32 V2LenSquared(V2 X);
 Float32 V2Len(V2 X);
