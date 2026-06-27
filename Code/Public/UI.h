@@ -1,9 +1,9 @@
 #if !defined(UI_H)
 #define UI_H
 
+#include "Input.h"
 #include "Math.h"
 #include "Render.h"
-#include "Input.h"
 
 #define UIID Uint32
 

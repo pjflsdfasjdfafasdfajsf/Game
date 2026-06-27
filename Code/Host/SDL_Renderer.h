@@ -4,9 +4,9 @@
 
 #include <SDL3/SDL.h>
 
+#include "Mem.h"
 #include "Render.h"
 #include "Types.h"
-#include "Mem.h"
 
 // NOTE: Internal textures.
 #define ReservedCircleTex 0

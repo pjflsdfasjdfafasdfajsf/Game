@@ -1,9 +1,9 @@
 
 #include "SDK.h"
 
+#include "Menu.h"
 #include "State.h"
 #include "World.h"
-#include "Menu.h"
 
 UpdateAndRender(UpdateAndRender)
 {
@@ -23,7 +23,7 @@ UpdateAndRender(UpdateAndRender)
 
         State->World = WorldInit(State);
         State->Menu = MenuInit(State);
-        
+
         PrintCStr("(Game): Initialized");
         State->IsInitialized = True;
     }
@@ -32,11 +32,13 @@ UpdateAndRender(UpdateAndRender)
     {
     case GameState_Game:
     {
-        WorldUpdateAndRender(RenderBuf, State);   
-    } break;
+        WorldUpdateAndRender(RenderBuf, State);
+    }
+    break;
     case GameState_Menu:
     {
-        MenuUpdateAndRender(RenderBuf, State);   
-    } break;
+        MenuUpdateAndRender(RenderBuf, State);
+    }
+    break;
     }
 }

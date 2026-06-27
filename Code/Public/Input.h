@@ -2,8 +2,8 @@
 #if !defined(INPUT_H)
 #define INPUT_H
 
-#include "Types.h"
 #include "Math.h"
+#include "Types.h"
 
 typedef struct Action
 {
@@ -26,6 +26,5 @@ typedef struct Input
     Action Left;
     Action Right;
 } Input;
-
 
 #endif

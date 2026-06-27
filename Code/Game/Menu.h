@@ -7,5 +7,4 @@
 Menu MenuInit(State *State);
 Void MenuUpdateAndRender(RenderBuf *RenderBuf, State *State);
 
-#endif 
-
+#endif

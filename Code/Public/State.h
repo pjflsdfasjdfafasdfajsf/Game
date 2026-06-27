@@ -57,12 +57,14 @@ typedef struct Player
     V2 Vel;
     PlayerState State;
 
-    struct {
+    struct
+    {
         Float32 Timer;
         Float32 Direction;
     } Dash;
 
-    struct {
+    struct
+    {
         // NOTE: Position of the hook target players hooking on
         V2 Target;
         // NOTE: Length of the 'rope'
@@ -98,9 +100,9 @@ typedef struct Player
 
 typedef struct World
 {
-	Camera Camera;
-	Map Map;
-	Player Player;	
+    Camera Camera;
+    Map Map;
+    Player Player;
 } World;
 
 typedef struct Menu
@@ -111,7 +113,7 @@ typedef struct Menu
 typedef enum
 {
     GameState_Game,
-    GameState_Menu,  
+    GameState_Menu,
 } GameState;
 
 // NOTE: ANYTHING THAT IS MODIFIED BY HOST MUST BE THE AT THE VERY TOP OF THIS

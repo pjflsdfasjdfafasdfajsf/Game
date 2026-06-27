@@ -180,7 +180,7 @@ static Bool MapFindNearestHookWithinRadius(State *State, V2 *OutNearestHook)
                 continue;
             }
 
-            V2 Center = V2Make((Float32)(X * MapTileSize) + (MapTileSize * 0.5f),(Float32)(Y * MapTileSize) + (MapTileSize * 0.5f));
+            V2 Center = V2Make((Float32)(X * MapTileSize) + (MapTileSize * 0.5f), (Float32)(Y * MapTileSize) + (MapTileSize * 0.5f));
             Float32 DistanceSquared = V2DistSquared(State->World.Player.Pos, Center);
 
             if (DistanceSquared > ClosestDistanceSquared)
@@ -498,14 +498,15 @@ Void WorldUpdateAndRender(RenderBuf *RenderBuf, State *State)
     Assert(RenderBuf);
     Assert(State);
 
+    // NOTE: Update
     World *World = &State->World;
-    
     PlayerUpdate(State);
 
+    // NOTE: Render
     RenderBufClear(RenderBuf, Black);
+
     MapDraw(RenderBuf, State);
     PlayerDraw(RenderBuf, State);
-    RenderBufDrawCStr(RenderBuf, White, V2Make(10.0f, 10.0f), V2Make(2.0f, 2.0f), "Hello, World!\n");
 
     if (State->Input.RMB.Pressed)
     {
@@ -513,6 +514,5 @@ Void WorldUpdateAndRender(RenderBuf *RenderBuf, State *State)
     }
 
     V2 WorldPos = V2Make((Float32)(MapWidth * MapTileSize), (Float32)(MapHeight * MapTileSize));
-    CameraUpdate(&World->Camera, World->Player.Pos, World->Camera.Viewport, WorldPos, State->Time.Delta); 
+    CameraUpdate(&World->Camera, World->Player.Pos, World->Camera.Viewport, WorldPos, State->Time.Delta);
 }
-

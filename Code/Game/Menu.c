@@ -2,15 +2,15 @@
 
 Menu MenuInit(State *State)
 {
-	Menu Result = {0};
+    Menu Result = {0};
 
-	return Result;
+    return Result;
 }
 
 Void MenuUpdateAndRender(RenderBuf *RenderBuf, State *State)
 {
-	Menu *Menu = &State->Menu;
-	
+    Menu *Menu = &State->Menu;
+
     UILayout Layout = UILayoutBeginCenteredVertical(&Menu->UI, ScreenCenter, V2Make(180.0f, 32.0f), 10.0f);
     if (UIButton(RenderBuf, &Menu->UI, &State->Input, UILayoutNext(&Layout), "Play"))
     {
@@ -27,7 +27,6 @@ Void MenuUpdateAndRender(RenderBuf *RenderBuf, State *State)
 
     if (State->Input.RMB.Pressed)
     {
-    	State->GameState = GameState_Game;
-    }	
+        State->GameState = GameState_Game;
+    }
 }
-
