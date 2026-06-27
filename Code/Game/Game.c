@@ -1,14 +1,40 @@
 //
 // NOTE: Main game file.
 //
+#include "Math.h"
 #include <SDK.h>
 
-#include "Math.h"
-#include "Render.h"
-#include "State.h"
-#include "Types.h"
+#define MapTileSize 40
 
-#define MapTileSize 28
+#define PlayerSize V2Splat(40.0f)
+#define PlayerHookRadius 267.0f
+#define PlayerHookForce 1000.0f
+// in pixels/sec
+#define PlayerMaxSpeed 600.0f
+#define PlayerDashSpeed 1500.0f
+#define PlayerJumpSpeed 1000.0f
+#define PlayerSlamSpeed 2500.0f
+#define PlayerAcceleration 3000.0f
+#define PlayerFriction 2500.0f
+#define PlayerGravity 2000.0f
+// how close to 0 velocity.y needs to be to trigger the apex
+#define PlayerApexThreshold 150.0f
+#define PlayerApexGravityMultiplier 0.5f
+#define PlayerApexControlMultiplier 2.0f
+// in seconds
+#define PlayerDashDuration 0.15f
+#define PlayerDashCooldown 1.0f
+#define PlayerJumpBufferDuration 0.15f
+#define PlayerHookCooldown 0.25f
+
+static Void CameraUpdate(Camera *Camera, V2 Target, V2I Viewport, V2 World, Float32 Delta)
+{
+    Assert(Camera);
+    
+    V2 Desired = V2Make(Clamp(Target.X - Viewport.X * 0.5f, 0, World.X - Viewport.X), Clamp(Target.Y - Viewport.Y * 0.5f, 0, World.Y - Viewport.Y));
+    Float32 Speed = 10.0f;
+    Camera->Pos = V2Add(Camera->Pos, V2Scale(V2Sub(Desired, Camera->Pos), Speed * Delta));
+}
 
 enum
 {
@@ -21,8 +47,8 @@ static inline Map MapInitialize(Void)
 {
     Map Result = {
         {
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0},
+            {0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1},
@@ -36,36 +62,47 @@ static inline Map MapInitialize(Void)
     return Result;
 }
 
-static inline Void MapDraw(Map *Map, RenderBuf *RenderBuf)
+static inline Void MapDraw(RenderBuf *RenderBuf, State *State)
 {
-    Assert(Map);
+    Assert(State);
     Assert(RenderBuf);
+
+    Map *Map = &State->Map;
 
     for (Int32 Y = 0; Y < MapHeight; Y++)
     {
         for (Int32 X = 0; X < MapWidth; X++)
         {
-            Int32 Tile = Map->Grid[Y][X];
+            Int32 TileID = Map->Grid[Y][X];
 
-            if (Tile == TileEmpty)
+            if (TileID == TileEmpty)
             {
                 /* NOTE: dont draw empty Tiles */
                 continue;
             }
 
-            Rect Rect = RectMake(X * MapTileSize, Y * MapTileSize, MapTileSize, MapTileSize);
-            Color color = Black;
+            Rect Tile = RectMake(X * MapTileSize, Y * MapTileSize, MapTileSize, MapTileSize);
+            Tile.Pos = CameraWorldToScreen(State->Camera, Tile.Pos);
+            
+            Color Color = Black;
 
-            switch (Tile)
+            switch (TileID)
             {
             case TileSolid:
             {
-                color = White;
+                Color = White;
+            }
+            break;
+            case TileHook:
+            {
+                Color = Blue;
+                V2 Center = V2Add(Tile.Pos, V2Scale(Tile.Size, 0.5f));
+                RenderBufDrawCircle(RenderBuf, Center, PlayerHookRadius, Green, Hollow);
             }
             break;
             }
 
-            RenderBufDrawRect(RenderBuf, TexHandleInvalid, Rect, Rect, color);
+            RenderBufDrawRect(RenderBuf, TexHandleInvalid, Tile, Tile, Color, Filled);
         }
     }
 }
@@ -90,8 +127,8 @@ static Bool MapIsOverlappingSolidTile(State *State, Rect Rectangle)
 {
     Assert(State);
 
-    V2I FirstTouchedTile = V2IUnscale(V2IFromV2(Rectangle.Pos), MapTileSize);
-    V2I LastTouchedTile = V2IUnscale(V2IFromV2(V2Add(Rectangle.Pos, V2Sub(Rectangle.Size, V2Splat(0.001f)))), MapTileSize);
+    V2I FirstTouchedTile = V2IUnscale(V2IMake2(Rectangle.Pos), MapTileSize);
+    V2I LastTouchedTile = V2IUnscale(V2IMake2(V2Add(Rectangle.Pos, V2Sub(Rectangle.Size, V2Splat(0.001f)))), MapTileSize);
 
     for (Int32 Y = FirstTouchedTile.Y; Y <= LastTouchedTile.Y; Y++)
     {
@@ -182,27 +219,6 @@ static Bool MapFindNearestHookWithinRadius(State *State, V2 Origin, Float32 Radi
 //
 // NOTE: player
 //
-
-#define PlayerSize V2Splat(40.0f)
-#define PlayerHookRadius 600.0f
-#define PlayerHookForce 1000.0f
-// in pixels/sec
-#define PlayerMaxSpeed 600.0f
-#define PlayerDashSpeed 1500.0f
-#define PlayerJumpSpeed 1000.0f
-#define PlayerSlamSpeed 2500.0f
-#define PlayerAcceleration 3000.0f
-#define PlayerFriction 2500.0f
-#define PlayerGravity 2000.0f
-// how close to 0 velocity.y needs to be to trigger the apex
-#define PlayerApexThreshold 150.0f
-#define PlayerApexGravityMultiplier 0.5f
-#define PlayerApexControlMultiplier 2.0f
-// in seconds
-#define PlayerDashDuration 0.15f
-#define PlayerDashCooldown 1.0f
-#define PlayerJumpBufferDuration 0.15f
-#define PlayerHookCooldown 0.25f
 
 static inline Player PlayerInitialize(Void)
 {
@@ -432,10 +448,20 @@ static inline Void PlayerUpdate(State *State)
     }
 }
 
-static void PlayerDraw(State *State, RenderBuf *RenderBuf)
+static void PlayerDraw(RenderBuf *RenderBuf, State *State)
 {
-    Rect Centered = RectGetCentered(State->Player.Pos, PlayerSize);
-    RenderBufDrawRect(RenderBuf, TexHandleInvalid, Centered, RectZero, Red);
+    Assert(State);
+    Assert(RenderBuf);
+
+    Player *Player = &State->Player;
+
+    Rect Centered = RectGetCentered(CameraWorldToScreen(State->Camera, Player->Pos), PlayerSize);
+    RenderBufDrawRect(RenderBuf, TexHandleInvalid, Centered, RectZero, Red, Filled);
+
+    if (Player->State == PlayerState_Hook)
+    {
+        RenderBufDrawLine(RenderBuf, CameraWorldToScreen(State->Camera, Player->Pos), CameraWorldToScreen(State->Camera, Player->HookTarget), White);
+    }
 }
 
 UpdateAndRender(UpdateAndRender)
@@ -454,6 +480,7 @@ UpdateAndRender(UpdateAndRender)
         ReadFileCStr("GameAtlas.txt", Buf, Size);
         State->SpriteAtlas = AtlasInit(&State->PermanentAlloc, State->SpriteAtlasTex, Buf, Size);
 
+        State->Camera.Viewport = V2IMake2(InternalRes);
         State->Map = MapInitialize();
 
         PrintCStr("(Game): Initialized");
@@ -463,8 +490,8 @@ UpdateAndRender(UpdateAndRender)
     PlayerUpdate(State);
 
     RenderBufClear(RenderBuf, Black);
-    MapDraw(&State->Map, RenderBuf);
-    PlayerDraw(State, RenderBuf);
+    MapDraw(RenderBuf, State);
+    PlayerDraw(RenderBuf, State);
     RenderBufDrawCStr(RenderBuf, White, V2Make(10.0f, 10.0f), V2Make(2.0f, 2.0f), "Hello, World!\n");
 
     // TODO: Put in state
@@ -488,4 +515,7 @@ UpdateAndRender(UpdateAndRender)
     {
         PrintCStr("AUGHHHH");
     }
+
+    V2 World = V2Make((Float32)(MapWidth * MapTileSize), (Float32)(MapHeight * MapTileSize));
+    CameraUpdate(&State->Camera, State->Player.Pos, State->Camera.Viewport, World, State->Time.Delta);
 }

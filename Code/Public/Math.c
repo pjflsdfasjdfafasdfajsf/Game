@@ -95,7 +95,7 @@ V2I V2IMake(Int32 X, Int32 Y)
     return (V2I){{{X, Y}}};
 }
 
-V2I V2IFromV2(V2 X)
+V2I V2IMake2(V2 X)
 {
     return V2IMake((Int32)X.X, (Int32)X.Y);
 }

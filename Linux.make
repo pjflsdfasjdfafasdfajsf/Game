@@ -24,7 +24,7 @@ SYSTEM_LIBS := -lm -lpthread -ldl -lrt -lstdc++
 # NOTE: Source groups
 ATLAS_SRC   := Code/Host/AtlasPack.c Code/Host/STB.c
 SDK_SRC     := Code/Public/Init.c Code/Public/Mem.c Code/Public/Render.c Code/Public/Math.c Code/Public/UI.c
-HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL.c Code/Host/Zip.c Code/Host/KeyValue.c
+HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL.c Code/Host/SDL_Renderer.c Code/Host/Zip.c Code/Host/KeyValue.c
 TEST_SRC    := Code/Host/Zip_Test.c Code/Host/Zip.c
 GAME_SRC    := Code/Game/Game.c
 

@@ -26,6 +26,8 @@ typedef enum
     RenderCommand_Clear,
     RenderCommand_DrawDebugText,
     RenderCommand_DrawRect,
+    RenderCommand_DrawCircle,
+    RenderCommand_DrawLine,
 } RenderCommand;
 
 // NOTE: Every command must start with this header for iterators sake.
@@ -65,6 +67,13 @@ typedef struct
     char Str[];
 } RenderDrawDebugText;
 
+enum
+{
+    Filled = True,
+    // NOTE: Dras only the rectangle outline
+    Hollow = False,
+};
+
 typedef struct
 {
     RenderHeader Header;
@@ -82,7 +91,31 @@ typedef struct
     // NOTE: If Tex is TexHandleInvalid then it's the color of the rectangle.
     // Otherwise acts as a tint. For unmodified keep it as White.
     Color Color;
+
+    // NOTE: This is fully ignored if Tex is NOT TexHandleInvalid and just renders a filled rectangle with a texture.
+    Bool Filled;
 } RenderDrawRect;
+
+// TODO: Texture?
+typedef struct
+{
+    RenderHeader Header;
+    
+    V2 Center;
+    Float32 Radius;
+    Color Color;
+    // TODO: Add filled circles
+    Bool Filled;
+} RenderDrawCircle;
+
+typedef struct
+{
+    RenderHeader Header;
+    
+    V2 Start;
+    V2 End;
+    Color Color;
+} RenderDrawLine;
 
 typedef struct
 {
@@ -103,7 +136,9 @@ Void RenderBufDrawCStr(RenderBuf *RenderBuf, Color Color, V2 Pos, V2 Scale, cons
 // everytime!' then you're probably doing something wrong. Standard untextured
 // rectangles shouldn't be a thing you do very often and if you're actually
 // using spritesheets like intended it should not seem as inconvinient.
-Void RenderBufDrawRect(RenderBuf *RenderBuf, TexHandle Tex, Rect Dst, Rect Src, Color Color);
+Void RenderBufDrawRect(RenderBuf *RenderBuf, TexHandle Tex, Rect Dst, Rect Src, Color Color, Bool Filled);
+Void RenderBufDrawCircle(RenderBuf *RenderBuf, V2 Center, Float32 Radius, Color Color, Bool Filled);
+Void RenderBufDrawLine(RenderBuf *RenderBuf, V2 Start, V2 End, Color Color);
 
 Void RenderBufReset(RenderBuf *RenderBuf);
 // NOTE: This is used only internally.

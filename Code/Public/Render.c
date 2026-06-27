@@ -2,6 +2,9 @@
 #include "Mem.h"
 #include "Types.h"
 
+// TODO:
+// *Macro for all render command implementation stuff
+
 RenderBuf RenderBufInit(MemAlloc *MemAlloc, Uint32 Cap)
 {
     RenderBuf Result = {};
@@ -87,7 +90,7 @@ Void RenderBufDrawCStr(RenderBuf *RenderBuf, Color Color, V2 Pos, V2 Scale, cons
     RenderBufDrawDebugText(RenderBuf, Color, Pos, Scale, Str, CStrLen(Str));
 }
 
-Void RenderBufDrawRect(RenderBuf *RenderBuf, TexHandle Tex, Rect Dst, Rect Src, Color Color)
+Void RenderBufDrawRect(RenderBuf *RenderBuf, TexHandle Tex, Rect Dst, Rect Src, Color Color, Bool Filled)
 {
     RenderDrawRect *Cmd = (RenderDrawRect *)RenderBufPush(RenderBuf, sizeof(RenderDrawRect));
 
@@ -95,13 +98,45 @@ Void RenderBufDrawRect(RenderBuf *RenderBuf, TexHandle Tex, Rect Dst, Rect Src, 
     {
         Cmd->Header.Type = RenderCommand_DrawRect;
         Cmd->Header.Size = BufAlignUp(sizeof(RenderDrawRect));
-
+    
         Cmd->Tex = Tex;
         Cmd->Dst = Dst;
         Cmd->Src = Src;
         Cmd->Color = Color;
+        Cmd->Filled = Filled;
     }
 }
+
+Void RenderBufDrawCircle(RenderBuf *RenderBuf, V2 Center, Float32 Radius, Color Color, Bool Filled)
+{
+    RenderDrawCircle *Cmd = (RenderDrawCircle *)RenderBufPush(RenderBuf, sizeof(RenderDrawCircle));
+
+    if (Cmd)
+    {
+        Cmd->Header.Type = RenderCommand_DrawCircle;
+        Cmd->Header.Size = BufAlignUp(sizeof(RenderDrawCircle));
+
+        Cmd->Center = Center;
+        Cmd->Radius = Radius;    
+        Cmd->Color = Color;
+        Cmd->Filled = Filled;
+    }
+}
+
+Void RenderBufDrawLine(RenderBuf *RenderBuf, V2 Start, V2 End, Color Color)
+{
+    RenderDrawLine *Cmd = (RenderDrawLine *)RenderBufPush(RenderBuf, sizeof(RenderDrawLine));
+
+    if (Cmd)
+    {
+        Cmd->Header.Type = RenderCommand_DrawLine;
+        Cmd->Header.Size = BufAlignUp(sizeof(RenderDrawLine));
+
+        Cmd->Start = Start;
+        Cmd->End = End;
+        Cmd->Color = Color;
+    }
+ }
 
 Void RenderBufReset(RenderBuf *RenderBuf)
 {

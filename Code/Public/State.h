@@ -31,6 +31,17 @@ typedef struct Input
     Action Right;
 } Input;
 
+typedef struct Camera
+{
+    V2 Pos;
+    V2I Viewport;
+} Camera;
+
+static inline V2 CameraWorldToScreen(Camera Camera, V2 World)
+{
+    return V2Sub(World, Camera.Pos);
+}
+
 // TODO: temporary
 #define MapHeight 9
 #define MapWidth 30
@@ -82,6 +93,7 @@ typedef struct State
     TexHandle SpriteAtlasTex;
     Atlas SpriteAtlas;
 
+    Camera Camera;
     Map Map;
     Player Player;
 
