@@ -58,7 +58,7 @@ typedef struct
 SDL Init();
 
 Bool Poll(SDL *App);
-Void Render(SDL *App);
+void Render(SDL *App);
 Void Update(SDL *App);
 
 #define LogCritical(Message, ...) SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "%s:%d (%s): " Message, __FILE__, __LINE__, __func__, ##__VA_ARGS__)

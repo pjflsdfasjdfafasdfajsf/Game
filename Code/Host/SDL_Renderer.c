@@ -3,9 +3,6 @@
 //
 #include "SDL_Renderer.h"
 #include "Mem.h"
-#include "SDL.h"
-#include <SDL3/SDL_error.h>
-#include <SDL3/SDL_render.h>
 
 //
 // NOTE: Internal
@@ -112,7 +109,6 @@ Renderer RendererInit(SDL_Window *Window, MemAlloc Alloc)
     Result.Buf = RenderBufInit(&Alloc, Kb(32));
     if (!Result.Buf.IsValid)
     {
-        // TODO: We could use this function more consistently
         SDL_SetError("Failed to initialize render buffer");
 
         Result.IsValid = False;
@@ -124,7 +120,7 @@ Renderer RendererInit(SDL_Window *Window, MemAlloc Alloc)
 }
 
 // TODO: Better error handling
-Void RendererDraw(Renderer *Renderer)
+Bool RendererDraw(Renderer *Renderer)
 {
     Assert(Renderer);
 
@@ -138,13 +134,11 @@ Void RendererDraw(Renderer *Renderer)
 
             if (!SDL_SetRenderDrawColor(Renderer->SDL, Clear->Color.R, Clear->Color.G, Clear->Color.B, Clear->Color.A))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
             if (!SDL_RenderClear(Renderer->SDL))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
         }
         break;
@@ -155,26 +149,22 @@ Void RendererDraw(Renderer *Renderer)
 
             if (!SDL_SetRenderDrawColor(Renderer->SDL, DrawDebugText->Color.R, DrawDebugText->Color.G, DrawDebugText->Color.B, DrawDebugText->Color.A))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
             if (!SDL_SetRenderScale(Renderer->SDL, DrawDebugText->Scale.X, DrawDebugText->Scale.Y))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
 
             V2 Target = V2Div(DrawDebugText->Pos, DrawDebugText->Scale);
             if (!SDL_RenderDebugText(Renderer->SDL, Target.X, Target.Y, DrawDebugText->Str))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
 
             if (!SDL_SetRenderScale(Renderer->SDL, 1.0f, 1.0f))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
         }
         break;
@@ -195,19 +185,16 @@ Void RendererDraw(Renderer *Renderer)
                 // NOTE: Untextured Rectangle
                 if (!SDL_SetRenderDrawColor(Renderer->SDL, DrawRect->Color.R, DrawRect->Color.G, DrawRect->Color.B, DrawRect->Color.A))
                 {
-                    LogCritical("%s", SDL_GetError());
-                    Assert(0);
+                    return False;
                 }
 
                 if (DrawRect->Filled && !SDL_RenderFillRect(Renderer->SDL, &DstRect))
                 {
-                    LogCritical("%s", SDL_GetError());
-                    Assert(0);
+                    return False;
                 }
                 else if (!SDL_RenderRect(Renderer->SDL, &DstRect))
                 {
-                    LogCritical("%s", SDL_GetError());
-                    Assert(0);
+                    return False;
                 }
             }
             else
@@ -215,17 +202,15 @@ Void RendererDraw(Renderer *Renderer)
                 // NOTE: Textured Rectangle
                 if (DrawRect->Tex >= Renderer->TexCount)
                 {
-                    LogCritical("Invalid texture handle: %d", DrawRect->Tex);
-                    Assert(0);
-                    break;
+                    SDL_SetError("Invalid texture handle: %d", DrawRect->Tex);
+                    return False;
                 }
 
                 SDL_Texture *Tex = Renderer->Texs[DrawRect->Tex];
                 if (!Tex)
                 {
-                    LogCritical("Attempted to draw null texture at handle: %d", DrawRect->Tex);
-                    Assert(0);
-                    break;
+                    SDL_SetError("Attempted to draw null texture at handle: %d", DrawRect->Tex);
+                    return False;
                 }
 
                 SDL_SetTextureColorMod(Tex, DrawRect->Color.R, DrawRect->Color.G, DrawRect->Color.B);
@@ -246,8 +231,7 @@ Void RendererDraw(Renderer *Renderer)
 
                 if (!SDL_RenderTexture(Renderer->SDL, Tex, SrcPtr, &DstRect))
                 {
-                    LogCritical("%s", SDL_GetError());
-                    Assert(0);
+                    return False;
                 }
             }
         }
@@ -263,8 +247,7 @@ Void RendererDraw(Renderer *Renderer)
                 DrawCircle->Color.A};
             if (!RenderCircle(Renderer->SDL, Renderer->Texs[ReservedCircleTex], Color, DrawCircle->Center, DrawCircle->Radius))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
         }
         break;
@@ -274,13 +257,11 @@ Void RendererDraw(Renderer *Renderer)
 
             if (!SDL_SetRenderDrawColor(Renderer->SDL, DrawLine->Color.R, DrawLine->Color.G, DrawLine->Color.B, DrawLine->Color.A))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
             if (!SDL_RenderLine(Renderer->SDL, DrawLine->Start.X, DrawLine->Start.Y, DrawLine->End.X, DrawLine->End.Y))
             {
-                LogCritical("%s", SDL_GetError());
-                Assert(0);
+                return False;
             }
         }
         break;
@@ -288,8 +269,8 @@ Void RendererDraw(Renderer *Renderer)
         case RenderCommand_None:
         default:
         {
-            LogCritical("Unrecognized or not implemented render command (%d)", Cmd->Type);
-            Assert(0);
+            SDL_SetError("Unrecognized or not implemented render command (%d)", Cmd->Type);
+            return False;
         }
         break;
         }
@@ -297,4 +278,6 @@ Void RendererDraw(Renderer *Renderer)
 
     SDL_RenderPresent(Renderer->SDL);
     RenderBufReset(&Renderer->Buf);
+
+    return True;
 }

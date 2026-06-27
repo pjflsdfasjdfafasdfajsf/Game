@@ -568,7 +568,8 @@ SDL Init()
     }
 
     Result.Renderer = RendererInit(Result.Window, Result.MemAlloc);
-    if (!Result.Renderer.IsValid) {
+    if (!Result.Renderer.IsValid)
+    {
         LogCritical("%s", SDL_GetError());
         Assert(0);
     }
@@ -657,9 +658,15 @@ static inline Action *GetMouseAction(SDL *App, Uint8 Code)
     return 0;
 }
 
-Void Render(SDL *App) {
+Void Render(SDL *App)
+{
     Assert(App);
-    RendererDraw(&App->Renderer);
+
+    if (!RendererDraw(&App->Renderer))
+    {
+        LogCritical("%s", SDL_GetError());
+        Assert(0);
+    }
 }
 
 Bool Poll(SDL *App)

@@ -24,6 +24,6 @@ typedef struct
 } Renderer;
 
 Renderer RendererInit(SDL_Window *Window, MemAlloc Alloc);
-Void RendererDraw(Renderer *R);
+Bool RendererDraw(Renderer *Renderer);
 
 #endif
