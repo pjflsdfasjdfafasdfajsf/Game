@@ -1,7 +1,4 @@
-
-#include "SDK.h"
-#include "State.h"
-#include "Menu.h"
+#include <SDK.h>
 
 Menu MenuInit(State *State)
 {
