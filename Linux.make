@@ -26,7 +26,7 @@ ATLAS_SRC   := Code/Host/AtlasPack.c Code/Host/STB.c
 SDK_SRC     := Code/Public/Init.c Code/Public/Mem.c Code/Public/Render.c Code/Public/Math.c Code/Public/UI.c
 HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL.c Code/Host/SDL_Renderer.c Code/Host/Zip.c Code/Host/KeyValue.c
 TEST_SRC    := Code/Host/Zip_Test.c Code/Host/Zip.c
-GAME_SRC    := Code/Game/Game.c
+GAME_SRC    := Code/Game/Game.c Code/Game/World.c Code/Game/Menu.c
 
 # NOTE: Objects
 SDK_OBJS      := $(patsubst Code/Public/%.c, $(OBJ_DIR)/SDK/Native/%.o, $(SDK_SRC))
@@ -107,7 +107,7 @@ $(BUILD_DIR)/Game: $(HOST_OBJS) $(BUILD_DIR)/libSDK.a $(BUILD_DIR)/GameAtlas.png
 # NOTE: Game
 #
 $(BUILD_DIR)/Game.wasm: $(GAME_SRC) $(BUILD_DIR)/libSDK_wasm.a | $(BUILD_DIR)
-	$(CC) $(WASM_CFLAGS) $(CPPFLAGS) $< -Wl,--whole-archive $(BUILD_DIR)/libSDK_wasm.a -Wl,--no-whole-archive $(GAME_LDFLAGS) -o $@
+	$(CC) $(WASM_CFLAGS) $(CPPFLAGS) $(GAME_SRC) -Wl,--whole-archive $(BUILD_DIR)/libSDK_wasm.a -Wl,--no-whole-archive $(GAME_LDFLAGS) -o $@
 
 $(BUILD_DIR)/Game.zip: $(BUILD_DIR)/Game.wasm Code/Game/Manifest.txt $(BUILD_DIR)/GameAtlas.png $(BUILD_DIR)/GameAtlas.txt | $(BUILD_DIR)
 	$(ZIP) -9 -j $@ $^ > /dev/null

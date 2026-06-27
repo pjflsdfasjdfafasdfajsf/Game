@@ -4,10 +4,9 @@
 #if !defined(STATE_H)
 #define STATE_H
 
-#include "Math.h"
 #include "Mem.h"
 #include "Render.h"
-#include "Types.h"
+#include "UI.h"
 
 #define Param(Type, Name) \
     struct                \
@@ -18,27 +17,10 @@
 #define GetParam(Param) ((Param).Value * (Param).Multiplier)
 #define GetParamV2(Param) V2Mul((Param).Value, (Param).Multiplier)
 
-typedef struct Action
+typedef struct Time
 {
-    Bool IsDown;
-    Bool Pressed;
-    Bool Released;
-} Action;
-
-typedef struct Input
-{
-    V2 MousePos;
-    Action LMB;
-    Action RMB;
-    Action MMB;
-
-    Action Jump;
-    Action Dash;
-    Action Slam;
-    Action Hook;
-    Action Left;
-    Action Right;
-} Input;
+    Float32 Delta;
+} Time;
 
 // TODO: Put this in Math.h
 typedef struct Camera
@@ -114,10 +96,23 @@ typedef struct Player
     } Params;
 } Player;
 
-typedef struct Time
+typedef struct World
 {
-    Float32 Delta;
-} Time;
+	Camera Camera;
+	Map Map;
+	Player Player;	
+} World;
+
+typedef struct Menu
+{
+    UIContext UI;
+} Menu;
+
+typedef enum
+{
+    GameState_Game,
+    GameState_Menu,  
+} GameState;
 
 // NOTE: ANYTHING THAT IS MODIFIED BY HOST MUST BE THE AT THE VERY TOP OF THIS
 // STRUCT!!!
@@ -132,9 +127,9 @@ typedef struct State
     TexHandle SpriteAtlasTex;
     Atlas SpriteAtlas;
 
-    Camera Camera;
-    Map Map;
-    Player Player;
+    GameState GameState;
+    World World;
+    Menu Menu;
 
     Bool IsInitialized;
 } State;

@@ -3,8 +3,7 @@
 
 #include "Math.h"
 #include "Render.h"
-#include "State.h"
-#include "Types.h"
+#include "Input.h"
 
 #define UIID Uint32
 
