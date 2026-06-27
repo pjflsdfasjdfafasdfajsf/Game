@@ -1,7 +1,3 @@
-
-#include "World.h"
-#include "State.h"
-
 //
 // NOTE: Main game file.
 //
