@@ -70,7 +70,7 @@ static inline Uint32 GetFileSize(const char *Path)
 //
 
 // TODO: Make it part of the SDK
-Import("CompInit") CompTypeResult CompInit(Usize Size);
+Import("CompInit") CompTypeResult CompInit(Uint32 Hash, Usize Size);
 Import("EntInit") EntResult EntInit(Void);
 
 Import("EntAddComp") Bool EntAddComp(EntID EntID, CompID TypeID, const Void *Mem);

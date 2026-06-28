@@ -21,6 +21,7 @@ typedef struct
 typedef struct
 {
     // NOTE: Components
+    Uint32 CompTypeHashes[MaxCompTypes];
     Usize CompSizes[MaxCompTypes];
     Uint32 CompTypeCount;
 
@@ -35,7 +36,9 @@ typedef struct
     Bool EntActive[MaxEnts];
 } World;
 
-CompTypeResult CompInit(World *World, Uint32 Size);
+Int32 GetInternalTypeID(const World *World, Uint32 Hash);
+
+CompTypeResult CompInit(World *World, Uint32 Hash, Uint32 Size);
 EntResult EntInit(World *World);
 
 Bool EntAddComp(World *World, Uint32 EntID, Uint32 TypeID, const Void *Mem);

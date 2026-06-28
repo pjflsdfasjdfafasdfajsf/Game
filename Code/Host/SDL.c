@@ -198,7 +198,6 @@ static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32
 
 // NOTE: Res
 
-// TODO
 static ResID HostResGetID(wasm_exec_env_t ExecEnv, Uint32 NamePtrOffset, Uint32 NameLen)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
@@ -241,7 +240,7 @@ static Uint32 HostResSetVal(wasm_exec_env_t ExecEnv, Uint32 ResID, Uint32 Val)
 
 // NOTE: Comp
 
-static Void HostCompInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 Size)
+static Void HostCompInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 Hash, Uint32 Size)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
@@ -260,7 +259,7 @@ static Void HostCompInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 Si
         return;
     }
 
-    *Result = CompInit(&App->World, Size);
+    *Result = CompInit(&App->World, Hash, Size);
 }
 
 // NOTE: Ent
@@ -296,13 +295,14 @@ static Bool HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID,
 
     World *World = &App->World;
 
-    if (TypeID >= World->CompTypeCount)
+    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    if (InternalID < 0)
     {
-        LogCritical("Invalid Comp Type ID %u.\n", TypeID);
+        LogCritical("Invalid Comp Type Hash %u.\n", TypeID);
         return False;
     }
 
-    Usize Size = World->CompSizes[TypeID];
+    Usize Size = World->CompSizes[InternalID];
     if (!wasm_runtime_validate_app_addr(ModuleInst, MemOffset, Size))
     {
         LogCritical("Comp input memory bounds violation.\n");
@@ -696,25 +696,8 @@ SDL Init()
     // NOTE: Built-in components.
     //
 
-    CompTypeResult TransformComp = CompInit(&Result.World, sizeof(CompTransform));
-    if (TransformComp.IsValid)
-    {
-        ResID ID = ResGetID(&Result.World, CompTransformName, sizeof(CompTransformName) - 1);
-        if (ID != ResID_Invalid)
-        {
-            ResSetVal(&Result.World, ID, TransformComp.ID);
-        }
-    }
-
-    CompTypeResult RenderableComp = CompInit(&Result.World, sizeof(CompRenderable));
-    if (RenderableComp.IsValid)
-    {
-        ResID ID = ResGetID(&Result.World, CompRenderableName, sizeof(CompRenderableName) - 1);
-        if (ID != ResID_Invalid)
-        {
-            ResSetVal(&Result.World, ID, RenderableComp.ID);
-        }
-    }
+    CompInit(&Result.World, CompTransformHash, sizeof(CompTransform));
+    CompInit(&Result.World, CompRenderableHash, sizeof(CompRenderable));
 
     // ApplyInputBindings(&Result);
 
@@ -739,7 +722,7 @@ SDL Init()
         // {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0},
         {"ReadFile", (void *)HostReadFile, "(iiii)i", 0},
         // NOTE: ECS
-        {"CompInit", (void *)HostCompInit, "(ii)", 0},
+        {"CompInit", (void *)HostCompInit, "(iii)", 0},
 
         {"EntInit", (void *)HostEntInit, "(i)", 0},
         {"EntAddComp", (void *)HostEntAddComp, "(iii)i", 0},

@@ -1,13 +1,34 @@
 #include "Ent.h"
+#include "Public/Ent.h"
 #include "Public/Math.h"
 #include "Public/Mem.h"
 #include "SDL.h"
 
-CompTypeResult CompInit(World *World, Uint32 Size)
+Int32 GetInternalTypeID(const World *World, Uint32 Hash)
+{
+    for (Uint32 I = 0; I < World->CompTypeCount; ++I)
+    {
+        if (World->CompTypeHashes[I] == Hash)
+        {
+            return (Int32)I;
+        }
+    }
+    return -1;
+}
+
+CompTypeResult CompInit(World *World, Uint32 Hash, Uint32 Size)
 {
     Assert(World);
 
     CompTypeResult Result = {0};
+
+    Int32 ExistingID = GetInternalTypeID(World, Hash);
+    if (ExistingID >= 0)
+    {
+        Result.ID = Hash;
+        Result.IsValid = True;
+        return Result;
+    }
 
     if (World->CompTypeCount >= MaxCompTypes)
     {
@@ -25,11 +46,12 @@ CompTypeResult CompInit(World *World, Uint32 Size)
         return Result;
     }
 
-    Uint32 TypeID = World->CompTypeCount;
-    World->CompSizes[TypeID] = Size;
+    Uint32 Index = World->CompTypeCount;
+    World->CompTypeHashes[Index] = Hash;
+    World->CompSizes[Index] = Size;
     World->CompTypeCount++;
 
-    Result.ID = TypeID;
+    Result.ID = Hash;
     Result.IsValid = True;
     return Result;
 }
@@ -68,9 +90,10 @@ Bool EntAddComp(World *World, Uint32 EntID, Uint32 TypeID, const Void *Mem)
         return False;
     }
 
-    if (TypeID >= World->CompTypeCount)
+    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    if (InternalID < 0)
     {
-        LogCritical("Invalid Comp Type ID %u.\n", TypeID);
+        LogCritical("Invalid Comp Type Hash %u.\n", TypeID);
         return False;
     }
 
@@ -86,9 +109,9 @@ Bool EntAddComp(World *World, Uint32 EntID, Uint32 TypeID, const Void *Mem)
         return False;
     }
 
-    Usize Size = World->CompSizes[TypeID];
-    SDL_memcpy(World->CompData[EntID][TypeID], Mem, Size);
-    World->CompPresent[EntID][TypeID] = True;
+    Usize Size = World->CompSizes[InternalID];
+    SDL_memcpy(World->CompData[EntID][InternalID], Mem, Size);
+    World->CompPresent[EntID][InternalID] = True;
     return True;
 }
 
@@ -98,15 +121,21 @@ CompResult EntGetComp(World *World, Uint32 EntID, Uint32 TypeID)
 
     CompResult Result = {0};
 
-    if (EntID >= MaxEnts || TypeID >= World->CompTypeCount)
+    if (EntID >= MaxEnts)
     {
         return Result;
     }
 
-    if (World->EntActive[EntID] && World->CompPresent[EntID][TypeID])
+    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    if (InternalID < 0)
     {
-        Usize Size = World->CompSizes[TypeID];
-        SDL_memcpy(Result.Mem, World->CompData[EntID][TypeID], Size);
+        return Result;
+    }
+
+    if (World->EntActive[EntID] && World->CompPresent[EntID][InternalID])
+    {
+        Usize Size = World->CompSizes[InternalID];
+        SDL_memcpy(Result.Mem, World->CompData[EntID][InternalID], Size);
         Result.IsValid = True;
     }
 

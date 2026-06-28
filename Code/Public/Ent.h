@@ -48,7 +48,7 @@ typedef struct CompTransform
     V2 Size;
 } CompTransform;
 
-#define CompTransformName "CompTransform"
+#define CompTransformHash HashCStr("CompTransform")
 
 typedef Uint32 TexHandle;
 #define TexHandle_Invalid 0
@@ -127,6 +127,6 @@ typedef struct CompRenderable
     };
 } CompRenderable;
 
-#define CompRenderableName "CompRenderable"
+#define CompRenderableHash HashCStr("CompRenderable")
 
 #endif
