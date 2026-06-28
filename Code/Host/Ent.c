@@ -4,6 +4,8 @@
 #include "Public/Mem.h"
 #include "SDL.h"
 
+#include <stdarg.h>
+
 Int32 GetInternalTypeID(const World *World, Uint32 Hash)
 {
     for (Uint32 I = 0; I < World->CompTypeCount; ++I)
@@ -207,4 +209,96 @@ Bool ResSetVal(World *World, Uint32 ResID, Uint32 Value)
 
     World->Res[ResID].Value = Value;
     return True;
+}
+
+//
+// NOTE: Iter
+//
+
+Iter IterInit(World *World, const CompID *CompIDs, Uint32 CompCount)
+{
+    Assert(World);
+    Assert(CompCount <= MaxIterComps);
+
+    Iter Result = {0};
+    Result.World = World;
+    Result.CompCount = CompCount;
+    Result.CurEntID = 0;
+    Result.IsValid = True;
+
+    for (Uint32 I = 0; I < CompCount; ++I)
+    {
+        Int32 InternalID = GetInternalTypeID(World, CompIDs[I]);
+        Result.InternalCompIDs[I] = InternalID;
+
+        if (InternalID < 0)
+        {
+            Result.IsValid = False;
+        }
+    }
+
+    return Result;
+}
+
+Bool IterNext(Iter *Iter, EntID *OutEntID, ...)
+{
+    Assert(Iter);
+    Assert(Iter->World);
+
+    if (!Iter->IsValid)
+    {
+        return False;
+    }
+
+    World *World = Iter->World;
+
+    while (Iter->CurEntID < MaxEnts)
+    {
+        EntID CurID = Iter->CurEntID++;
+
+        if (!World->EntActive[CurID])
+        {
+            continue;
+        }
+
+        Bool AllPresent = True;
+        for (Uint32 I = 0; I < Iter->CompCount; ++I)
+        {
+            Int32 InternalID = Iter->InternalCompIDs[I];
+            Assert(InternalID >= 0 && InternalID < MaxCompTypes);
+
+            if (!World->CompPresent[CurID][InternalID])
+            {
+                AllPresent = False;
+                break;
+            }
+        }
+
+        if (!AllPresent)
+        {
+            continue;
+        }
+
+        if (OutEntID)
+        {
+            *OutEntID = CurID;
+        }
+
+        va_list Args;
+        va_start(Args, OutEntID);
+        for (Uint32 I = 0; I < Iter->CompCount; ++I)
+        {
+            Int32 InternalID = Iter->InternalCompIDs[I];
+            Void **OutPtr = (Void **)va_arg(Args, Void *);
+            if (OutPtr)
+            {
+                *OutPtr = (Void *)World->CompData[CurID][InternalID];
+            }
+        }
+        va_end(Args);
+
+        return True;
+    }
+
+    return False;
 }

@@ -10,6 +10,8 @@
 #define MaxRes 1024
 #define MaxResNameLen 64
 
+#define MaxIterComps 8
+
 typedef struct
 {
     Uint32 Hash;
@@ -53,5 +55,24 @@ ResID ResGetID(World *World, const char *NamePtr, Usize NameLen);
 
 Uint32 ResGetVal(const World *World, ResID ResID);
 Bool ResSetVal(World *World, Uint32 ResID, Uint32 Value);
+
+//
+// NOTE: Iter
+//
+
+typedef struct Iter
+{
+    World *World;
+
+    Int32 InternalCompIDs[MaxIterComps];
+    Uint32 CompCount;
+
+    EntID CurEntID;
+
+    Bool IsValid;
+} Iter;
+
+Iter IterInit(World *World, const CompID *CompIDs, Uint32 CompCount);
+Bool IterNext(Iter *Iter, EntID *OutEntID, ...);
 
 #endif

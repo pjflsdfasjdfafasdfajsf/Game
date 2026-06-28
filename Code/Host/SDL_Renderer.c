@@ -2,6 +2,8 @@
 // NOTE: Renderer implementation with SDL_Renderer
 //
 #include "SDL_Renderer.h"
+#include "Host/Ent.h"
+#include "Public/Ent.h"
 
 //
 // NOTE: Internal
@@ -125,159 +127,138 @@ Bool RendererDraw(World *World, Renderer *Renderer)
         return False;
     }
 
-    CompID TransformID = CompID_Invalid;
-    CompID RenderableID = CompID_Invalid;
+    Iter Iter = IterInit(World, (CompID[]){CompTransformHash, CompRenderableHash}, 2);
 
-    for (Uint32 I = 0; I < World->CompTypeCount; ++I)
+    EntID EntID;
+    CompTransform *Transform;
+    CompRenderable *Renderable;
+
+    while (IterNext(&Iter, &EntID, &Transform, &Renderable))
     {
-        // TODO: HACK
-        if (World->CompSizes[I] == sizeof(CompTransform))
+        switch (Renderable->Type)
         {
-            TransformID = I;
-        }
-        else if (World->CompSizes[I] == sizeof(CompRenderable))
+        case RenderableType_DebugText:
         {
-            RenderableID = I;
-        }
-    }
-
-    for (EntID EntID = 0; EntID < MaxEnts; ++EntID)
-    {
-        if (!World->EntActive[EntID])
-        {
-            continue;
-        }
-
-        if (World->CompPresent[EntID][RenderableID])
-        {
-            CompRenderable *Renderable = (CompRenderable *)World->CompData[EntID][RenderableID];
-            CompTransform *Transform = (CompTransform *)World->CompData[EntID][TransformID];
-
-            switch (Renderable->Type)
+            if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->DebugText.Color.R, Renderable->DebugText.Color.G, Renderable->DebugText.Color.B, Renderable->DebugText.Color.A))
             {
-            case RenderableType_DebugText:
-            {
-                if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->DebugText.Color.R, Renderable->DebugText.Color.G, Renderable->DebugText.Color.B, Renderable->DebugText.Color.A))
-                {
-                    return False;
-                }
-                if (!SDL_SetRenderScale(Renderer->SDL, Renderable->DebugText.Scale.X, Renderable->DebugText.Scale.Y))
-                {
-                    return False;
-                }
-
-                V2 Target = V2Div(Transform->Pos, Renderable->DebugText.Scale);
-                if (!SDL_RenderDebugText(Renderer->SDL, Target.X, Target.Y, Renderable->DebugText.Str))
-                {
-                    return False;
-                }
-
-                if (!SDL_SetRenderScale(Renderer->SDL, 1.0f, 1.0f))
-                {
-                    return False;
-                }
-            }
-            break;
-
-            case RenderableType_Rect:
-            {
-                SDL_FRect DstRect = {
-                    Transform->Pos.X,
-                    Transform->Pos.Y,
-                    Transform->Size.W,
-                    Transform->Size.H,
-                };
-
-                if (Renderable->Rect.Tex == TexHandle_Invalid)
-                {
-                    // NOTE: Untextured Rectangle
-                    if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->Rect.Color.R, Renderable->Rect.Color.G, Renderable->Rect.Color.B, Renderable->Rect.Color.A))
-                    {
-                        return False;
-                    }
-
-                    if (Renderable->Rect.Filled && !SDL_RenderFillRect(Renderer->SDL, &DstRect))
-                    {
-                        return False;
-                    }
-                    else if (!SDL_RenderRect(Renderer->SDL, &DstRect))
-                    {
-                        return False;
-                    }
-                }
-                else
-                {
-                    // NOTE: Textured Rectangle
-                    if (Renderable->Rect.Tex >= Renderer->TexCount)
-                    {
-                        SDL_SetError("Invalid texture handle: %d", Renderable->Rect.Tex);
-                        return False;
-                    }
-
-                    SDL_Texture *Tex = Renderer->Texs[Renderable->Rect.Tex];
-                    if (!Tex)
-                    {
-                        SDL_SetError("Attempted to draw null texture at handle: %d", Renderable->Rect.Tex);
-                        return False;
-                    }
-
-                    SDL_SetTextureColorMod(Tex, Renderable->Rect.Color.R, Renderable->Rect.Color.G, Renderable->Rect.Color.B);
-                    SDL_SetTextureAlphaMod(Tex, Renderable->Rect.Color.A);
-
-                    SDL_FRect SrcRect = {
-                        Renderable->Rect.Src.Pos.X,
-                        Renderable->Rect.Src.Pos.Y,
-                        Renderable->Rect.Src.Size.W,
-                        Renderable->Rect.Src.Size.H,
-                    };
-
-                    SDL_FRect *SrcPtr = &SrcRect;
-                    if (Renderable->Rect.Src.Pos.X == 0 && Renderable->Rect.Src.Pos.Y == 0 && Renderable->Rect.Src.Size.W == 0)
-                    {
-                        SrcPtr = 0;
-                    }
-
-                    if (!SDL_RenderTexture(Renderer->SDL, Tex, SrcPtr, &DstRect))
-                    {
-                        return False;
-                    }
-                }
-            }
-            break;
-            case RenderableType_Circle:
-            {
-                SDL_Color Color = {
-                    Renderable->Circle.Color.R,
-                    Renderable->Circle.Color.G,
-                    Renderable->Circle.Color.B,
-                    Renderable->Circle.Color.A};
-                if (!RenderCircle(Renderer->SDL, Renderer->Texs[ReservedCircleTex], Color, Transform->Pos, Renderable->Circle.Radius))
-                {
-                    return False;
-                }
-            }
-            break;
-            case RenderableType_Line:
-            {
-                if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->Line.Color.R, Renderable->Line.Color.G, Renderable->Line.Color.B, Renderable->Line.Color.A))
-                {
-                    return False;
-                }
-                if (!SDL_RenderLine(Renderer->SDL, Transform->Pos.X, Transform->Pos.Y, Renderable->Line.End.X, Renderable->Line.End.Y))
-                {
-                    return False;
-                }
-            }
-            break;
-
-            case RenderableType_None:
-            default:
-            {
-                SDL_SetError("Unrecognized or not implemented render command (%d)", Renderable->Type);
                 return False;
             }
-            break;
+            if (!SDL_SetRenderScale(Renderer->SDL, Renderable->DebugText.Scale.X, Renderable->DebugText.Scale.Y))
+            {
+                return False;
             }
+
+            V2 Target = V2Div(Transform->Pos, Renderable->DebugText.Scale);
+            if (!SDL_RenderDebugText(Renderer->SDL, Target.X, Target.Y, Renderable->DebugText.Str))
+            {
+                return False;
+            }
+
+            if (!SDL_SetRenderScale(Renderer->SDL, 1.0f, 1.0f))
+            {
+                return False;
+            }
+        }
+        break;
+
+        case RenderableType_Rect:
+        {
+            SDL_FRect DstRect = {
+                Transform->Pos.X,
+                Transform->Pos.Y,
+                Transform->Size.W,
+                Transform->Size.H,
+            };
+
+            if (Renderable->Rect.Tex == TexHandle_Invalid)
+            {
+                // NOTE: Untextured Rectangle
+                if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->Rect.Color.R, Renderable->Rect.Color.G, Renderable->Rect.Color.B, Renderable->Rect.Color.A))
+                {
+                    return False;
+                }
+
+                if (Renderable->Rect.Filled && !SDL_RenderFillRect(Renderer->SDL, &DstRect))
+                {
+                    return False;
+                }
+                else if (!SDL_RenderRect(Renderer->SDL, &DstRect))
+                {
+                    return False;
+                }
+            }
+            else
+            {
+                // NOTE: Textured Rectangle
+                if (Renderable->Rect.Tex >= Renderer->TexCount)
+                {
+                    SDL_SetError("Invalid texture handle: %d", Renderable->Rect.Tex);
+                    return False;
+                }
+
+                SDL_Texture *Tex = Renderer->Texs[Renderable->Rect.Tex];
+                if (!Tex)
+                {
+                    SDL_SetError("Attempted to draw null texture at handle: %d", Renderable->Rect.Tex);
+                    return False;
+                }
+
+                SDL_SetTextureColorMod(Tex, Renderable->Rect.Color.R, Renderable->Rect.Color.G, Renderable->Rect.Color.B);
+                SDL_SetTextureAlphaMod(Tex, Renderable->Rect.Color.A);
+
+                SDL_FRect SrcRect = {
+                    Renderable->Rect.Src.Pos.X,
+                    Renderable->Rect.Src.Pos.Y,
+                    Renderable->Rect.Src.Size.W,
+                    Renderable->Rect.Src.Size.H,
+                };
+
+                SDL_FRect *SrcPtr = &SrcRect;
+                if (Renderable->Rect.Src.Pos.X == 0 && Renderable->Rect.Src.Pos.Y == 0 && Renderable->Rect.Src.Size.W == 0)
+                {
+                    SrcPtr = 0;
+                }
+
+                if (!SDL_RenderTexture(Renderer->SDL, Tex, SrcPtr, &DstRect))
+                {
+                    return False;
+                }
+            }
+        }
+        break;
+        case RenderableType_Circle:
+        {
+            SDL_Color Color = {
+                Renderable->Circle.Color.R,
+                Renderable->Circle.Color.G,
+                Renderable->Circle.Color.B,
+                Renderable->Circle.Color.A};
+            if (!RenderCircle(Renderer->SDL, Renderer->Texs[ReservedCircleTex], Color, Transform->Pos, Renderable->Circle.Radius))
+            {
+                return False;
+            }
+        }
+        break;
+        case RenderableType_Line:
+        {
+            if (!SDL_SetRenderDrawColor(Renderer->SDL, Renderable->Line.Color.R, Renderable->Line.Color.G, Renderable->Line.Color.B, Renderable->Line.Color.A))
+            {
+                return False;
+            }
+            if (!SDL_RenderLine(Renderer->SDL, Transform->Pos.X, Transform->Pos.Y, Renderable->Line.End.X, Renderable->Line.End.Y))
+            {
+                return False;
+            }
+        }
+        break;
+
+        case RenderableType_None:
+        default:
+        {
+            SDL_SetError("Unrecognized or not implemented render command (%d)", Renderable->Type);
+            return False;
+        }
+        break;
         }
     }
 
