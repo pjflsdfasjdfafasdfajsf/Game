@@ -160,6 +160,15 @@ Rect RectGetCentered(V2 Pos, V2 Size)
 }
 
 //
+// NOTE: Camera
+//
+
+V2 ToScreen(Camera Camera, V2 World)
+{
+    return V2Sub(World, Camera.Pos);
+}
+
+//
 // NOTE: Hashing
 //
 
