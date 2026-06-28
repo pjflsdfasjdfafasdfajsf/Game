@@ -1,7 +1,7 @@
 // TODO: Test
 #include "KeyValue.h"
-#include "Mem.h"
-#include "Types.h"
+#include "Public/Mem.h"
+#include "Public/Types.h"
 
 //
 // NOTE: Internal

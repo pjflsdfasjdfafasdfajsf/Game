@@ -2,8 +2,6 @@
 // NOTE: Renderer implementation with SDL_Renderer
 //
 #include "SDL_Renderer.h"
-#include "Ent.h"
-#include "Math.h"
 
 //
 // NOTE: Internal

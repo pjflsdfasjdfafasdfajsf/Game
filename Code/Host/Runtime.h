@@ -1,9 +1,9 @@
-#if !defined(HOST_H)
-#define HOST_H
+#if !defined(HOST_RUNTIME_H)
+#define HOST_RUNTIME_H
 
 #include <wasm_export.h>
 
-#include "Types.h"
+#include "Public/Types.h"
 
 typedef struct
 {

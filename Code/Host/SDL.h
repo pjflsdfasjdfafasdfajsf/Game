@@ -1,10 +1,10 @@
-#include "SDL_Renderer.h"
-#if !defined(SDL_H)
-#define SDL_H
+#if !defined(HOST_SDL_H)
+#define HOST_SDL_H
 
 #include <SDL3/SDL.h>
 
 #include "Runtime.h"
+#include "SDL_Renderer.h"
 #include "Zip.h"
 
 enum
@@ -47,7 +47,7 @@ typedef struct
     Mod Mods[512];
     Uint32 ModCount;
 
-    World World;    
+    World World;
 } SDL;
 
 // NOTE: On any failures all of these function just traps the process.

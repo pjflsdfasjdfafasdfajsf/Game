@@ -14,17 +14,6 @@ typedef Uint32 CompID;
 typedef Uint32 EntID;
 #define EntIDInvalid 0xFFFFFFFF
 
-typedef struct World
-{
-    Usize CompSizes[MaxCompTypes];
-    Uint32 CompTypeCount;
-
-    Uint8 CompData[MaxEnts][MaxCompTypes][MaxCompSize];
-    Bool CompPresent[MaxEnts][MaxCompTypes];
-
-    Bool EntActive[MaxEnts];
-} World;
-
 typedef struct CompTypeResult
 {
     CompID ID;

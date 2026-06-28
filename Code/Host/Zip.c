@@ -1,7 +1,7 @@
 #include "Zip.h"
-#include "Mem.h"
+#include "Public/Mem.h"
+#include "Public/Types.h"
 #include "SDL.h"
-#include "Types.h"
 
 // NOTE: End of central directory record signature
 #define SigEOCD 0x06054b50U

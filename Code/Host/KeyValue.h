@@ -4,11 +4,11 @@
 //     # This is a comment.
 //     Key = Value
 //
-#if !defined(KEY_VALUE_H)
-#define KEY_VALUE_H
+#if !defined(HOST_KEY_VALUE_H)
+#define HOST_KEY_VALUE_H
 
-#include "Mem.h"
-#include "Types.h"
+#include "Public/Mem.h"
+#include "Public/Types.h"
 
 typedef struct
 {

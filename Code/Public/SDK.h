@@ -14,8 +14,6 @@
 #define Import(Name)
 #endif
 
-#define ExtraMemSize Mb(2)
-
 // NOTE: `State` is the game state and `ExtraMem` is memory for allocating your own state struct if you need it.
 typedef Void UpdateAndRenderFunction(Void);
 #define UpdateAndRender(Name) Export("UpdateAndRender") Void Name(Void)

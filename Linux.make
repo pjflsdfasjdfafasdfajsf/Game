@@ -24,7 +24,8 @@ SYSTEM_LIBS := -lm -lpthread -ldl -lrt -lstdc++
 # NOTE: Source groups
 ATLAS_SRC   := Code/Host/AtlasPack.c Code/Host/STB.c
 SDK_SRC     := Code/Public/Mem.c Code/Public/Math.c
-HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL_Renderer.c Code/Host/SDL.c Code/Host/Zip.c Code/Host/KeyValue.c
+HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL_Renderer.c \
+			   Code/Host/SDL.c Code/Host/Zip.c Code/Host/KeyValue.c Code/Host/Ent.c
 TEST_SRC    := Code/Host/Zip_Test.c Code/Host/Zip.c
 GAME_SRC    := Code/Game/Game.c
 
@@ -35,7 +36,7 @@ HOST_OBJS     := $(patsubst Code/Host/%.c, $(OBJ_DIR)/Host/%.o, $(HOST_SRC))
 TEST_OBJS     := $(patsubst Code/Host/%.c, $(OBJ_DIR)/Test/%.o, $(TEST_SRC))
 
 # NOTE: Global flags
-CPPFLAGS := -ICode/Public -IExt/WAMR/Include -IExt/SDL3/Include -I$(BUILD_DIR) -MMD -MP
+CPPFLAGS := -ICode -IExt/WAMR/Include -IExt/SDL3/Include -I$(BUILD_DIR) -MMD -MP
 # TODO: We need to have Release and Debug flags
 CFLAGS   := -Wall -Wextra -g
 LDFLAGS  := -no-pie
@@ -44,7 +45,7 @@ LDLIBS   := $(BUILD_DIR)/libSDK.a $(SDL3_LIB) $(WAMR_LIB) $(SYSTEM_LIBS)
 # NOTE: Flags
 ATLAS_CFLAGS := $(CFLAGS) -IExt/STB -O2
 HOST_CFLAGS  := -IExt/STB
-WASM_CFLAGS  := --target=wasm32 -nostdlib
+WASM_CFLAGS  := -ICode/Public --target=wasm32 -nostdlib
 GAME_LDFLAGS := -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined
 
 IMAGES := $(wildcard Assets/Images/*)

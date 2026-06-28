@@ -1,11 +1,11 @@
 // TODO: Maybe this could be an actual proper interface
-#if !defined(SDL_RENDERER_H)
-#define SDL_RENDERER_H
+#if !defined(HOST_SDL_RENDERER_H)
+#define HOST_SDL_RENDERER_H
 
 #include <SDL3/SDL.h>
 
 #include "Ent.h"
-#include "Types.h"
+#include "Public/Types.h"
 
 #define MaxTexs 512
 // NOTE: Internal textures.

@@ -2,10 +2,9 @@
 // NOTE: WASM Runtime implementation.
 //
 #include "Runtime.h"
-#include "SDK.h"
 #include "SDL.h"
 
-#include "Types.h"
+#include "Public/Types.h"
 #include "wasm_export.h"
 
 Bool RtGlobalInit(Void)

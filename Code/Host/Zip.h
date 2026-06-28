@@ -1,10 +1,10 @@
 //
 // NOTE: ZIP archive reader. Used for mods.
 //
-#if !defined(ZIP_H)
-#define ZIP_H
+#if !defined(HOST_ZIP_H)
+#define HOST_ZIP_H
 
-#include "Types.h"
+#include "Public/Types.h"
 
 typedef struct
 {

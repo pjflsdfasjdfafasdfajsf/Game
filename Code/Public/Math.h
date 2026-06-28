@@ -119,7 +119,7 @@ Rect RectGetCentered(V2 Pos, V2 Size);
 
 //
 // NOTE: Camera.
-// 
+//
 
 typedef struct Camera
 {
