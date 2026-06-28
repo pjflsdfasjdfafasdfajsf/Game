@@ -1,11 +1,8 @@
 #include "SDL.h"
 #include "KeyValue.h"
-#include "Math.h"
-#include "Render.h"
 #include "Runtime.h"
-#include "SDL_Renderer.h"
+#include "SDK.h"
 #include "STB.h"
-#include "State.h"
 
 #define GameZip "Game.zip"
 
@@ -30,72 +27,72 @@ static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
 }
 
 // TODO: move this out to SDL_Renderer.c somehow.
-static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Size)
-{
-    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+// static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Size)
+// {
+//     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
 
-    if (!wasm_runtime_validate_app_addr(ModuleInst, PtrOffset, Size))
-    {
-        LogCritical("Memory bounds violation.\n");
+//     if (!wasm_runtime_validate_app_addr(ModuleInst, PtrOffset, Size))
+//     {
+//         LogCritical("Memory bounds violation.\n");
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    const Uint8 *Mem = (const Uint8 *)wasm_runtime_addr_app_to_native(ModuleInst, PtrOffset);
-    if (!Mem || Size == 0)
-    {
-        LogCritical("Invalid pointer or size.\n");
+//     const Uint8 *Mem = (const Uint8 *)wasm_runtime_addr_app_to_native(ModuleInst, PtrOffset);
+//     if (!Mem || Size == 0)
+//     {
+//         LogCritical("Invalid pointer or size.\n");
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    SDL_Log("Texture allocation request for %u bytes.\n", Size);
+//     SDL_Log("Texture allocation request for %u bytes.\n", Size);
 
-    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
-    Assert(App);
+//     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+//     Assert(App);
 
-    if (App->Renderer.TexCount >= ArrayCount(App->Renderer.Texs))
-    {
-        LogCritical("Too many textures.\n");
+//     if (App->Renderer.TexCount >= ArrayCount(App->Renderer.Texs))
+//     {
+//         LogCritical("Too many textures.\n");
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    Int32 Width = 0;
-    Int32 Height = 0;
-    Int32 Channels = 0;
+//     Int32 Width = 0;
+//     Int32 Height = 0;
+//     Int32 Channels = 0;
 
-    Uint8 *Pixels = stbi_load_from_memory(Mem, Size, &Width, &Height, &Channels, 4);
-    if (!Pixels)
-    {
-        LogCritical("%s\n", stbi_failure_reason());
+//     Uint8 *Pixels = stbi_load_from_memory(Mem, Size, &Width, &Height, &Channels, 4);
+//     if (!Pixels)
+//     {
+//         LogCritical("%s\n", stbi_failure_reason());
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    SDL_Texture *Tex = SDL_CreateTexture(App->Renderer.SDL, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, Width, Height);
-    if (!Tex)
-    {
-        LogCritical("%s\n", SDL_GetError());
+//     SDL_Texture *Tex = SDL_CreateTexture(App->Renderer.SDL, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, Width, Height);
+//     if (!Tex)
+//     {
+//         LogCritical("%s\n", SDL_GetError());
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    if (!SDL_UpdateTexture(Tex, 0, Pixels, Width * 4))
-    {
-        LogCritical("%s\n", SDL_GetError());
+//     if (!SDL_UpdateTexture(Tex, 0, Pixels, Width * 4))
+//     {
+//         LogCritical("%s\n", SDL_GetError());
 
-        return TexHandleInvalid;
-    }
+//         return TexHandleInvalid;
+//     }
 
-    stbi_image_free(Pixels);
+//     stbi_image_free(Pixels);
 
-    TexHandle Handle = App->Renderer.TexCount;
-    App->Renderer.Texs[Handle] = Tex;
-    App->Renderer.TexCount++;
+//     TexHandle Handle = App->Renderer.TexCount;
+//     App->Renderer.Texs[Handle] = Tex;
+//     App->Renderer.TexCount++;
 
-    return Handle;
-}
+//     return Handle;
+// }
 
 static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32 PathLen, Uint32 DstPtrOffset, Uint32 DstSize)
 {
@@ -190,6 +187,173 @@ static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32
     }
 
     return Ent.UncompressedSize;
+}
+
+//
+// NOTE: ECS
+//
+
+static Void HostAddComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 Size)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(CompTypeResult)))
+    {
+        LogCritical("Output memory bounds violation.\n");
+        return;
+    }
+
+    CompTypeResult *Result = (CompTypeResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    if (!Result)
+    {
+        LogCritical("Invalid output pointer.\n");
+        return;
+    }
+
+    World *World = &App->World;
+
+    if (World->CompTypeCount >= MaxCompTypes)
+    {
+        LogCritical("Maximum component types (%u) exceeded.\n", MaxCompTypes);
+        Result->TypeID = 0;
+        Result->IsValid = False;
+        return;
+    }
+
+    if (Size > MaxCompSize)
+    {
+        LogCritical("Comp size %u exceeds MaxCompSize (%u).\n", Size, MaxCompSize);
+        Result->TypeID = 0;
+        Result->IsValid = False;
+        return;
+    }
+
+    Uint32 TypeID = World->CompTypeCount;
+    World->CompSizes[TypeID] = Size;
+    World->CompTypeCount++;
+
+    Result->TypeID = TypeID;
+    Result->IsValid = True;
+}
+
+static Void HostAddEnt(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(EntResult)))
+    {
+        LogCritical("Output memory bounds violation.\n");
+        return;
+    }
+
+    EntResult *Result = (EntResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    if (!Result)
+    {
+        LogCritical("Invalid output pointer.\n");
+        return;
+    }
+
+    World *World = &App->World;
+
+    for (Uint32 I = 0; I < MaxEnts; ++I)
+    {
+        if (!World->EntActive[I])
+        {
+            World->EntActive[I] = True;
+            Result->EntID = I;
+            Result->IsValid = True;
+            return;
+        }
+    }
+
+    LogCritical("Maximum entity capacity (%u) reached.\n", MaxEnts);
+    Result->EntID = 0;
+    Result->IsValid = False;
+}
+
+static Void HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID, Uint32 MemOffset)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    World *World = &App->World;
+
+    if (EntID >= MaxEnts)
+    {
+        LogCritical("Invalid Entity ID %u.\n", EntID);
+        return;
+    }
+
+    if (TypeID >= World->CompTypeCount)
+    {
+        LogCritical("Invalid Comp Type ID %u.\n", TypeID);
+        return;
+    }
+
+    if (!World->EntActive[EntID])
+    {
+        LogCritical("Entity %u is inactive.\n", EntID);
+        return;
+    }
+
+    Usize Size = World->CompSizes[TypeID];
+    if (!wasm_runtime_validate_app_addr(ModuleInst, MemOffset, Size))
+    {
+        LogCritical("Comp input memory bounds violation.\n");
+        return;
+    }
+
+    const Void *Mem = wasm_runtime_addr_app_to_native(ModuleInst, MemOffset);
+    if (!Mem)
+    {
+        LogCritical("Invalid dynamic component memory source.\n");
+        return;
+    }
+
+    SDL_memcpy(World->CompData[EntID][TypeID], Mem, Size);
+    World->CompPresent[EntID][TypeID] = True;
+}
+
+static Void HostEntGetComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 EntID, Uint32 TypeID)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(CompResult)))
+    {
+        LogCritical("Output memory bounds violation.\n");
+        return;
+    }
+
+    CompResult *Result = (CompResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    if (!Result)
+    {
+        LogCritical("Invalid output pointer.\n");
+        return;
+    }
+
+    SDL_memset(Result->Mem, 0, sizeof(Result->Mem));
+    Result->IsValid = False;
+
+    World *World = &App->World;
+
+    if (EntID >= MaxEnts || TypeID >= World->CompTypeCount)
+    {
+        return;
+    }
+
+    if (World->EntActive[EntID] && World->CompPresent[EntID][TypeID])
+    {
+        Usize Size = World->CompSizes[TypeID];
+        SDL_memcpy(Result->Mem, World->CompData[EntID][TypeID], Size);
+        Result->IsValid = True;
+    }
 }
 
 //
@@ -469,7 +633,7 @@ Void Update(SDL *App)
 {
     Assert(App);
 
-    App->State.Time.Delta = GetDeltaSeconds();
+    // App->State.Time.Delta = GetDeltaSeconds();
 
     for (Uint32 I = 0; I < App->ModCount; ++I)
     {
@@ -485,15 +649,15 @@ Void Update(SDL *App)
             SDL_Delay(50);
             SDL_Log("Reloading: %s\n", Mod->Path);
 
-            // NOTE: Need to save ExtraMem since that's where state is stored
-            if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
-            {
-                Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
-                if (NativeExtraMem)
-                {
-                    SDL_memcpy(Mod->ExtraMem, NativeExtraMem, ExtraMemSize);
-                }
-            }
+            // // NOTE: Need to save ExtraMem since that's where state is stored
+            // if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
+            // {
+            //     Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
+            //     if (NativeExtraMem)
+            //     {
+            //         SDL_memcpy(Mod->ExtraMem, NativeExtraMem, ExtraMemSize);
+            //     }
+            // }
 
             RtDeinit(&Mod->Rt);
             Mod->Rt = RtInit();
@@ -502,21 +666,21 @@ Void Update(SDL *App)
             {
                 Mod->LastWriteTime = CurrentTime;
 
-                // NOTE: And restore the saved ExtraMem
-                if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
-                {
-                    Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
-                    if (NativeExtraMem)
-                    {
-                        SDL_memcpy(NativeExtraMem, Mod->ExtraMem, ExtraMemSize);
-                    }
-                }
+                // // NOTE: And restore the saved ExtraMem
+                // if (Mod->Rt.ModuleInst && Mod->Rt.ExtraMem)
+                // {
+                //     Void *NativeExtraMem = wasm_runtime_addr_app_to_native(Mod->Rt.ModuleInst, Mod->Rt.ExtraMem);
+                //     if (NativeExtraMem)
+                //     {
+                //         SDL_memcpy(NativeExtraMem, Mod->ExtraMem, ExtraMemSize);
+                //     }
+                // }
             }
         }
         // NOTE: This handles the case where you got an error on compilation
         if (Mod->Rt.IsValid)
         {
-            if (!RtUpdate(&Mod->Rt, &App->State, &App->Renderer.Buf))
+            if (!RtUpdate(&Mod->Rt))
             {
                 Assert(0);
             }
@@ -524,22 +688,22 @@ Void Update(SDL *App)
     }
 }
 
-static inline Void ApplyInputBindings(SDL *App)
-{
-    /* TODO: later read them from a input file. Right now they are hardcoded */
-    Input *Input = &App->State.Input;
+// static inline Void ApplyInputBindings(SDL *App)
+// {
+//     /* TODO: later read them from a input file. Right now they are hardcoded */
+//     Input *Input = &App->State.Input;
 
-    App->Keys[SDL_SCANCODE_D] = &Input->Right;
-    App->Keys[SDL_SCANCODE_A] = &Input->Left;
-    App->Keys[SDL_SCANCODE_SPACE] = &Input->Jump;
-    App->Keys[SDL_SCANCODE_LSHIFT] = &Input->Dash;
-    App->Keys[SDL_SCANCODE_E] = &Input->Hook;
-    App->Keys[SDL_SCANCODE_S] = &Input->Slam;
+//     App->Keys[SDL_SCANCODE_D] = &Input->Right;
+//     App->Keys[SDL_SCANCODE_A] = &Input->Left;
+//     App->Keys[SDL_SCANCODE_SPACE] = &Input->Jump;
+//     App->Keys[SDL_SCANCODE_LSHIFT] = &Input->Dash;
+//     App->Keys[SDL_SCANCODE_E] = &Input->Hook;
+//     App->Keys[SDL_SCANCODE_S] = &Input->Slam;
 
-    App->Keys[MouseButtonLeft] = &Input->LMB;
-    App->Keys[MouseButtonRight] = &Input->RMB;
-    App->Keys[MouseButtonMiddle] = &Input->MMB;
-}
+//     App->Keys[MouseButtonLeft] = &Input->LMB;
+//     App->Keys[MouseButtonRight] = &Input->RMB;
+//     App->Keys[MouseButtonMiddle] = &Input->MMB;
+// }
 
 SDL Init()
 {
@@ -551,28 +715,14 @@ SDL Init()
         Assert(0);
     }
 
-    Void *Mem = SDL_malloc(Kb(64));
-    if (!Mem)
-    {
-        Assert(0);
-    }
-    Result.MemAlloc = MemAllocInit(Mem, Kb(64));
-
-    Result.Window = SDL_CreateWindow("Game", InternalRes.W, InternalRes.H, SDL_WINDOW_RESIZABLE);
+    Result.Window = SDL_CreateWindow("Game", 1280, 720, SDL_WINDOW_RESIZABLE);
     if (!Result.Window)
     {
         LogCritical("%s", SDL_GetError());
         Assert(0);
     }
 
-    Result.Renderer = RendererInit(Result.Window, Result.MemAlloc);
-    if (!Result.Renderer.IsValid)
-    {
-        LogCritical("%s", SDL_GetError());
-        Assert(0);
-    }
-
-    ApplyInputBindings(&Result);
+    // ApplyInputBindings(&Result);
 
     if (!RtGlobalInit())
     {
@@ -588,10 +738,15 @@ SDL Init()
     // understading why on reloads the game would just hang, and all because
     // THIS fucking array was not static. This was just IMPOSSIBLE to fucking
     // debug as all it was just a HANG.
+
     static NativeSymbol Natives[] = {
         {"PrintLine", (void *)HostPrintLine, "(ii)", 0},
-        {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0},
-        {"ReadFile", (void *)HostReadFile, "(iiii)i", 0}};
+        // {"AllocTexture", (void *)HostAllocTexture, "(ii)i", 0},
+        {"ReadFile", (void *)HostReadFile, "(iiii)i", 0},
+        {"AddComp", (void *)HostAddComp, "(ii)", 0},
+        {"AddEnt", (void *)HostAddEnt, "(i)", 0},
+        {"EntAddComp", (void *)HostEntAddComp, "(iii)", 0},
+        {"EntGetComp", (void *)HostEntGetComp, "(iii)", 0}};
     if (!wasm_runtime_register_natives("env", Natives, ArrayCount(Natives)))
     {
         Assert(0);
@@ -641,45 +796,45 @@ SDL Init()
     return Result;
 }
 
-static inline Action *GetMouseAction(SDL *App, Uint8 Code)
-{
-    switch (Code)
-    {
-    case SDL_BUTTON_LEFT:
-        return App->Keys[MouseButtonLeft];
-    case SDL_BUTTON_RIGHT:
-        return App->Keys[MouseButtonRight];
-    case SDL_BUTTON_MIDDLE:
-        return App->Keys[MouseButtonMiddle];
-    }
+// static inline Action *GetMouseAction(SDL *App, Uint8 Code)
+// {
+//     switch (Code)
+//     {
+//     case SDL_BUTTON_LEFT:
+//         return App->Keys[MouseButtonLeft];
+//     case SDL_BUTTON_RIGHT:
+//         return App->Keys[MouseButtonRight];
+//     case SDL_BUTTON_MIDDLE:
+//         return App->Keys[MouseButtonMiddle];
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
 
 Void Render(SDL *App)
 {
     Assert(App);
 
-    if (!RendererDraw(&App->Renderer))
-    {
-        LogCritical("%s", SDL_GetError());
-        Assert(0);
-    }
+    // if (!RendererDraw(&App->Renderer))
+    // {
+    //     LogCritical("%s", SDL_GetError());
+    //     Assert(0);
+    // }
 }
 
 Bool Poll(SDL *App)
 {
     Assert(App);
 
-    for (Usize I = 0; I < KeysCount; I++)
-    {
-        Action *Action = App->Keys[I];
+    // for (Usize I = 0; I < KeysCount; I++)
+    // {
+    //     Action *Action = App->Keys[I];
 
-        if (Action)
-        {
-            Action->Pressed = False;
-        }
-    }
+    //     if (Action)
+    //     {
+    //         Action->Pressed = False;
+    //     }
+    // }
 
     SDL_Event Ev;
     while (SDL_PollEvent(&Ev))
@@ -692,70 +847,70 @@ Bool Poll(SDL *App)
         }
         break;
 
-        case SDL_EVENT_MOUSE_MOTION:
-        {
-            // TODO: Can we not do that to not do that
-            SDL_ConvertEventToRenderCoordinates(App->Renderer.SDL, &Ev);
-            App->State.Input.MousePos.X = Ev.motion.x;
-            App->State.Input.MousePos.Y = Ev.motion.y;
-        }
-        break;
+            // case SDL_EVENT_MOUSE_MOTION:
+            // {
+            //     // TODO: Can we not do that to not do that
+            //     SDL_ConvertEventToRenderCoordinates(App->Renderer.SDL, &Ev);
+            //     App->State.Input.MousePos.X = Ev.motion.x;
+            //     App->State.Input.MousePos.Y = Ev.motion.y;
+            // }
+            // break;
 
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        {
-            Action *Action = GetMouseAction(App, Ev.button.button);
+            // case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            // {
+            //     Action *Action = GetMouseAction(App, Ev.button.button);
 
-            if (Action)
-            {
-                Action->IsDown = True;
-                Action->Pressed = True;
-            }
-        }
-        break;
+            //     if (Action)
+            //     {
+            //         Action->IsDown = True;
+            //         Action->Pressed = True;
+            //     }
+            // }
+            // break;
 
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-        {
-            Action *Action = GetMouseAction(App, Ev.button.button);
+            // case SDL_EVENT_MOUSE_BUTTON_UP:
+            // {
+            //     Action *Action = GetMouseAction(App, Ev.button.button);
 
-            if (Action)
-            {
-                Action->IsDown = False;
-                Action->Released = True;
-            }
-        }
-        break;
+            //     if (Action)
+            //     {
+            //         Action->IsDown = False;
+            //         Action->Released = True;
+            //     }
+            // }
+            // break;
 
-        case SDL_EVENT_KEY_DOWN:
-        {
-            SDL_Scancode Scancode = Ev.key.scancode;
-            if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
-            {
-                Action *Action = App->Keys[Scancode];
+            // case SDL_EVENT_KEY_DOWN:
+            // {
+            //     SDL_Scancode Scancode = Ev.key.scancode;
+            //     if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
+            //     {
+            //         Action *Action = App->Keys[Scancode];
 
-                if (Action)
-                {
-                    Action->IsDown = True;
-                    Action->Pressed = True;
-                }
-            }
-        }
-        break;
+            //         if (Action)
+            //         {
+            //             Action->IsDown = True;
+            //             Action->Pressed = True;
+            //         }
+            //     }
+            // }
+            // break;
 
-        case SDL_EVENT_KEY_UP:
-        {
-            SDL_Scancode Scancode = Ev.key.scancode;
-            if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
-            {
-                Action *Action = App->Keys[Scancode];
+            // case SDL_EVENT_KEY_UP:
+            // {
+            //     SDL_Scancode Scancode = Ev.key.scancode;
+            //     if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
+            //     {
+            //         Action *Action = App->Keys[Scancode];
 
-                if (Action)
-                {
-                    Action->IsDown = False;
-                    Action->Released = True;
-                }
-            }
-        }
-        break;
+            //         if (Action)
+            //         {
+            //             Action->IsDown = False;
+            //             Action->Released = True;
+            //         }
+            //     }
+            // }
+            // break;
 
         default:
         {

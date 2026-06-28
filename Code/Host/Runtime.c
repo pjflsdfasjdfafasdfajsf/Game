@@ -5,6 +5,7 @@
 #include "SDK.h"
 #include "SDL.h"
 
+#include "Types.h"
 #include "wasm_export.h"
 
 Bool RtGlobalInit(Void)
@@ -145,75 +146,16 @@ Bool RtLoadOne(Runtime *Rt, const char *Path)
     return True;
 }
 
-Bool RtUpdate(Runtime *Rt, State *HostState, RenderBuf *HostRenderBuf)
+Bool RtUpdate(Runtime *Rt)
 {
     Assert(Rt);
     Assert(Rt->UpdateAndRender);
     Assert(Rt->ModuleInst);
 
-    // NOTE: State
-    if (!wasm_runtime_validate_app_addr(Rt->ModuleInst, Rt->State, sizeof(State)))
-    {
-        LogCritical("State memory is out of bounds.\n");
-        return False;
-    }
-    State *NativeState = (State *)wasm_runtime_addr_app_to_native(Rt->ModuleInst, Rt->State);
-
-    // NOTE: RenderBuf
-    if (!wasm_runtime_validate_app_addr(Rt->ModuleInst, Rt->RenderBuf, 16))
-    {
-        LogCritical("RenderBuf header is out of bounds.\n");
-        return False;
-    }
-    Uint32 *NativeRenderBuf = (Uint32 *)wasm_runtime_addr_app_to_native(Rt->ModuleInst, Rt->RenderBuf);
-
-    // NOTE: Copy in.
-    SDL_memcpy(NativeState, HostState, sizeof(State));
-
-    Uint32 Args[3] = {Rt->State, Rt->ExtraMem, Rt->RenderBuf};
-    if (!wasm_runtime_call_wasm(Rt->ExecEnv, Rt->UpdateAndRender, 3, Args))
+    Uint32 Args[0] = {};
+    if (!wasm_runtime_call_wasm(Rt->ExecEnv, Rt->UpdateAndRender, ArrayCount(Args), Args))
     {
         LogCritical("wasm_runtime_call_wasm  (runtime error): %s\n", wasm_runtime_get_exception(Rt->ModuleInst));
-        return False;
-    }
-
-    // NOTE: Copy out.
-    SDL_memcpy(HostState, NativeState, sizeof(State));
-
-    // typedef struct
-    // {
-    //     Uint8 *Mem; 0-3
-    //     Uint32 Size; 4-7
-    //     Uint32 Cap; 8-11
-
-    //     Bool IsValid; 12-15
-    // } RenderBuf;
-
-    Uint32 RenderBufMemOffset = NativeRenderBuf[0];
-    Uint32 RenderBufSizeOffset = NativeRenderBuf[1];
-
-    if (RenderBufSizeOffset == 0)
-    {
-        return True;
-    }
-
-    if (!wasm_runtime_validate_app_addr(Rt->ModuleInst, RenderBufMemOffset, RenderBufSizeOffset))
-    {
-        LogCritical("RenderBuf memory is out of bounds.\n");
-        return False;
-    }
-
-    Void *RenderBufMem = (Void *)wasm_runtime_addr_app_to_native(Rt->ModuleInst, RenderBufMemOffset);
-
-    Void *Dst = RenderBufPush(HostRenderBuf, RenderBufSizeOffset);
-    if (Dst)
-    {
-        SDL_memcpy(Dst, RenderBufMem, RenderBufSizeOffset);
-        NativeRenderBuf[1] = 0;
-    }
-    else
-    {
-        LogCritical("Out of memory.\n");
         return False;
     }
 

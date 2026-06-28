@@ -34,6 +34,6 @@ Void RtDeinit(Runtime *Rt);
 
 Bool RtLoadOne(Runtime *Rt, const char *Path);
 
-Bool RtUpdate(Runtime *Rt, State *RuntimeState, RenderBuf *RuntimeRenderBuf);
+Bool RtUpdate(Runtime *Rt);
 
 #endif

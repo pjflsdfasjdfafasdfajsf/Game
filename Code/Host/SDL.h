@@ -4,8 +4,18 @@
 #include <SDL3/SDL.h>
 
 #include "Runtime.h"
-#include "SDL_Renderer.h"
 #include "Zip.h"
+
+typedef struct World
+{
+    Usize CompSizes[MaxCompTypes];
+    Uint32 CompTypeCount;
+
+    Uint8 CompData[MaxEnts][MaxCompTypes][MaxCompSize];
+    Bool CompPresent[MaxEnts][MaxCompTypes];
+
+    Bool EntActive[MaxEnts];
+} World;
 
 enum
 {
@@ -33,7 +43,6 @@ typedef struct
 {
     SDL_Window *Window;
 
-    Renderer Renderer;
     // NOTE: The game loading logic is basically the same as mods except for
     // the file that is being loaded. If all regular mods are loaded from Mods
     // directory the game is just hardcoded to be loaded from Game.wasm. Since
@@ -47,10 +56,7 @@ typedef struct
     Mod Mods[512];
     Uint32 ModCount;
 
-    MemAlloc MemAlloc;
-
-    Action *Keys[KeysCount];
-    State State;
+    World World;    
 } SDL;
 
 // NOTE: On any failures all of these function just traps the process.
