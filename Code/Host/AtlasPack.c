@@ -7,7 +7,7 @@
 //
 
 #include "STB.h"
-#include "Types.h"
+#include "Public/Types.h"
 
 #include <stdio.h>
 
