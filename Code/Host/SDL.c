@@ -762,6 +762,7 @@ SDL Init()
     if (GetAbsPath(ModsDir, sizeof(ModsDir), "Mods/"))
     {
         SDL_CreateDirectory(ModsDir);
+
         if (!SDL_EnumerateDirectory(ModsDir, EnumerateDirectoryCallback, &Result))
         {
             LogCritical("%s", SDL_GetError());
