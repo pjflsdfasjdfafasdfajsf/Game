@@ -1,9 +1,4 @@
-# LSP things
-compile_commands.json
-.cache
-.ignore
+.zig-cache
 
-# Build output
-Build
-# Symlink'd Makefile
-Makefile
+zig-out
+zig-pkg
