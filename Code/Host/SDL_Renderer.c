@@ -127,10 +127,6 @@ Bool RendererDraw(World *World, Renderer *Renderer)
         return False;
     }
 
-    // NOTE: TEMP
-
-    //
-
     Iter It = IterInit(World, (CompID[]){CompTransformHash, CompRenderableHash}, 2);
 
     EntID EntID;
