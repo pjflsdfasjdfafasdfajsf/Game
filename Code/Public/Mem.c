@@ -57,158 +57,158 @@ Void MemAllocClear(MemAlloc *MemAlloc)
 // NOTE: Memory Reader
 //
 
-MemReader MemReaderInit(const Uint8 *Mem, Usize Size)
+MemStream MemStreamInit(const Void *Mem, Usize Size)
 {
-    MemReader Result = {};
+    MemStream Result = {};
 
-    Result.Base = Mem;
+    Result.Base = (Uint8 *)Mem;
     Result.Size = Size;
     Result.HasError = (Mem == 0);
 
     return Result;
 }
 
-Void MemReaderSeek(MemReader *R, Usize Pos)
+Void MemStreamSeek(MemStream *S, Usize Pos)
 {
-    Assert(R);
-    if (R->HasError)
+    Assert(S);
+    if (S->HasError)
     {
         return;
     }
 
-    if (Pos > R->Size)
+    if (Pos > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         return;
     }
 
-    R->Pos = Pos;
+    S->Pos = Pos;
 
-    R->BitBuf = 0;
-    R->BitCount = 0;
+    S->BitBuf = 0;
+    S->BitCount = 0;
 }
 
-Void MemReaderSkip(MemReader *R, Usize Bytes)
+Void MemStreamSkip(MemStream *S, Usize Bytes)
 {
-    Assert(R);
-    if (R->HasError)
+    Assert(S);
+    if (S->HasError)
     {
         return;
     }
 
-    if (R->Pos + Bytes > R->Size)
+    if (S->Pos + Bytes > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         return;
     }
 
-    R->Pos += Bytes;
+    S->Pos += Bytes;
 }
 
-Uint16 MemReaderReadU16LE(MemReader *R)
+Uint16 MemStreamReadU16LE(MemStream *S)
 {
-    Assert(R);
-    if (R->HasError)
+    Assert(S);
+    if (S->HasError)
     {
         return 0;
     }
 
-    if (R->Pos + 2 > R->Size)
+    if (S->Pos + 2 > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         return 0;
     }
 
-    const Uint8 *Val = R->Base + R->Pos;
+    const Uint8 *Val = S->Base + S->Pos;
     Uint16 Result = (Uint16)Val[0] |
                     ((Uint16)Val[1] << 8);
 
-    R->Pos += 2;
+    S->Pos += 2;
     return Result;
 }
 
-Uint32 MemReaderReadU32LE(MemReader *R)
+Uint32 MemStreamReadU32LE(MemStream *S)
 {
-    Assert(R);
-    if (R->HasError)
+    Assert(S);
+    if (S->HasError)
     {
         return 0;
     }
 
-    if (R->Pos + 4 > R->Size)
+    if (S->Pos + 4 > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         return 0;
     }
 
-    const Uint8 *Val = R->Base + R->Pos;
+    const Uint8 *Val = S->Base + S->Pos;
     Uint32 Result = (Uint32)Val[0] |
                     ((Uint32)Val[1] << 8) |
                     ((Uint32)Val[2] << 16) |
                     ((Uint32)Val[3] << 24);
 
-    R->Pos += 4;
+    S->Pos += 4;
     return Result;
 }
 
-const Uint8 *MemReaderReadBytes(MemReader *R, Usize Bytes)
+const Uint8 *MemStreamReadBytes(MemStream *S, Usize Bytes)
 {
-    Assert(R);
-    if (R->HasError)
+    Assert(S);
+    if (S->HasError)
     {
         return 0;
     }
 
-    if (R->Pos + Bytes > R->Size)
+    if (S->Pos + Bytes > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         return 0;
     }
 
-    const Uint8 *Result = R->Base + R->Pos;
-    R->Pos += Bytes;
+    const Uint8 *Result = S->Base + S->Pos;
+    S->Pos += Bytes;
 
     return Result;
 }
 
-Void MemReaderRefillBits(MemReader *R, Uint32 Num)
+Void MemStreamRefillBits(MemStream *S, Uint32 Num)
 {
-    Assert(R);
+    Assert(S);
     Assert(Num <= 24);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return;
     }
 
-    while (R->BitCount < Num)
+    while (S->BitCount < Num)
     {
-        if (R->Pos < R->Size)
+        if (S->Pos < S->Size)
         {
-            R->BitBuf |= (Uint32)R->Base[R->Pos] << R->BitCount;
-            R->Pos++;
-            R->BitCount += 8;
+            S->BitBuf |= (Uint32)S->Base[S->Pos] << S->BitCount;
+            S->Pos++;
+            S->BitCount += 8;
         }
         else
         {
-            R->HasError = True;
+            S->HasError = True;
             break;
         }
     }
 }
 
-Uint32 MemReaderGetBits(MemReader *R, Uint32 Num)
+Uint32 MemStreamGetBits(MemStream *S, Uint32 Num)
 {
-    Assert(R);
+    Assert(S);
     Assert(Num <= 24);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return 0;
     }
 
-    MemReaderRefillBits(R, Num);
-    if (R->HasError)
+    MemStreamRefillBits(S, Num);
+    if (S->HasError)
     {
         return 0;
     }
@@ -219,19 +219,19 @@ Uint32 MemReaderGetBits(MemReader *R, Uint32 Num)
         Mask = (1U << Num) - 1U;
     }
 
-    Uint32 Value = R->BitBuf & Mask;
+    Uint32 Value = S->BitBuf & Mask;
 
-    R->BitBuf >>= Num;
-    R->BitCount -= Num;
+    S->BitBuf >>= Num;
+    S->BitCount -= Num;
 
     return Value;
 }
 
-Uint32 MemReaderGetBitsBase(MemReader *R, Uint32 Num, Uint32 Base)
+Uint32 MemStreamGetBitsBase(MemStream *S, Uint32 Num, Uint32 Base)
 {
-    Assert(R);
+    Assert(S);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return 0;
     }
@@ -239,39 +239,119 @@ Uint32 MemReaderGetBitsBase(MemReader *R, Uint32 Num, Uint32 Base)
     Uint32 Extra = 0;
     if (Num > 0)
     {
-        Extra = MemReaderGetBits(R, Num);
+        Extra = MemStreamGetBits(S, Num);
     }
 
     return Base + Extra;
 }
 
-Void MemReaderAlignToByteBoundary(MemReader *R)
+Void MemStreamAlignToByteBoundary(MemStream *S)
 {
-    Assert(R);
+    Assert(S);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return;
     }
 
     // NOTE: If there are unused whole bytes Pos must be rewind back so that
     // they aren't skipped when reading uncompressed bytes
-    while (R->BitCount >= 8)
+    while (S->BitCount >= 8)
     {
-        if (R->Pos > 0)
+        if (S->Pos > 0)
         {
-            R->Pos--;
-            R->BitCount -= 8;
+            S->Pos--;
+            S->BitCount -= 8;
         }
         else
         {
-            R->HasError = True;
+            S->HasError = True;
             return;
         }
     }
 
-    R->BitBuf = 0;
-    R->BitCount = 0;
+    S->BitBuf = 0;
+    S->BitCount = 0;
+}
+
+Void MemStreamWriteU8(MemStream *S, Uint8 Val)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    if (S->Pos + 1 > S->Size)
+    {
+        S->HasError = True;
+        return;
+    }
+
+    S->Base[S->Pos++] = Val;
+}
+
+Void MemStreamWriteU16LE(MemStream *S, Uint16 Val)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    if (S->Pos + 2 > S->Size)
+    {
+        S->HasError = True;
+        return;
+    }
+
+    S->Base[S->Pos++] = (Uint8)(Val & 0xff);
+    S->Base[S->Pos++] = (Uint8)((Val >> 8) & 0xff);
+}
+
+Void MemStreamWriteU32LE(MemStream *S, Uint32 Val)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    if (S->Pos + 4 > S->Size)
+    {
+        S->HasError = True;
+        return;
+    }
+
+    S->Base[S->Pos++] = (Uint8)(Val & 0xff);
+    S->Base[S->Pos++] = (Uint8)((Val >> 8) & 0xff);
+    S->Base[S->Pos++] = (Uint8)((Val >> 16) & 0xff);
+    S->Base[S->Pos++] = (Uint8)((Val >> 24) & 0xff);
+}
+
+Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    if (Size == 0)
+    {
+        return;
+    }
+
+    Assert(Bytes);
+
+    if (S->Pos + Size > S->Size)
+    {
+        S->HasError = True;
+        return;
+    }
+
+    MemCopy(S->Base + S->Pos, Bytes, Size);
+    S->Pos += Size;
 }
 
 //

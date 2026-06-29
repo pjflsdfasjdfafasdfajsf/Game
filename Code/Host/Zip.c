@@ -74,12 +74,12 @@ typedef struct
     Int32 MaxSym;
 } DeflateTree;
 
-static inline Int32 MemReaderDecodeSymbol(MemReader *R, const DeflateTree *T)
+static inline Int32 MemStreamDecodeSymbol(MemStream *S, const DeflateTree *T)
 {
-    Assert(R);
+    Assert(S);
     Assert(T);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return -1;
     }
@@ -89,8 +89,8 @@ static inline Int32 MemReaderDecodeSymbol(MemReader *R, const DeflateTree *T)
 
     for (Int32 Len = 1; Len <= DeflateMaxBitLength; ++Len)
     {
-        Uint32 Bit = MemReaderGetBits(R, 1);
-        if (R->HasError)
+        Uint32 Bit = MemStreamGetBits(S, 1);
+        if (S->HasError)
         {
             LogCritical("Failed to read bit during Huffman symbol decoding.\n");
             return -1;
@@ -103,7 +103,7 @@ static inline Int32 MemReaderDecodeSymbol(MemReader *R, const DeflateTree *T)
             Int32 Index = Base + Offs;
             if (Index < 0 || Index >= DeflateNumLiteralSymbols)
             {
-                R->HasError = True;
+                S->HasError = True;
                 LogCritical("Decoded symbol index is out of bounds.\n");
                 return -1;
             }
@@ -114,7 +114,7 @@ static inline Int32 MemReaderDecodeSymbol(MemReader *R, const DeflateTree *T)
         Offs -= (Int32)T->Counts[Len];
     }
 
-    R->HasError = True;
+    S->HasError = True;
     LogCritical("Code exceeded maximum bit length.\n");
 
     return -1;
@@ -237,13 +237,13 @@ static inline Void BuildFixedTrees(DeflateTree *Lt, DeflateTree *Dt, Bool IsDefl
     Dt->MaxSym = IsDeflate64 ? 31 : DeflateFixedDtMaxSymbol;
 }
 
-static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, Bool IsDeflate64)
+static inline Bool DecodeTrees(MemStream *S, DeflateTree *Lt, DeflateTree *Dt, Bool IsDeflate64)
 {
-    Assert(R);
+    Assert(S);
     Assert(Lt);
     Assert(Dt);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return False;
     }
@@ -253,9 +253,9 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
     static const Uint8 ClcIndex[DeflateNumCodeLengthSymbols] = {
         16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
-    Uint32 Hlit = MemReaderGetBits(R, DeflateHlitBits) + DeflateHlitBase;
-    Uint32 Hdist = MemReaderGetBits(R, DeflateHdistBits) + DeflateHdistBase;
-    Uint32 Hclen = MemReaderGetBits(R, DeflateHclenBits) + DeflateHclenBase;
+    Uint32 Hlit = MemStreamGetBits(S, DeflateHlitBits) + DeflateHlitBase;
+    Uint32 Hdist = MemStreamGetBits(S, DeflateHdistBits) + DeflateHdistBase;
+    Uint32 Hclen = MemStreamGetBits(S, DeflateHclenBits) + DeflateHclenBase;
 
     SDL_Log("Dynamic tree (HLIT=%u, HDIST=%u, HCLEN=%u)\n", Hlit, Hdist, Hclen);
 
@@ -263,7 +263,7 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
 
     if (Hlit > DeflateMaxHlit || Hdist > MaxHdist)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Dynamic tree header parameters exceed spec limits.\n");
         return False;
     }
@@ -272,11 +272,11 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
 
     for (Uint32 I = 0; I < Hclen; ++I)
     {
-        Uint32 Clen = MemReaderGetBits(R, DeflateCodeLengthBits);
+        Uint32 Clen = MemStreamGetBits(S, DeflateCodeLengthBits);
         CodeLengths[ClcIndex[I]] = (Uint8)Clen;
     }
 
-    if (R->HasError)
+    if (S->HasError)
     {
         LogCritical("Error reading code lengths for code length tree.\n");
         return False;
@@ -285,24 +285,24 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
     DeflateTree CodeTree;
     if (!BuildTree(&CodeTree, CodeLengths, DeflateNumCodeLengthSymbols))
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Failed to build code length Huffman tree.\n");
         return False;
     }
 
     if (CodeTree.MaxSym == -1)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Code length tree is empty.\n");
         return False;
     }
 
     for (Uint32 Num = 0; Num < Hlit + Hdist;)
     {
-        Int32 Sym = MemReaderDecodeSymbol(R, &CodeTree);
-        if (R->HasError || Sym < 0 || Sym > CodeTree.MaxSym)
+        Int32 Sym = MemStreamDecodeSymbol(S, &CodeTree);
+        if (S->HasError || Sym < 0 || Sym > CodeTree.MaxSym)
         {
-            R->HasError = True;
+            S->HasError = True;
             LogCritical("Failed to decode symbol.\n");
             return False;
         }
@@ -319,31 +319,31 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
         {
             if (Num == 0)
             {
-                R->HasError = True;
+                S->HasError = True;
                 LogCritical("Sym 16 (copy previous) encountered at start of tree length decoding.\n");
                 return False;
             }
             FillValue = Lengths[Num - 1];
-            Length = MemReaderGetBits(R, DeflateCopyPrevBits) + DeflateCopyPrevBase;
+            Length = MemStreamGetBits(S, DeflateCopyPrevBits) + DeflateCopyPrevBase;
         }
         else if (Sym == DeflateSymRepeatZero310)
         {
             FillValue = 0;
-            Length = MemReaderGetBits(R, DeflateRepeatZero310Bits) + DeflateRepeatZero310Base;
+            Length = MemStreamGetBits(S, DeflateRepeatZero310Bits) + DeflateRepeatZero310Base;
         }
         else if (Sym == DeflateSymRepeatZero11138)
         {
             FillValue = 0;
-            Length = MemReaderGetBits(R, DeflateRepeatZero11138Bits) + DeflateRepeatZero11138Base;
+            Length = MemStreamGetBits(S, DeflateRepeatZero11138Bits) + DeflateRepeatZero11138Base;
         }
         else
         {
-            R->HasError = True;
+            S->HasError = True;
             LogCritical("Unexpected symbol decoded in dynamic tree loop.\n");
             return False;
         }
 
-        if (R->HasError)
+        if (S->HasError)
         {
             LogCritical("Error reading extra repeat bits.\n");
             return False;
@@ -351,7 +351,7 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
 
         if (Length > Hlit + Hdist - Num)
         {
-            R->HasError = True;
+            S->HasError = True;
             LogCritical("Repeat count overflows hlit + hdist boundary.\n");
             return False;
         }
@@ -364,21 +364,21 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
 
     if (Lengths[DeflateEndOfBlockSymbol] == 0)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("End-of-block symbol (256) is missing in the dynamic literal/length code lengths.\n");
         return False;
     }
 
     if (!BuildTree(Lt, Lengths, Hlit))
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Failed to build dynamic literal/length tree.\n");
         return False;
     }
 
     if (!BuildTree(Dt, Lengths + Hlit, Hdist))
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Failed to build dynamic distance tree.\n");
         return False;
     }
@@ -386,9 +386,9 @@ static inline Bool DecodeTrees(MemReader *R, DeflateTree *Lt, DeflateTree *Dt, B
     return True;
 }
 
-static inline Bool DecompressBlockData(MemReader *R, const DeflateTree *Lt, const DeflateTree *Dt, Uint8 *Buf, Usize BufSize, Usize *OutDestLen, Bool IsDeflate64)
+static inline Bool DecompressBlockData(MemStream *S, const DeflateTree *Lt, const DeflateTree *Dt, Uint8 *Buf, Usize BufSize, Usize *OutDestLen, Bool IsDeflate64)
 {
-    Assert(R);
+    Assert(S);
     Assert(Lt);
     Assert(Dt);
     Assert(Buf);
@@ -413,10 +413,10 @@ static inline Bool DecompressBlockData(MemReader *R, const DeflateTree *Lt, cons
 
     for (;;)
     {
-        Int32 Sym = MemReaderDecodeSymbol(R, Lt);
-        if (R->HasError || Sym < 0)
+        Int32 Sym = MemStreamDecodeSymbol(S, Lt);
+        if (S->HasError || Sym < 0)
         {
-            R->HasError = True;
+            S->HasError = True;
             LogCritical("Failed to decode next literal/length symbol in block.\n");
             return False;
         }
@@ -440,27 +440,27 @@ static inline Bool DecompressBlockData(MemReader *R, const DeflateTree *Lt, cons
 
             if (Sym > Lt->MaxSym || Sym - DeflateFirstLengthSymbol > DeflateMaxLengthIndex || Dt->MaxSym == -1)
             {
-                R->HasError = True;
+                S->HasError = True;
                 LogCritical("Invalid match length symbol decoded.\n");
                 return False;
             }
 
             Uint32 SymIndex = (Uint32)(Sym - DeflateFirstLengthSymbol);
-            Uint32 Length = MemReaderGetBitsBase(R, LengthBits[SymIndex], LengthBase[SymIndex]);
-            Int32 Dist = MemReaderDecodeSymbol(R, Dt);
+            Uint32 Length = MemStreamGetBitsBase(S, LengthBits[SymIndex], LengthBase[SymIndex]);
+            Int32 Dist = MemStreamDecodeSymbol(S, Dt);
 
-            if (R->HasError || Dist > Dt->MaxSym || Dist > (Int32)MaxDistIndex)
+            if (S->HasError || Dist > Dt->MaxSym || Dist > (Int32)MaxDistIndex)
             {
-                R->HasError = True;
+                S->HasError = True;
                 LogCritical("Invalid distance code decoded.\n");
                 return False;
             }
 
-            Uint32 Offs = MemReaderGetBitsBase(R, DistBits[Dist], DistBase[Dist]);
+            Uint32 Offs = MemStreamGetBitsBase(S, DistBits[Dist], DistBase[Dist]);
 
             if (Offs > *OutDestLen)
             {
-                R->HasError = True;
+                S->HasError = True;
                 LogCritical("Offset refers to data before start of output buffer.\n");
                 return False;
             }
@@ -480,34 +480,34 @@ static inline Bool DecompressBlockData(MemReader *R, const DeflateTree *Lt, cons
     }
 }
 
-static inline Bool DecompressUncompressedBlock(MemReader *R, Uint8 *Buf, Usize BufSize, Usize *OutDestLen)
+static inline Bool DecompressUncompressedBlock(MemStream *S, Uint8 *Buf, Usize BufSize, Usize *OutDestLen)
 {
-    Assert(R);
+    Assert(S);
     Assert(Buf);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         return False;
     }
 
-    MemReaderAlignToByteBoundary(R);
-    if (R->HasError)
+    MemStreamAlignToByteBoundary(S);
+    if (S->HasError)
     {
         LogCritical("Failed to align reader to byte boundary.\n");
         return False;
     }
 
-    if (R->Pos + DeflateUncompressedHeaderSize > R->Size)
+    if (S->Pos + DeflateUncompressedHeaderSize > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Payload ended before reading uncompressed block length headers.\n");
         return False;
     }
 
-    Uint16 Length = MemReaderReadU16LE(R);
-    Uint16 InvLength = MemReaderReadU16LE(R);
+    Uint16 Length = MemStreamReadU16LE(S);
+    Uint16 InvLength = MemStreamReadU16LE(S);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         LogCritical("Error reading length headers of uncompressed block.\n");
         return False;
@@ -515,16 +515,16 @@ static inline Bool DecompressUncompressedBlock(MemReader *R, Uint8 *Buf, Usize B
 
     if (Length != (Uint16)(~InvLength))
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Uncompressed block length mismatch.\n");
         return False;
     }
 
     SDL_Log("Decompressed block of %u bytes\n", Length);
 
-    if (R->Pos + Length > R->Size)
+    if (S->Pos + Length > S->Size)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Uncompressed block length exceeds source stream size.\n");
         return False;
     }
@@ -535,8 +535,8 @@ static inline Bool DecompressUncompressedBlock(MemReader *R, Uint8 *Buf, Usize B
         return False;
     }
 
-    const Uint8 *Src = MemReaderReadBytes(R, Length);
-    if (R->HasError || !Src)
+    const Uint8 *Src = MemStreamReadBytes(S, Length);
+    if (S->HasError || !Src)
     {
         LogCritical("Failed to read uncompressed block payload data.\n");
         return False;
@@ -545,8 +545,8 @@ static inline Bool DecompressUncompressedBlock(MemReader *R, Uint8 *Buf, Usize B
     MemCopy(Buf + *OutDestLen, Src, Length);
     *OutDestLen += Length;
 
-    R->BitBuf = 0;
-    R->BitCount = 0;
+    S->BitBuf = 0;
+    S->BitCount = 0;
 
     return True;
 }
@@ -558,15 +558,15 @@ static inline Bool DecompressDeflate(Uint8 *Buf, Usize BufSize, const Uint8 *Pay
     Assert(Payload);
     Assert(CompressedSize > 0);
 
-    MemReader R = MemReaderInit(Payload, CompressedSize);
+    MemStream R = MemStreamInit(Payload, CompressedSize);
 
     Usize OutDestLen = 0;
     Uint32 BFinal = 0;
 
     do
     {
-        BFinal = MemReaderGetBits(&R, 1);
-        Uint32 BType = MemReaderGetBits(&R, 2);
+        BFinal = MemStreamGetBits(&R, 1);
+        Uint32 BType = MemStreamGetBits(&R, 2);
 
         if (R.HasError)
         {
@@ -670,12 +670,12 @@ static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
     Usize MinOffset = (Size > SearchLimit) ? (Size - SearchLimit) : 0;
     Usize MaxOffset = Size - 22;
 
-    MemReader R = MemReaderInit(Mem, Size);
+    MemStream R = MemStreamInit(Mem, Size);
 
     for (Usize I = MaxOffset; I >= MinOffset; I--)
     {
-        MemReaderSeek(&R, I);
-        Uint32 Sig = MemReaderReadU32LE(&R);
+        MemStreamSeek(&R, I);
+        Uint32 Sig = MemStreamReadU32LE(&R);
 
         if (!R.HasError && Sig == SigEOCD)
         {
@@ -693,41 +693,41 @@ static inline Bool FindEOCD(const Uint8 *Mem, Usize Size, Usize *OutEOCD)
     return False;
 }
 
-static inline ZipEntry ParseCDEntry(MemReader *R)
+static inline ZipEntry ParseCDEntry(MemStream *S)
 {
-    Assert(R);
+    Assert(S);
 
     ZipEntry Result = {0};
 
-    Uint32 Sig = MemReaderReadU32LE(R);
+    Uint32 Sig = MemStreamReadU32LE(S);
     if (Sig != SigCDHeader)
     {
-        R->HasError = True;
+        S->HasError = True;
         LogCritical("Central directory header signature mismatch.\n");
         return Result;
     }
 
     // NOTE: VersionMadeBy (2), VersionNeeded(2), BitFlag(2)
-    MemReaderSkip(R, 6);
-    Uint16 CompressionMethod = MemReaderReadU16LE(R);
+    MemStreamSkip(S, 6);
+    Uint16 CompressionMethod = MemStreamReadU16LE(S);
     // NOTE: ModTime (2), ModDate(2)
-    MemReaderSkip(R, 4);
+    MemStreamSkip(S, 4);
 
-    Uint32 Crc32 = MemReaderReadU32LE(R);
-    Uint32 CompressedSize = MemReaderReadU32LE(R);
-    Uint32 UncompressedSize = MemReaderReadU32LE(R);
-    Uint16 NameLen = MemReaderReadU16LE(R);
-    Uint16 ExtraLen = MemReaderReadU16LE(R);
-    Uint16 CommentLen = MemReaderReadU16LE(R);
+    Uint32 Crc32 = MemStreamReadU32LE(S);
+    Uint32 CompressedSize = MemStreamReadU32LE(S);
+    Uint32 UncompressedSize = MemStreamReadU32LE(S);
+    Uint16 NameLen = MemStreamReadU16LE(S);
+    Uint16 ExtraLen = MemStreamReadU16LE(S);
+    Uint16 CommentLen = MemStreamReadU16LE(S);
     // NOTE: DiskNumStart (2), IntFileAttr (2), ExtFileAttr (4)
-    MemReaderSkip(R, 8);
+    MemStreamSkip(S, 8);
 
-    Uint32 LocalHeaderOffset = MemReaderReadU32LE(R);
+    Uint32 LocalHeaderOffset = MemStreamReadU32LE(S);
 
-    const Uint8 *NamePtr = MemReaderReadBytes(R, NameLen);
-    MemReaderSkip(R, ExtraLen + CommentLen);
+    const Uint8 *NamePtr = MemStreamReadBytes(S, NameLen);
+    MemStreamSkip(S, ExtraLen + CommentLen);
 
-    if (R->HasError)
+    if (S->HasError)
     {
         LogCritical("Failed to parse Central Directory entry fields.\n");
         return Result;
@@ -761,16 +761,16 @@ ZipArchive ZipOpen(const Uint8 *Mem, Usize Size)
         return Result;
     }
 
-    MemReader R = MemReaderInit(Mem, Size);
-    MemReaderSeek(&R, EOCDOffset + 4);
+    MemStream R = MemStreamInit(Mem, Size);
+    MemStreamSeek(&R, EOCDOffset + 4);
 
-    Uint16 DiskNum = MemReaderReadU16LE(&R);
-    Uint16 CdDiskNum = MemReaderReadU16LE(&R);
-    Uint16 DiskEntries = MemReaderReadU16LE(&R);
-    Uint16 TotalEntries = MemReaderReadU16LE(&R);
-    Uint32 CdSize = MemReaderReadU32LE(&R);
-    Uint32 CdOffset = MemReaderReadU32LE(&R);
-    Uint16 CommentLen = MemReaderReadU16LE(&R);
+    Uint16 DiskNum = MemStreamReadU16LE(&R);
+    Uint16 CdDiskNum = MemStreamReadU16LE(&R);
+    Uint16 DiskEntries = MemStreamReadU16LE(&R);
+    Uint16 TotalEntries = MemStreamReadU16LE(&R);
+    Uint32 CdSize = MemStreamReadU32LE(&R);
+    Uint32 CdOffset = MemStreamReadU32LE(&R);
+    Uint16 CommentLen = MemStreamReadU16LE(&R);
 
     if (R.HasError)
     {
@@ -818,8 +818,8 @@ ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index)
         return Result;
     }
 
-    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
-    MemReaderSeek(&R, Zip->CdOffset);
+    MemStream R = MemStreamInit(Zip->Mem, Zip->Size);
+    MemStreamSeek(&R, Zip->CdOffset);
 
     for (Uint32 I = 0; I <= Index; I++)
     {
@@ -850,8 +850,8 @@ ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File)
 
     ZipEntry Result = {0};
 
-    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
-    MemReaderSeek(&R, Zip->CdOffset);
+    MemStream R = MemStreamInit(Zip->Mem, Zip->Size);
+    MemStreamSeek(&R, Zip->CdOffset);
 
     for (Uint32 I = 0; I < Zip->Count; I++)
     {
@@ -896,10 +896,10 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
         return False;
     }
 
-    MemReader R = MemReaderInit(Zip->Mem, Zip->Size);
-    MemReaderSeek(&R, Ent->LocalHeaderOffset);
+    MemStream R = MemStreamInit(Zip->Mem, Zip->Size);
+    MemStreamSeek(&R, Ent->LocalHeaderOffset);
 
-    Uint32 Sig = MemReaderReadU32LE(&R);
+    Uint32 Sig = MemStreamReadU32LE(&R);
     if (Sig != SigLocalHeader)
     {
         LogCritical("Local file header signature mismatch.\n");
@@ -907,22 +907,22 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
     }
 
     // NOTE: Version (2), Flag (2), Compression (2), ModTime (2), ModDate (2), CRC (4), CompressedSize (4), UncompressedSize (4)
-    MemReaderSkip(&R, 22);
+    MemStreamSkip(&R, 22);
 
-    Uint16 NameLen = MemReaderReadU16LE(&R);
-    Uint16 ExtraLen = MemReaderReadU16LE(&R);
+    Uint16 NameLen = MemStreamReadU16LE(&R);
+    Uint16 ExtraLen = MemStreamReadU16LE(&R);
     if (R.HasError)
     {
         LogCritical("Failed to read header size fields from local header.\n");
         return False;
     }
 
-    MemReaderSkip(&R, NameLen + ExtraLen);
+    MemStreamSkip(&R, NameLen + ExtraLen);
 
     if (Ent->CompressionMethod == CompressionStore)
     {
         // NOTE: No compression
-        const Uint8 *Payload = MemReaderReadBytes(&R, Ent->UncompressedSize);
+        const Uint8 *Payload = MemStreamReadBytes(&R, Ent->UncompressedSize);
         if (R.HasError)
         {
             LogCritical("Uncompressed store payload read out of bounds.\n");
@@ -936,7 +936,7 @@ Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize Bu
     }
     else
     {
-        const Uint8 *Payload = MemReaderReadBytes(&R, Ent->CompressedSize);
+        const Uint8 *Payload = MemStreamReadBytes(&R, Ent->CompressedSize);
         if (R.HasError)
         {
             LogCritical("Compressed payload read out of bounds.\n");

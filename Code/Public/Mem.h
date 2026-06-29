@@ -31,7 +31,7 @@ Void MemAllocClear(MemAlloc *MemAlloc);
 
 typedef struct
 {
-    const Uint8 *Base;
+    Uint8 *Base;
     Usize Size;
     Usize Pos;
 
@@ -40,21 +40,30 @@ typedef struct
     Uint32 BitCount;
 
     Bool HasError;
-} MemReader;
+} MemStream;
 
-MemReader MemReaderInit(const Uint8 *Mem, Usize Size);
+MemStream MemStreamInit(const Void *Mem, Usize Size);
 
-Void MemReaderSeek(MemReader *R, Usize Pos);
-Void MemReaderSkip(MemReader *R, Usize Bytes);
+Void MemStreamSeek(MemStream *S, Usize Pos);
+Void MemStreamSkip(MemStream *S, Usize Bytes);
 
-Uint16 MemReaderReadU16LE(MemReader *R);
-Uint32 MemReaderReadU32LE(MemReader *R);
-const Uint8 *MemReaderReadBytes(MemReader *R, Usize Bytes);
+// NOTE: Read functions.
 
-Void MemReaderRefillBits(MemReader *R, Uint32 Num);
-Uint32 MemReaderGetBits(MemReader *R, Uint32 Num);
-Uint32 MemReaderGetBitsBase(MemReader *R, Uint32 Num, Uint32 Base);
-Void MemReaderAlignToByteBoundary(MemReader *R);
+Uint16 MemStreamReadU16LE(MemStream *S);
+Uint32 MemStreamReadU32LE(MemStream *S);
+const Uint8 *MemStreamReadBytes(MemStream *S, Usize Bytes);
+
+Void MemStreamRefillBits(MemStream *S, Uint32 Num);
+Uint32 MemStreamGetBits(MemStream *S, Uint32 Num);
+Uint32 MemStreamGetBitsBase(MemStream *S, Uint32 Num, Uint32 Base);
+Void MemStreamAlignToByteBoundary(MemStream *S);
+
+// NOTE: Write functions.
+
+Void MemStreamWriteU8(MemStream *S, Uint8 Val);
+Void MemStreamWriteU16LE(MemStream *S, Uint16 Val);
+Void MemStreamWriteU32LE(MemStream *S, Uint32 Val);
+Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size);
 
 //
 // NOTE: String utilities
