@@ -2,6 +2,7 @@
 #define SDK_H
 
 #include "Ent.h"
+#include "Input.h"
 #include "Math.h"
 #include "Mem.h"
 #include "Types.h"
@@ -91,5 +92,10 @@ static inline ResID ResGetIDCStr(const char *Name)
 // TODO: The performance is VERY bad
 Import("IterInit") Iter IterInit(const CompID *CompIDs, Uint32 CompCount);
 Import("IterNext") Bool IterNext(Iter *It, EntID *OutEntID, ...);
+//
+// NOTE: Input
+//
+
+Import("GetInputState") InputState GetInputState(Input Input);
 
 #endif
