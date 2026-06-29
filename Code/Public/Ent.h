@@ -17,6 +17,8 @@ typedef Uint32 EntID;
 typedef Uint32 ResID;
 #define ResID_Invalid 0xFFFFFFFF
 
+#define MaxIterComps 8
+
 typedef struct CompTypeResult
 {
     CompID ID;
@@ -37,6 +39,15 @@ typedef struct CompResult
 
     Bool IsValid;
 } CompResult;
+
+typedef struct IterResult
+{
+    Int32 InternalCompIDs[MaxIterComps];
+    Uint32 CompCount;
+    EntID CurEntID;
+
+    Bool IsValid;
+} Iter;
 
 //
 // NOTE: Built-in components.

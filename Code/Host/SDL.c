@@ -333,6 +333,119 @@ static Void HostEntGetComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 
     *Result = EntGetComp(&App->World, EntID, TypeID);
 }
 
+// NOTE: Iter
+
+static Void HostIterInit(wasm_exec_env_t ExecEnv, Uint32 OutIterOffset, Uint32 CompIDsOffset, Uint32 CompCount)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutIterOffset, sizeof(Iter)) ||
+        !wasm_runtime_validate_app_addr(ModuleInst, CompIDsOffset, CompCount * sizeof(CompID)))
+    {
+        LogCritical("Memory bounds violation.\n");
+        return;
+    }
+
+    Iter *Result = (Iter *)wasm_runtime_addr_app_to_native(ModuleInst, OutIterOffset);
+    const CompID *CompIDs = (const CompID *)wasm_runtime_addr_app_to_native(ModuleInst, CompIDsOffset);
+
+    if (!Result || !CompIDs)
+    {
+        return;
+    }
+
+    *Result = IterInit(&App->World, CompIDs, CompCount);
+}
+
+static Bool HostIterNext(wasm_exec_env_t ExecEnv, Uint32 IterOffset, Uint32 OutEntIDOffset, Uint32 VarargsBufferOffset)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    if (!wasm_runtime_validate_app_addr(ModuleInst, IterOffset, sizeof(Iter)))
+    {
+        LogCritical("IterNext: Iterator memory bounds violation.\n");
+        return False;
+    }
+
+    if (OutEntIDOffset != 0 && !wasm_runtime_validate_app_addr(ModuleInst, OutEntIDOffset, sizeof(EntID)))
+    {
+        LogCritical("OutEntID memory bounds violation.\n");
+        return False;
+    }
+
+    Iter *It = (Iter *)wasm_runtime_addr_app_to_native(ModuleInst, IterOffset);
+    if (!It || !It->IsValid)
+    {
+        return False;
+    }
+
+    if (It->CompCount > 0 && VarargsBufferOffset != 0)
+    {
+        if (!wasm_runtime_validate_app_addr(ModuleInst, VarargsBufferOffset, It->CompCount * sizeof(Uint32)))
+        {
+            LogCritical("Varargs buffer memory bounds violation.\n");
+            return False;
+        }
+    }
+
+    const Uint32 *Varargs = (It->CompCount > 0) ? (const Uint32 *)wasm_runtime_addr_app_to_native(ModuleInst, VarargsBufferOffset) : 0;
+
+    Void *CompPtrs[MaxIterComps] = {0};
+    Void **CompPtrPtrs[MaxIterComps];
+    for (Uint32 I = 0; I < It->CompCount; ++I)
+    {
+        CompPtrPtrs[I] = &CompPtrs[I];
+    }
+
+    EntID Ent = 0;
+
+    if (!IterNextArray(&App->World, It, &Ent, CompPtrPtrs))
+    {
+        return False;
+    }
+    if (OutEntIDOffset != 0)
+    {
+        EntID *OutEntID = (EntID *)wasm_runtime_addr_app_to_native(ModuleInst, OutEntIDOffset);
+        if (OutEntID)
+        {
+            *OutEntID = Ent;
+        }
+    }
+
+    if (!Varargs)
+    {
+        return True;
+    }
+
+    for (Uint32 I = 0; I < It->CompCount; ++I)
+    {
+        Uint32 DstOffset = Varargs[I];
+        if (DstOffset == 0 || CompPtrs[I] == 0)
+        {
+            continue;
+        }
+
+        Usize Size = App->World.CompSizes[It->InternalCompIDs[I]];
+        if (!wasm_runtime_validate_app_addr(ModuleInst, DstOffset, Size))
+        {
+            LogCritical("Component %u destination memory bounds violation.\n", I);
+            return False;
+        }
+
+        Void *Dst = wasm_runtime_addr_app_to_native(ModuleInst, DstOffset);
+        if (Dst)
+        {
+            SDL_memcpy(Dst, CompPtrs[I], Size);
+        }
+    }
+
+    return True;
+}
+
 //
 // NOTE: Internal
 //
@@ -728,7 +841,11 @@ SDL Init()
 
         {"ResGetID", (void *)HostResGetID, "(ii)i", 0},
         {"ResGetVal", (void *)HostResGetVal, "(i)i", 0},
-        {"ResSetVal", (void *)HostResSetVal, "(ii)", 0}};
+        {"ResSetVal", (void *)HostResSetVal, "(ii)", 0},
+
+        {"IterInit", (void *)HostIterInit, "(iii)", 0},
+        {"IterNext", (void *)HostIterNext, "(iii)i", 0}};
+
     if (!wasm_runtime_register_natives("env", Natives, ArrayCount(Natives)))
     {
         Assert(0);

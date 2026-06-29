@@ -23,4 +23,14 @@ Init(Init)
 
 UpdateAndRender(UpdateAndRender)
 {
+    Iter It = IterInit((CompID[]){CompTransformHash}, 1);
+
+    EntID EntID;
+    CompTransform Transform;
+
+    while (IterNext(&It, &EntID, &Transform))
+    {
+        Transform.Pos.X += 0.01f;
+        EntAddComp(EntID, CompTransformHash, &Transform);
+    }
 }

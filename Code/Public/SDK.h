@@ -88,4 +88,8 @@ static inline ResID ResGetIDCStr(const char *Name)
     return ResGetID(Name, CStrLen(Name));
 }
 
+// TODO: The performance is VERY bad
+Import("IterInit") Iter IterInit(const CompID *CompIDs, Uint32 CompCount);
+Import("IterNext") Bool IterNext(Iter *It, EntID *OutEntID, ...);
+
 #endif

@@ -127,13 +127,17 @@ Bool RendererDraw(World *World, Renderer *Renderer)
         return False;
     }
 
-    Iter Iter = IterInit(World, (CompID[]){CompTransformHash, CompRenderableHash}, 2);
+    // NOTE: TEMP
+
+    //
+
+    Iter It = IterInit(World, (CompID[]){CompTransformHash, CompRenderableHash}, 2);
 
     EntID EntID;
     CompTransform *Transform;
     CompRenderable *Renderable;
 
-    while (IterNext(&Iter, &EntID, &Transform, &Renderable))
+    while (IterNext(World, &It, &EntID, &Transform, &Renderable))
     {
         switch (Renderable->Type)
         {

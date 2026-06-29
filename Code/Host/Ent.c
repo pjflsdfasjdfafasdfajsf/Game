@@ -221,7 +221,6 @@ Iter IterInit(World *World, const CompID *CompIDs, Uint32 CompCount)
     Assert(CompCount <= MaxIterComps);
 
     Iter Result = {0};
-    Result.World = World;
     Result.CompCount = CompCount;
     Result.CurEntID = 0;
     Result.IsValid = True;
@@ -240,21 +239,19 @@ Iter IterInit(World *World, const CompID *CompIDs, Uint32 CompCount)
     return Result;
 }
 
-Bool IterNext(Iter *Iter, EntID *OutEntID, ...)
+Bool IterNextArray(World *World, Iter *It, EntID *OutEntID, Void ***OutPtrs)
 {
-    Assert(Iter);
-    Assert(Iter->World);
+    Assert(World);
+    Assert(It);
 
-    if (!Iter->IsValid)
+    if (!It->IsValid)
     {
         return False;
     }
 
-    World *World = Iter->World;
-
-    while (Iter->CurEntID < MaxEnts)
+    while (It->CurEntID < MaxEnts)
     {
-        EntID CurID = Iter->CurEntID++;
+        EntID CurID = It->CurEntID++;
 
         if (!World->EntActive[CurID])
         {
@@ -262,9 +259,9 @@ Bool IterNext(Iter *Iter, EntID *OutEntID, ...)
         }
 
         Bool AllPresent = True;
-        for (Uint32 I = 0; I < Iter->CompCount; ++I)
+        for (Uint32 I = 0; I < It->CompCount; ++I)
         {
-            Int32 InternalID = Iter->InternalCompIDs[I];
+            Int32 InternalID = It->InternalCompIDs[I];
             Assert(InternalID >= 0 && InternalID < MaxCompTypes);
 
             if (!World->CompPresent[CurID][InternalID])
@@ -284,21 +281,35 @@ Bool IterNext(Iter *Iter, EntID *OutEntID, ...)
             *OutEntID = CurID;
         }
 
-        va_list Args;
-        va_start(Args, OutEntID);
-        for (Uint32 I = 0; I < Iter->CompCount; ++I)
+        if (OutPtrs)
         {
-            Int32 InternalID = Iter->InternalCompIDs[I];
-            Void **OutPtr = (Void **)va_arg(Args, Void *);
-            if (OutPtr)
+            for (Uint32 I = 0; I < It->CompCount; ++I)
             {
-                *OutPtr = (Void *)World->CompData[CurID][InternalID];
+                Int32 InternalID = It->InternalCompIDs[I];
+                Void **OutPtr = OutPtrs[I];
+                if (OutPtr)
+                {
+                    *OutPtr = (Void *)World->CompData[CurID][InternalID];
+                }
             }
         }
-        va_end(Args);
 
         return True;
     }
 
     return False;
+}
+
+Bool IterNext(World *World, Iter *It, EntID *OutEntID, ...)
+{
+    Void **Ptrs[MaxIterComps] = {0};
+    va_list Args;
+    va_start(Args, OutEntID);
+    for (Uint32 I = 0; I < It->CompCount; ++I)
+    {
+        Ptrs[I] = va_arg(Args, Void **);
+    }
+    va_end(Args);
+
+    return IterNextArray(World, It, OutEntID, Ptrs);
 }
