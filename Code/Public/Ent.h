@@ -4,7 +4,7 @@
 #include "Math.h"
 #include "Types.h"
 
-#define MaxEnts 32
+#define MaxEnts 512
 #define MaxCompTypes 8
 #define MaxCompSize Kb(1)
 
