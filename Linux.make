@@ -1,10 +1,6 @@
 CC  := clang
 AR  := ar
-ZIP ?= zip
 
-ifeq (, $(shell command -v $(ZIP) 2>/dev/null))
-$(error "Your system is missing '$(ZIP)' for game packaging.")
-endif
 ifeq (, $(shell command -v $(CC) 2>/dev/null))
 $(error "Your system is missing '$(CC)' compiler.")
 endif
@@ -22,7 +18,6 @@ WAMR_LIB    := Ext/WAMR/Bin/Linux/libiwasm.a
 SYSTEM_LIBS := -lm -lpthread -ldl -lrt -lstdc++
 
 # NOTE: Source groups
-ATLAS_SRC   := Code/Host/AtlasPack.c Code/Host/STB.c
 SDK_SRC     := Code/Public/Mem.c Code/Public/Math.c
 HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL_Renderer.c \
 			   Code/Host/SDL.c Code/Host/Zip.c Code/Host/KeyValue.c Code/Host/Ent.c
@@ -35,6 +30,9 @@ SDK_WASM_OBJS := $(patsubst Code/Public/%.c, $(OBJ_DIR)/SDK/WASM/%.o, $(SDK_SRC)
 HOST_OBJS     := $(patsubst Code/Host/%.c, $(OBJ_DIR)/Host/%.o, $(HOST_SRC))
 TEST_OBJS     := $(patsubst Code/Host/%.c, $(OBJ_DIR)/Test/%.o, $(TEST_SRC))
 
+ZIP_CLI      := $(TOOLS_DIR)/Zip
+ZIP_CLI_OBJS := $(OBJ_DIR)/Test/Zip_Cli.o $(OBJ_DIR)/Test/Zip.o
+
 # NOTE: Global flags
 CPPFLAGS := -ICode -IExt/WAMR/Include -IExt/SDL3/Include -I$(BUILD_DIR) -MMD -MP
 # TODO: We need to have Release and Debug flags
@@ -43,7 +41,6 @@ LDFLAGS  := -no-pie
 LDLIBS   := $(BUILD_DIR)/libSDK.a $(SDL3_LIB) $(WAMR_LIB) $(SYSTEM_LIBS)
 
 # NOTE: Flags
-ATLAS_CFLAGS := $(CFLAGS) -IExt/STB -O2
 HOST_CFLAGS  := -IExt/STB
 WASM_CFLAGS  := -ICode/Public --target=wasm32 -nostdlib
 GAME_LDFLAGS := -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined
@@ -58,6 +55,7 @@ all: $(BUILD_DIR)/Game $(BUILD_DIR)/Game.zip Makefile
 -include $(SDK_WASM_OBJS:.o=.d)
 -include $(HOST_OBJS:.o=.d)
 -include $(TEST_OBJS:.o=.d)
+-include $(ZIP_CLI_OBJS:.o=.d)
 
 #
 # NOTE: Dirs
@@ -68,17 +66,6 @@ $(OBJ_DIR)/SDK/WASM $(OBJ_DIR)/SDK/Native $(OBJ_DIR)/Host $(OBJ_DIR)/Test:
 
 Makefile:
 	@ln -sf Linux.make Makefile
-
-#
-# NOTE: Atlas packer
-#
-$(TOOLS_DIR)/AtlasPack: $(ATLAS_SRC) | $(TOOLS_DIR)
-	$(CC) $(ATLAS_CFLAGS) $(CPPFLAGS) $^ -lm -o $@
-
-$(BUILD_DIR)/GameAtlas.png $(BUILD_DIR)/GameAtlas.txt &: $(TOOLS_DIR)/AtlasPack $(IMAGES) | $(BUILD_DIR)
-	$(TOOLS_DIR)/AtlasPack $(BUILD_DIR)/GameAtlas Assets/Images/*
-
-pack: $(BUILD_DIR)/GameAtlas.png $(BUILD_DIR)/GameAtlas.txt
 
 #
 # NOTE: SDK
@@ -101,7 +88,7 @@ $(BUILD_DIR)/libSDK_wasm.a: $(SDK_WASM_OBJS) | $(BUILD_DIR)
 $(OBJ_DIR)/Host/%.o: Code/Host/%.c | $(OBJ_DIR)/Host
 	$(CC) $(CFLAGS) $(HOST_CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/Game: $(HOST_OBJS) $(BUILD_DIR)/libSDK.a $(BUILD_DIR)/GameAtlas.png $(BUILD_DIR)/GameAtlas.txt | $(BUILD_DIR)
+$(BUILD_DIR)/Game: $(HOST_OBJS) $(BUILD_DIR)/libSDK.a | $(BUILD_DIR)
 	$(CC) $(LDFLAGS) $(HOST_OBJS) $(LDLIBS) -o $@
 
 #
@@ -110,8 +97,14 @@ $(BUILD_DIR)/Game: $(HOST_OBJS) $(BUILD_DIR)/libSDK.a $(BUILD_DIR)/GameAtlas.png
 $(BUILD_DIR)/Game.wasm: $(GAME_SRC) $(BUILD_DIR)/libSDK_wasm.a | $(BUILD_DIR)
 	$(CC) $(WASM_CFLAGS) $(CPPFLAGS) $(GAME_SRC) -Wl,--whole-archive $(BUILD_DIR)/libSDK_wasm.a -Wl,--no-whole-archive $(GAME_LDFLAGS) -o $@
 
-$(BUILD_DIR)/Game.zip: $(BUILD_DIR)/Game.wasm Code/Game/Manifest.txt $(BUILD_DIR)/GameAtlas.png $(BUILD_DIR)/GameAtlas.txt | $(BUILD_DIR)
-	$(ZIP) -9 -j $@ $^ > /dev/null
+# 
+# NOTE: Zip
+#
+$(ZIP_CLI): $(ZIP_CLI_OBJS) $(BUILD_DIR)/libSDK.a | $(TOOLS_DIR)
+	$(CC) $(LDFLAGS) $(ZIP_CLI_OBJS) $(BUILD_DIR)/libSDK.a $(SDL3_LIB) $(SYSTEM_LIBS) -o $@
+
+$(BUILD_DIR)/Game.zip: $(ZIP_CLI) $(BUILD_DIR)/Game.wasm Code/Game/Manifest.txt | $(BUILD_DIR)
+	$(ZIP_CLI) $@ $(filter-out $(ZIP_CLI), $^)
 
 #
 # NOTE: Tests
