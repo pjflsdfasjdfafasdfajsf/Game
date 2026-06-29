@@ -2,6 +2,7 @@
 #define SDK_H
 
 #include "Ent.h"
+#include "Input.h"
 #include "Math.h"
 #include "Mem.h"
 #include "Types.h"
@@ -87,5 +88,11 @@ static inline ResID ResGetIDCStr(const char *Name)
 
     return ResGetID(Name, CStrLen(Name));
 }
+
+//
+// NOTE: Input
+//
+
+Import("GetInputState") InputState GetInputState(Input Input);
 
 #endif

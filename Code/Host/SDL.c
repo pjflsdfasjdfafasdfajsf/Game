@@ -11,7 +11,8 @@
 // NOTE: Host-provided funcs.
 //
 
-static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
+static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset,
+                          Uint32 Len)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     if (!wasm_runtime_validate_app_str_addr(ModuleInst, PtrOffset))
@@ -28,7 +29,8 @@ static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
 }
 
 // TODO: move this out to SDL_Renderer.c somehow.
-// static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Size)
+// static TexHandle HostAllocTexture(wasm_exec_env_t ExecEnv, Uint32 PtrOffset,
+// Uint32 Size)
 // {
 //     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
 
@@ -39,8 +41,9 @@ static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
 //         return TexHandleInvalid;
 //     }
 
-//     const Uint8 *Mem = (const Uint8 *)wasm_runtime_addr_app_to_native(ModuleInst, PtrOffset);
-//     if (!Mem || Size == 0)
+//     const Uint8 *Mem = (const Uint8
+//     *)wasm_runtime_addr_app_to_native(ModuleInst, PtrOffset); if (!Mem ||
+//     Size == 0)
 //     {
 //         LogCritical("Invalid pointer or size.\n");
 
@@ -63,16 +66,17 @@ static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
 //     Int32 Height = 0;
 //     Int32 Channels = 0;
 
-//     Uint8 *Pixels = stbi_load_from_memory(Mem, Size, &Width, &Height, &Channels, 4);
-//     if (!Pixels)
+//     Uint8 *Pixels = stbi_load_from_memory(Mem, Size, &Width, &Height,
+//     &Channels, 4); if (!Pixels)
 //     {
 //         LogCritical("%s\n", stbi_failure_reason());
 
 //         return TexHandleInvalid;
 //     }
 
-//     SDL_Texture *Tex = SDL_CreateTexture(App->Renderer.SDL, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, Width, Height);
-//     if (!Tex)
+//     SDL_Texture *Tex = SDL_CreateTexture(App->Renderer.SDL,
+//     SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, Width, Height); if
+//     (!Tex)
 //     {
 //         LogCritical("%s\n", SDL_GetError());
 
@@ -95,7 +99,9 @@ static Void HostPrintLine(wasm_exec_env_t ExecEnv, Uint32 PtrOffset, Uint32 Len)
 //     return Handle;
 // }
 
-static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32 PathLen, Uint32 DstPtrOffset, Uint32 DstSize)
+static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset,
+                           Uint32 PathLen, Uint32 DstPtrOffset,
+                           Uint32 DstSize)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
 
@@ -196,7 +202,8 @@ static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset, Uint32
 
 // NOTE: Res
 
-static ResID HostResGetID(wasm_exec_env_t ExecEnv, Uint32 NamePtrOffset, Uint32 NameLen)
+static ResID HostResGetID(wasm_exec_env_t ExecEnv, Uint32 NamePtrOffset,
+                          Uint32 NameLen)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     if (!wasm_runtime_validate_app_str_addr(ModuleInst, NamePtrOffset))
@@ -238,19 +245,22 @@ static Uint32 HostResSetVal(wasm_exec_env_t ExecEnv, Uint32 ResID, Uint32 Val)
 
 // NOTE: Comp
 
-static Void HostCompInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 Hash, Uint32 Size)
+static Void HostCompInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset,
+                         Uint32 Hash, Uint32 Size)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(CompTypeResult)))
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset,
+                                        sizeof(CompTypeResult)))
     {
         LogCritical("Output memory bounds violation.\n");
         return;
     }
 
-    CompTypeResult *Result = (CompTypeResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    CompTypeResult *Result = (CompTypeResult *)wasm_runtime_addr_app_to_native(
+        ModuleInst, OutPtrOffset);
     if (!Result)
     {
         LogCritical("Invalid output pointer.\n");
@@ -269,13 +279,15 @@ static Void HostEntInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset)
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(EntResult)))
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset,
+                                        sizeof(EntResult)))
     {
         LogCritical("Output memory bounds violation.\n");
         return;
     }
 
-    EntResult *Result = (EntResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    EntResult *Result =
+        (EntResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
     if (!Result)
     {
         LogCritical("Invalid output pointer.\n");
@@ -285,7 +297,8 @@ static Void HostEntInit(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset)
     *Result = EntInit(&App->World);
 }
 
-static Bool HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID, Uint32 MemOffset)
+static Bool HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID,
+                           Uint32 MemOffset)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
@@ -311,19 +324,22 @@ static Bool HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID,
     return EntAddComp(World, EntID, TypeID, Mem);
 }
 
-static Void HostEntGetComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 EntID, Uint32 TypeID)
+static Void HostEntGetComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset,
+                           Uint32 EntID, Uint32 TypeID)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset, sizeof(CompResult)))
+    if (!wasm_runtime_validate_app_addr(ModuleInst, OutPtrOffset,
+                                        sizeof(CompResult)))
     {
         LogCritical("Output memory bounds violation.\n");
         return;
     }
 
-    CompResult *Result = (CompResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    CompResult *Result =
+        (CompResult *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
     if (!Result)
     {
         LogCritical("Invalid output pointer.\n");
@@ -331,6 +347,34 @@ static Void HostEntGetComp(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Uint32 
     }
 
     *Result = EntGetComp(&App->World, EntID, TypeID);
+}
+
+//
+// NOTE: Input
+//
+
+static Void HostGetInputState(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Input Input)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    InputState *Result =
+        (InputState *)wasm_runtime_addr_app_to_native(ModuleInst, OutPtrOffset);
+    if (!Result)
+    {
+        LogCritical("Invalid output pointer.\n");
+        return;
+    }
+
+    if (Input < 0 || Input > Key_Count)
+    {
+        LogCritical("Invalid key.\n");
+        *Result = (InputState){0};
+        return;
+    }
+
+    *Result = App->Inputs[Input];
 }
 
 //
@@ -408,7 +452,8 @@ static Bool ReadManifest(ZipArchive *Archive, const char *Path)
         return False;
     }
 
-    if (!ZipReadEnt(Archive, &Manifest, (Uint8 *)Buf, Manifest.UncompressedSize))
+    if (!ZipReadEnt(Archive, &Manifest, (Uint8 *)Buf,
+                    Manifest.UncompressedSize))
     {
         LogCritical("Failed to read Manifest.txt from archive.\n");
         return False;
@@ -424,16 +469,19 @@ static Bool ReadManifest(ZipArchive *Archive, const char *Path)
         return False;
     }
 
-#define ReqField(Field)                                                                       \
-    KeyValuePair Field##Pair = KeyValueListFind(List, #Field, sizeof(#Field) - 1);            \
-    if (Field##Pair.KeyLen == 0)                                                              \
-    {                                                                                         \
-        LogCritical("Invalid manifest in %s. Missing required field: '%s'.\n", Path, #Field); \
-        return False;                                                                         \
+#define ReqField(Field)                                                        \
+    KeyValuePair Field##Pair =                                                 \
+        KeyValueListFind(List, #Field, sizeof(#Field) - 1);                    \
+    if (Field##Pair.KeyLen == 0)                                               \
+    {                                                                          \
+        LogCritical("Invalid manifest in %s. Missing required field: '%s'.\n", \
+                    Path, #Field);                                             \
+        return False;                                                          \
     }
 
-#define OptField(Field) \
-    KeyValuePair Field##Pair = KeyValueListFind(List, #Field, sizeof(#Field) - 1);
+#define OptField(Field)        \
+    KeyValuePair Field##Pair = \
+        KeyValueListFind(List, #Field, sizeof(#Field) - 1);
 
     ReqField(Name);
     ReqField(Version);
@@ -446,16 +494,14 @@ static Bool ReadManifest(ZipArchive *Archive, const char *Path)
 
     if (AuthorPair.KeyLen > 0)
     {
-        SDL_Log("%s: %.*s %.*s by %.*s\n", Path,
-                (Int32)NamePair.ValueLen, NamePair.Value,
-                (Int32)VersionPair.ValueLen, VersionPair.Value,
+        SDL_Log("%s: %.*s %.*s by %.*s\n", Path, (Int32)NamePair.ValueLen,
+                NamePair.Value, (Int32)VersionPair.ValueLen, VersionPair.Value,
                 (Int32)AuthorPair.ValueLen, AuthorPair.Value);
     }
     else
     {
-        SDL_Log("%s: %.*s %.*s\n", Path,
-                (Int32)NamePair.ValueLen, NamePair.Value,
-                (Int32)VersionPair.ValueLen, VersionPair.Value);
+        SDL_Log("%s: %.*s %.*s\n", Path, (Int32)NamePair.ValueLen,
+                NamePair.Value, (Int32)VersionPair.ValueLen, VersionPair.Value);
     }
 
     if (SummaryPair.KeyLen > 0)
@@ -550,7 +596,8 @@ static Bool LoadOneMod(SDL *App, Mod *Mod, const char *ZipPath)
 
     if (!SDL_SaveFile(PathBuf, WasmBuf, Wasm.UncompressedSize))
     {
-        LogCritical("Failed to write extracted wasm to %s: %s\n", PathBuf, SDL_GetError());
+        LogCritical("Failed to write extracted wasm to %s: %s\n", PathBuf,
+                    SDL_GetError());
         SDL_free(WasmBuf);
         return False;
     }
@@ -583,7 +630,8 @@ static Bool LoadOneMod(SDL *App, Mod *Mod, const char *ZipPath)
 }
 
 // NOTE: UserData -- *SDL
-static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(Void *UserData, const char *DirName, const char *FileName)
+static SDL_EnumerationResult SDLCALL EnumerateDirectoryCallback(
+    Void *UserData, const char *DirName, const char *FileName)
 {
     SDL *App = (SDL *)UserData;
 
@@ -651,8 +699,8 @@ Void Update(SDL *App)
 
 // static inline Void ApplyInputBindings(SDL *App)
 // {
-//     /* TODO: later read them from a input file. Right now they are hardcoded */
-//     Input *Input = &App->State.Input;
+//     /* TODO: later read them from a input file. Right now they are hardcoded
+//     */ Input *Input = &App->State.Input;
 
 //     App->Keys[SDL_SCANCODE_D] = &Input->Right;
 //     App->Keys[SDL_SCANCODE_A] = &Input->Left;
@@ -728,7 +776,10 @@ SDL Init()
 
         {"ResGetID", (void *)HostResGetID, "(ii)i", 0},
         {"ResGetVal", (void *)HostResGetVal, "(i)i", 0},
-        {"ResSetVal", (void *)HostResSetVal, "(ii)", 0}};
+        {"ResSetVal", (void *)HostResSetVal, "(ii)", 0},
+
+        // NOTE: Input
+        {"GetInputState", (void *)HostGetInputState, "(ii)", 0}};
     if (!wasm_runtime_register_natives("env", Natives, ArrayCount(Natives)))
     {
         Assert(0);
@@ -774,20 +825,35 @@ SDL Init()
     return Result;
 }
 
-// static inline Action *GetMouseAction(SDL *App, Uint8 Code)
-// {
-//     switch (Code)
-//     {
-//     case SDL_BUTTON_LEFT:
-//         return App->Keys[MouseButtonLeft];
-//     case SDL_BUTTON_RIGHT:
-//         return App->Keys[MouseButtonRight];
-//     case SDL_BUTTON_MIDDLE:
-//         return App->Keys[MouseButtonMiddle];
-//     }
+static inline Int32 GetMouseIndex(Uint8 Code)
+{
+    switch (Code)
+    {
+    case SDL_BUTTON_LEFT:
+        return Button_Left;
+    case SDL_BUTTON_RIGHT:
+        return Button_Right;
+    default:
+        return -1;
+    }
+}
 
-//     return 0;
-// }
+static inline Int32 GetKeyIndex(SDL_Scancode Code)
+{
+    switch (Code)
+    {
+    case SDL_SCANCODE_W:
+        return Key_W;
+    case SDL_SCANCODE_A:
+        return Key_A;
+    case SDL_SCANCODE_S:
+        return Key_S;
+    case SDL_SCANCODE_D:
+        return Key_D;
+    default:
+        return -1;
+    }
+}
 
 Void Render(SDL *App)
 {
@@ -804,15 +870,16 @@ Bool Poll(SDL *App)
 {
     Assert(App);
 
-    // for (Usize I = 0; I < KeysCount; I++)
-    // {
-    //     Action *Action = App->Keys[I];
+    for (Usize I = 0; I < Key_Count; I++)
+    {
+        InputState *InputState = &App->Inputs[I];
 
-    //     if (Action)
-    //     {
-    //         Action->Pressed = False;
-    //     }
-    // }
+        if (InputState)
+        {
+            InputState->Pressed = False;
+            InputState->Released = False;
+        }
+    }
 
     SDL_Event Ev;
     while (SDL_PollEvent(&Ev))
@@ -834,61 +901,73 @@ Bool Poll(SDL *App)
             // }
             // break;
 
-            // case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            // {
-            //     Action *Action = GetMouseAction(App, Ev.button.button);
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        {
+            Int32 Index = GetMouseIndex(Ev.button.button);
 
-            //     if (Action)
-            //     {
-            //         Action->IsDown = True;
-            //         Action->Pressed = True;
-            //     }
-            // }
-            // break;
+            if (Index != -1)
+            {
+                InputState *InputState = &App->Inputs[Index];
+                Assert(InputState);
 
-            // case SDL_EVENT_MOUSE_BUTTON_UP:
-            // {
-            //     Action *Action = GetMouseAction(App, Ev.button.button);
+                InputState->Down = True;
+                InputState->Pressed = True;
+            }
+        }
+        break;
 
-            //     if (Action)
-            //     {
-            //         Action->IsDown = False;
-            //         Action->Released = True;
-            //     }
-            // }
-            // break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+        {
+            Int32 Index = GetMouseIndex(Ev.button.button);
 
-            // case SDL_EVENT_KEY_DOWN:
-            // {
-            //     SDL_Scancode Scancode = Ev.key.scancode;
-            //     if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
-            //     {
-            //         Action *Action = App->Keys[Scancode];
+            if (Index != -1)
+            {
+                InputState *InputState = &App->Inputs[Index];
+                Assert(InputState);
 
-            //         if (Action)
-            //         {
-            //             Action->IsDown = True;
-            //             Action->Pressed = True;
-            //         }
-            //     }
-            // }
-            // break;
+                InputState->Down = False;
+                InputState->Released = True;
+            }
+        }
+        break;
 
-            // case SDL_EVENT_KEY_UP:
-            // {
-            //     SDL_Scancode Scancode = Ev.key.scancode;
-            //     if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
-            //     {
-            //         Action *Action = App->Keys[Scancode];
+        case SDL_EVENT_KEY_DOWN:
+        {
+            SDL_Scancode Scancode = Ev.key.scancode;
+            if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
+            {
+                Int32 Index = GetKeyIndex(Scancode);
 
-            //         if (Action)
-            //         {
-            //             Action->IsDown = False;
-            //             Action->Released = True;
-            //         }
-            //     }
-            // }
-            // break;
+                if (Index != -1)
+                {
+                    InputState *InputState = &App->Inputs[Index];
+                    Assert(InputState);
+
+                    InputState->Down = True;
+                    InputState->Pressed = True;
+                }
+            }
+        }
+        break;
+
+        case SDL_EVENT_KEY_UP:
+        {
+            SDL_Scancode Scancode = Ev.key.scancode;
+            if (Scancode > 0 && Scancode < SDL_SCANCODE_COUNT)
+            {
+                Int32 Index = GetKeyIndex(Scancode);
+
+                if (Index != -1)
+                {
+                    InputState *InputState = &App->Inputs[Index];
+                    Assert(InputState);
+
+                    InputState->Down = False;
+                    InputState->Released = True;
+                }
+            }
+        }
+        break;
 
         default:
         {

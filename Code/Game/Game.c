@@ -1,3 +1,4 @@
+#include "Input.h"
 #include <SDK.h>
 
 Init(Init)
@@ -23,4 +24,18 @@ Init(Init)
 
 UpdateAndRender(UpdateAndRender)
 {
+    if (GetInputState(Button_Left).Down)
+    {
+        PrintCStr("(Game): LMB DOWN!");
+    }
+
+    if (GetInputState(Key_W).Pressed)
+    {
+        PrintCStr("(Game): W Pressed!");
+    }
+
+    if (GetInputState(Key_S).Released)
+    {
+        PrintCStr("(Game): S Released!");
+    }
 }
