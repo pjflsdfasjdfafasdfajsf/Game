@@ -31,6 +31,7 @@ UpdateAndRender(UpdateAndRender)
     while (IterNext(&It, &EntID, &Transform))
     {
         Transform.Pos.X += 0.01f;
+        // TODO: No copy
         EntAddComp(EntID, CompTransformHash, &Transform);
     }
 }
