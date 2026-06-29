@@ -1,7 +1,7 @@
 #if !defined(HOST_RUNTIME_H)
 #define HOST_RUNTIME_H
 
-#include <wasm_export.h>
+#include <WAMR/wasm_export.h>
 
 #include "Public/Types.h"
 

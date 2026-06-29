@@ -6,7 +6,6 @@
 #include "SDL.h"
 
 #include "Public/Types.h"
-#include "wasm_export.h"
 
 Bool RtGlobalInit(Void)
 {

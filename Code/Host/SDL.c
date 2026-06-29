@@ -4,8 +4,6 @@
 #include "Public/Ent.h"
 #include "Runtime.h"
 #include "SDL_Renderer.h"
-#include "STB.h"
-#include "wasm_export.h"
 
 #define GameZip "Game.zip"
 

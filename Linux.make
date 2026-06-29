@@ -13,13 +13,13 @@ TEST_DATA_DIR := $(TEST_DIR)/Data
 OBJ_DIR       := $(BUILD_DIR)/Obj
 
 # NOTE: Libraries
-SDL3_LIB    := Ext/SDL3/Bin/Linux/libSDL3.a
-WAMR_LIB    := Ext/WAMR/Bin/Linux/libiwasm.a
+SDL3_LIB    := Ext/Bin/SDL3/libSDL3.a
+WAMR_LIB    := Ext/Bin/WAMR/libiwasm.a
 SYSTEM_LIBS := -lm -lpthread -ldl -lrt -lstdc++
 
 # NOTE: Source groups
 SDK_SRC     := Code/Public/Mem.c Code/Public/Math.c
-HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/STB.c Code/Host/SDL_Renderer.c \
+HOST_SRC    := Code/Host/Main.c Code/Host/Runtime.c Code/Host/SDL_Renderer.c \
 			   Code/Host/SDL.c Code/Host/Zip.c Code/Host/KeyValue.c Code/Host/Ent.c
 TEST_SRC    := Code/Host/Zip_Test.c Code/Host/Zip.c
 GAME_SRC    := Code/Game/Game.c
@@ -34,14 +34,14 @@ ZIP_CLI      := $(TOOLS_DIR)/Zip
 ZIP_CLI_OBJS := $(OBJ_DIR)/Test/Zip_Cli.o $(OBJ_DIR)/Test/Zip.o
 
 # NOTE: Global flags
-CPPFLAGS := -ICode -IExt/WAMR/Include -IExt/SDL3/Include -I$(BUILD_DIR) -MMD -MP
+CPPFLAGS := -ICode -IExt/Include -I$(BUILD_DIR) -MMD -MP
 # TODO: We need to have Release and Debug flags
 CFLAGS   := -Wall -Wextra -g
 LDFLAGS  := -no-pie
 LDLIBS   := $(BUILD_DIR)/libSDK.a $(SDL3_LIB) $(WAMR_LIB) $(SYSTEM_LIBS)
 
 # NOTE: Flags
-HOST_CFLAGS  := -IExt/STB
+HOST_CFLAGS  := 
 WASM_CFLAGS  := -ICode/Public --target=wasm32 -nostdlib
 GAME_LDFLAGS := -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined
 
