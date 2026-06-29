@@ -73,21 +73,11 @@ Import("EntInit") EntResult EntInit(Void);
 Import("EntAddComp") Bool EntAddComp(EntID EntID, CompID TypeID, const Void *Mem);
 Import("EntGetComp") CompResult EntGetComp(EntID EntID, CompID TypeID);
 
-Import("ResGetID") ResID ResGetID(const char *NamePtr, Usize NameLen);
-Import("ResGetVal") Uint32 ResGetVal(ResID ResID);
-Import("ResSetVal") Void ResSetVal(ResID ResID, Uint32 Val);
+Import("ResGetUint") Uint32 ResGetUint(ResID ResID);
+Import("ResSetUint") Bool ResSetUint(ResID ResID, Uint32 Value);
 
-static inline ResID ResGetIDCStr(const char *Name)
-{
-    Assert(Name);
-
-    if (!Name)
-    {
-        return ResID_Invalid;
-    }
-
-    return ResGetID(Name, CStrLen(Name));
-}
+Import("ResGetFloat") Float32 ResGetFloat(ResID ResID);
+Import("ResSetFloat") Bool ResSetFloat(ResID ResID, Float32 Value);
 
 // TODO: The performance is VERY bad
 Import("IterInit") Iter IterInit(const CompID *CompIDs, Uint32 CompCount);

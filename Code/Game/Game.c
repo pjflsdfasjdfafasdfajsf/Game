@@ -1,3 +1,4 @@
+#include "Ent.h"
 #include "Input.h"
 #include <SDK.h>
 
@@ -31,11 +32,11 @@ UpdateAndRender(UpdateAndRender)
 
     while (IterNext(&It, &EntID, &Transform))
     {
-        Transform.Pos.X += 1.0f;
+        Transform.Pos.X += 100.0f * ResGetFloat(DeltaTimeHash);
         // TODO: No copy
         EntAddComp(EntID, CompTransformHash, &Transform);
     }
-    
+
     if (GetInputState(Button_Left).Down)
     {
         PrintCStr("(Game): LMB DOWN!");

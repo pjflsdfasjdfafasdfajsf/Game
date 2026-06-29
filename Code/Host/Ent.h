@@ -13,8 +13,14 @@
 typedef struct
 {
     Uint32 Hash;
-    // NOTE: Integer representation.
-    Uint32 Value;
+    struct
+    {
+        Uint32 Uint;
+
+        Int32 Int;
+
+        Float32 Float;
+    } Value;
     // TODO: Generic ptr.
 } Res;
 
@@ -36,7 +42,13 @@ typedef struct
     Bool EntActive[MaxEnts];
 } World;
 
-Int32 GetInternalTypeID(const World *World, Uint32 Hash);
+typedef enum
+{
+    Lookup_Comp,
+    Lookup_Res
+} LookupType;
+
+Int32 GetID(const World *World, LookupType Type, Uint32 Hash);
 
 CompTypeResult CompInit(World *World, Uint32 Hash, Uint32 Size);
 EntResult EntInit(World *World);
@@ -48,11 +60,11 @@ CompResult EntGetComp(World *World, Uint32 EntID, Uint32 TypeID);
 // NOTE: Res
 //
 
-// NOTE: If the requested resource does not exist it is registered.
-ResID ResGetID(World *World, const char *NamePtr, Usize NameLen);
+Uint32 ResGetUint(const World *World, Uint32 Hash);
+Bool ResSetUint(World *World, Uint32 Hash, Uint32 Value);
 
-Uint32 ResGetVal(const World *World, ResID ResID);
-Bool ResSetVal(World *World, Uint32 ResID, Uint32 Value);
+Float32 ResGetFloat(const World *World, Uint32 Hash);
+Bool ResSetFloat(World *World, Uint32 Hash, Float32 Value);
 
 //
 // NOTE: Iter

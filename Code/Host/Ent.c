@@ -6,15 +6,70 @@
 
 #include <stdarg.h>
 
-Int32 GetInternalTypeID(const World *World, Uint32 Hash)
+//
+// NOTE: Internal
+//
+
+Int32 GetOrCreateResID(World *World, Uint32 Hash)
 {
-    for (Uint32 I = 0; I < World->CompTypeCount; ++I)
+    Int32 Existing = GetID(World, Lookup_Res, Hash);
+    if (Existing >= 0)
     {
-        if (World->CompTypeHashes[I] == Hash)
+        return Existing;
+    }
+
+    if (World->ResCount >= MaxRes)
+    {
+        LogCritical("Maximum resource capacity (%u) reached.\n", MaxRes);
+        return -1;
+    }
+
+    ResID Result = World->ResCount++;
+    World->Res[Result] = (Res){0};
+    World->Res[Result].Hash = Hash;
+
+    SDL_snprintf(World->ResNames[Result], sizeof(World->ResNames[Result]), "Anon_0x%08X", Hash);
+
+    return (Int32)Result;
+}
+
+//
+// NOTE: Implementation
+//
+
+Int32 GetID(const World *World, LookupType Type, Uint32 Hash)
+{
+    Assert(World);
+
+    const Uint8 *Base;
+    Uint32 Count;
+    Usize Stride;
+    Usize Offset;
+
+    if (Type == Lookup_Comp)
+    {
+        Base = (const Uint8 *)World->CompTypeHashes;
+        Count = World->CompTypeCount;
+        Stride = sizeof(Uint32);
+        Offset = 0;
+    }
+    else // Lookup_Resource
+    {
+        Base = (const Uint8 *)World->Res;
+        Count = World->ResCount;
+        Stride = sizeof(Res);
+        Offset = offsetof(Res, Hash);
+    }
+
+    for (Uint32 I = 0; I < Count; ++I)
+    {
+        const Uint32 *TargetHash = (const Uint32 *)(Base + (I * Stride) + Offset);
+        if (*TargetHash == Hash)
         {
             return (Int32)I;
         }
     }
+
     return -1;
 }
 
@@ -24,7 +79,7 @@ CompTypeResult CompInit(World *World, Uint32 Hash, Uint32 Size)
 
     CompTypeResult Result = {0};
 
-    Int32 ExistingID = GetInternalTypeID(World, Hash);
+    Int32 ExistingID = GetID(World, Lookup_Comp, Hash);
     if (ExistingID >= 0)
     {
         Result.ID = Hash;
@@ -92,7 +147,7 @@ Bool EntAddComp(World *World, Uint32 EntID, Uint32 TypeID, const Void *Mem)
         return False;
     }
 
-    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    Int32 InternalID = GetID(World, Lookup_Comp, TypeID);
     if (InternalID < 0)
     {
         LogCritical("Invalid Comp Type Hash %u.\n", TypeID);
@@ -128,7 +183,7 @@ CompResult EntGetComp(World *World, Uint32 EntID, Uint32 TypeID)
         return Result;
     }
 
-    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    Int32 InternalID = GetID(World, Lookup_Comp, TypeID);
     if (InternalID < 0)
     {
         return Result;
@@ -184,30 +239,57 @@ ResID ResGetID(World *World, const char *NamePtr, Usize NameLen)
     return Result;
 }
 
-Uint32 ResGetVal(const World *World, ResID ResID)
+Uint32 ResGetUint(const World *World, Uint32 Hash)
 {
     Assert(World);
+    Int32 ID = GetID(World, Lookup_Res, Hash);
 
-    if (ResID >= World->ResCount)
+    if (ID < 0)
     {
-        LogCritical("Attempt to read out-of-bounds ResID: %u\n", ResID);
         return 0;
     }
 
-    return World->Res[ResID].Value;
+    return World->Res[ID].Value.Uint;
 }
 
-Bool ResSetVal(World *World, Uint32 ResID, Uint32 Value)
+Bool ResSetUint(World *World, Uint32 Hash, Uint32 Value)
 {
     Assert(World);
+    Int32 ID = GetOrCreateResID(World, Hash);
 
-    if (ResID >= World->ResCount)
+    if (ID < 0)
     {
-        LogCritical("Attempt to read out-of-bounds ResID: %u\n", ResID);
-        return 0;
+        return False;
     }
 
-    World->Res[ResID].Value = Value;
+    World->Res[ID].Value.Uint = Value;
+    return True;
+}
+
+Float32 ResGetFloat(const World *World, Uint32 Hash)
+{
+    Assert(World);
+    Int32 ID = GetID(World, Lookup_Res, Hash);
+
+    if (ID < 0)
+    {
+        return 0.0f;
+    }
+
+    return World->Res[ID].Value.Float;
+}
+
+Bool ResSetFloat(World *World, Uint32 Hash, Float32 Value)
+{
+    Assert(World);
+    Int32 ID = GetOrCreateResID(World, Hash);
+
+    if (ID < 0)
+    {
+        return False;
+    }
+
+    World->Res[ID].Value.Float = Value;
     return True;
 }
 
@@ -227,7 +309,7 @@ Iter IterInit(World *World, const CompID *CompIDs, Uint32 CompCount)
 
     for (Uint32 I = 0; I < CompCount; ++I)
     {
-        Int32 InternalID = GetInternalTypeID(World, CompIDs[I]);
+        Int32 InternalID = GetID(World, Lookup_Comp, CompIDs[I]);
         Result.InternalCompIDs[I] = InternalID;
 
         if (InternalID < 0)

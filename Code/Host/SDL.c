@@ -2,6 +2,7 @@
 #include "Host/Ent.h"
 #include "KeyValue.h"
 #include "Public/Ent.h"
+#include "Public/Mem.h"
 #include "Runtime.h"
 #include "SDL_Renderer.h"
 
@@ -202,45 +203,40 @@ static Uint32 HostReadFile(wasm_exec_env_t ExecEnv, Uint32 PathPtrOffset,
 
 // NOTE: Res
 
-static ResID HostResGetID(wasm_exec_env_t ExecEnv, Uint32 NamePtrOffset,
-                          Uint32 NameLen)
+static Uint32 HostResGetUint(wasm_exec_env_t ExecEnv, Uint32 ResID)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
-    if (!wasm_runtime_validate_app_str_addr(ModuleInst, NamePtrOffset))
-    {
-        LogCritical("Resource name memory bounds violation.\n");
-        return ResID_Invalid;
-    }
-
-    const char *Name = (const char *)wasm_runtime_addr_app_to_native(ModuleInst, NamePtrOffset);
-    if (!Name || NameLen == 0)
-    {
-        LogCritical("Invalid resource name pointer or length.\n");
-        return ResID_Invalid;
-    }
-
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    return ResGetID(&App->World, Name, NameLen);
+    return ResGetUint(&App->World, ResID);
 }
 
-static Uint32 HostResGetVal(wasm_exec_env_t ExecEnv, Uint32 ResID)
+static Uint32 HostResSetUint(wasm_exec_env_t ExecEnv, Uint32 ResID, Uint32 Val)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    return ResGetVal(&App->World, ResID);
+    return ResSetUint(&App->World, ResID, Val);
 }
 
-static Uint32 HostResSetVal(wasm_exec_env_t ExecEnv, Uint32 ResID, Uint32 Val)
+static Float32 HostResGetFloat(wasm_exec_env_t ExecEnv, Uint32 ResID)
 {
     wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
     SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
     Assert(App);
 
-    return ResSetVal(&App->World, ResID, Val);
+    return ResGetFloat(&App->World, ResID);
+}
+
+static Uint32 HostResSetFloat(wasm_exec_env_t ExecEnv, Uint32 ResID, Float32 Value)
+{
+    wasm_module_inst_t ModuleInst = wasm_runtime_get_module_inst(ExecEnv);
+    SDL *App = (SDL *)wasm_runtime_get_custom_data(ModuleInst);
+    Assert(App);
+
+    return ResSetFloat(&App->World, ResID, Value);
 }
 
 // NOTE: Comp
@@ -306,7 +302,7 @@ static Bool HostEntAddComp(wasm_exec_env_t ExecEnv, Uint32 EntID, Uint32 TypeID,
 
     World *World = &App->World;
 
-    Int32 InternalID = GetInternalTypeID(World, TypeID);
+    Int32 InternalID = GetID(World, Lookup_Comp, TypeID);
     if (InternalID < 0)
     {
         LogCritical("Invalid Comp Type Hash %u.\n", TypeID);
@@ -494,23 +490,23 @@ static Void HostGetInputState(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Inpu
 // NOTE: Internal
 //
 
-// static inline Float32 GetDeltaSeconds()
-// {
-//     static Uint64 LastFrameTicks = 0;
-//     static Bool IsInitialized = True;
+static inline Float32 GetDeltaSeconds()
+{
+    static Uint64 LastFrameTicks = 0;
+    static Bool IsInitialized = True;
 
-//     if (IsInitialized)
-//     {
-//         IsInitialized = False;
-//         LastFrameTicks = SDL_GetTicks();
-//     }
+    if (IsInitialized)
+    {
+        IsInitialized = False;
+        LastFrameTicks = SDL_GetTicks();
+    }
 
-//     Uint64 ThisFrameTicks = SDL_GetTicks();
-//     Float32 DeltaSeconds = (ThisFrameTicks - LastFrameTicks) / 1000.0f;
-//     LastFrameTicks = ThisFrameTicks;
+    Uint64 ThisFrameTicks = SDL_GetTicks();
+    Float32 DeltaSeconds = (ThisFrameTicks - LastFrameTicks) / 1000.0f;
+    LastFrameTicks = ThisFrameTicks;
 
-//     return DeltaSeconds;
-// }
+    return DeltaSeconds;
+}
 
 static inline Int64 GetFileModTime(const char *Path)
 {
@@ -779,7 +775,9 @@ Void Update(SDL *App)
 {
     Assert(App);
 
-    // App->State.Time.Delta = GetDeltaSeconds();
+    Float32 DeltaSeconds = GetDeltaSeconds();
+
+    ResSetFloat(&App->World, DeltaTimeHash, DeltaSeconds);
 
     for (Uint32 I = 0; I < App->ModCount; ++I)
     {
@@ -887,9 +885,11 @@ SDL Init()
         {"EntAddComp", (void *)HostEntAddComp, "(iii)i", 0},
         {"EntGetComp", (void *)HostEntGetComp, "(iii)", 0},
 
-        {"ResGetID", (void *)HostResGetID, "(ii)i", 0},
-        {"ResGetVal", (void *)HostResGetVal, "(i)i", 0},
-        {"ResSetVal", (void *)HostResSetVal, "(ii)", 0},
+        {"ResGetUint", (void *)HostResGetUint, "(i)i", 0},
+        {"ResSetUint", (void *)HostResSetUint, "(ii)i", 0},
+
+        {"ResGetFloat", (void *)HostResGetFloat, "(i)f", 0},
+        {"ResSetFloat", (void *)HostResSetFloat, "(if)i", 0},
 
         {"IterInit", (void *)HostIterInit, "(iii)", 0},
         {"IterNext", (void *)HostIterNext, "(iii)i", 0},

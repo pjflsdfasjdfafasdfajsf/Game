@@ -17,6 +17,8 @@ typedef Uint32 EntID;
 typedef Uint32 ResID;
 #define ResID_Invalid 0xFFFFFFFF
 
+#define DeltaTimeHash HashCStr("DeltaTime")
+
 #define MaxIterComps 8
 
 typedef struct CompTypeResult
