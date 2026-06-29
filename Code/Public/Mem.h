@@ -65,6 +65,9 @@ Void MemStreamWriteU16LE(MemStream *S, Uint16 Val);
 Void MemStreamWriteU32LE(MemStream *S, Uint32 Val);
 Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size);
 
+Void MemStreamWriteBits(MemStream *S, Uint32 Val, Uint32 Num);
+Void MemStreamFlushBits(MemStream *S);
+
 //
 // NOTE: String utilities
 //

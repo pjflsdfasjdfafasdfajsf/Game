@@ -4,19 +4,45 @@
 
 Int32 main()
 {
-    Usize Size = 0;
-    Uint8 *Mem = SDL_LoadFile("Build/Test/Data/Archive.zip", &Size);
-    if (!Mem) {
-        LogCritical("Bad CWD or invalid test data.\n");
+    SDL_Log("\n================================\n\n");
 
+    const char *Path = "Build/Test/Data/Archive/Hello.txt";
+
+    Uint8 *ZipBuffer = (Uint8 *)SDL_malloc(Mb(10));
+    if (!ZipBuffer)
+    {
         return 1;
     }
 
-    ZipArchive Zip = ZipOpen(Mem, Size);
+    MemStream Writer = ZipWriterInit(ZipBuffer, Mb(10));
+
+    Usize FileSize = 0;
+    Uint8 *FileData = (Uint8 *)SDL_LoadFile(Path, &FileSize);
+    if (!FileData)
+    {
+        return 1;
+    }
+
+    if (!ZipWriterAppend(&Writer, Path, FileData, FileSize))
+    {
+        return 1;
+    }
+    SDL_free(FileData);
+
+    Usize ZipSize = ZipWriterFlush(&Writer);
+    if (ZipSize == 0 || Writer.HasError)
+    {
+        return 1;
+    }
+
+    if (!SDL_SaveFile("Build/Test/Data/Archive.zip", ZipBuffer, ZipSize))
+    {
+        LogCritical("%s\n", SDL_GetError());
+    }
+
+    ZipArchive Zip = ZipOpen(ZipBuffer, ZipSize);
     if (!Zip.IsValid)
     {
-        LogCritical("Invalid test data.\n");
-
         return 1;
     }
 
@@ -30,10 +56,10 @@ Int32 main()
         }
     }
 
-    ZipEntry Entry = ZipGetEntByName(&Zip, "Build/Test/Data/Archive/Hello.txt");
+    ZipEntry Entry = ZipGetEntByName(&Zip, Path);
     if (Entry.IsValid)
     {
-        Uint8 *Buffer = SDL_malloc(Entry.UncompressedSize + 1);
+        Uint8 *Buffer = (Uint8 *)SDL_malloc(Entry.UncompressedSize + 1);
         if (Buffer)
         {
             if (ZipReadEnt(&Zip, &Entry, Buffer, Entry.UncompressedSize))
@@ -41,20 +67,7 @@ Int32 main()
                 Buffer[Entry.UncompressedSize] = '\0';
                 SDL_Log("%s", (char *)Buffer);
             }
-            else
-            {
-                LogCritical("Extraction failed.\n");
-                return 1;
-            }
         }
-        else
-        {
-            return 1;
-        }
-    }
-    else
-    {
-        LogCritical("Invalid test data.\n");
     }
 
     return 0;

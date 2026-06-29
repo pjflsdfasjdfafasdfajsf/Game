@@ -4,6 +4,7 @@
 #if !defined(HOST_ZIP_H)
 #define HOST_ZIP_H
 
+#include "Public/Mem.h"
 #include "Public/Types.h"
 
 typedef struct
@@ -35,6 +36,8 @@ typedef struct
     Bool IsValid;
 } ZipArchive;
 
+// NOTE: Reader
+
 ZipArchive ZipOpen(const Uint8 *Mem, Usize Size);
 
 ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index);
@@ -43,5 +46,11 @@ ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File);
 Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize BufSize);
 // NOTE: Returns true if Ent name ends with Suffix
 Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix);
+
+// NOTE: Writer
+
+MemStream ZipWriterInit(Void *Buf, Usize Cap);
+Bool ZipWriterAppend(MemStream *S, const char *Name, const Uint8 *Mem, Usize Size);
+Usize ZipWriterFlush(MemStream *S);
 
 #endif

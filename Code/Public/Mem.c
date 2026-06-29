@@ -354,6 +354,51 @@ Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size)
     S->Pos += Size;
 }
 
+Void MemStreamWriteBits(MemStream *S, Uint32 Val, Uint32 Num)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    S->BitBuf |= (Val & ((1U << Num) - 1)) << S->BitCount;
+    S->BitCount += Num;
+
+    while (S->BitCount >= 8)
+    {
+        if (S->Pos >= S->Size)
+        {
+            S->HasError = True;
+            return;
+        }
+        S->Base[S->Pos++] = (Uint8)(S->BitBuf & 0xFF);
+        S->BitBuf >>= 8;
+        S->BitCount -= 8;
+    }
+}
+
+Void MemStreamFlushBits(MemStream *S)
+{
+    Assert(S);
+    if (S->HasError)
+    {
+        return;
+    }
+
+    if (S->BitCount > 0)
+    {
+        if (S->Pos >= S->Size)
+        {
+            S->HasError = True;
+            return;
+        }
+        S->Base[S->Pos++] = (Uint8)(S->BitBuf & 0xFF);
+        S->BitBuf = 0;
+        S->BitCount = 0;
+    }
+}
+
 //
 // NOTE: String utilities
 //

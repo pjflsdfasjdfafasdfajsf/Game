@@ -116,17 +116,15 @@ $(BUILD_DIR)/Game.zip: $(BUILD_DIR)/Game.wasm Code/Game/Manifest.txt $(BUILD_DIR
 #
 # NOTE: Tests
 # 
-$(TEST_DATA_DIR)/Archive.zip: | $(TEST_DATA_DIR)
+$(TEST_DATA_DIR)/Archive: | $(TEST_DATA_DIR)
 	@mkdir -p $(TEST_DATA_DIR)/Archive
 	@echo "Hi i love u <3 AAAAAAANBBBBBCBCCCBCBCABAAAABCBCBCBABA" > $(TEST_DATA_DIR)/Archive/Hello.txt
 	@echo "Imagine this is a cool binary" > $(TEST_DATA_DIR)/Archive/SomeAsset.bin
-	@rm -f $@
-	$(ZIP) -9 -r $@ $(TEST_DATA_DIR)/Archive >/dev/null
 
 $(OBJ_DIR)/Test/%.o: Code/Host/%.c | $(OBJ_DIR)/Test
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(TEST_DIR)/Zip: $(TEST_OBJS) $(BUILD_DIR)/libSDK.a $(TEST_DATA_DIR)/Archive.zip | $(TEST_DIR)
+$(TEST_DIR)/Zip: $(TEST_OBJS) $(BUILD_DIR)/libSDK.a $(TEST_DATA_DIR)/Archive | $(TEST_DIR)
 	$(CC) $(LDFLAGS) $(TEST_OBJS) $(BUILD_DIR)/libSDK.a $(SDL3_LIB) $(SYSTEM_LIBS) -o $@
 
 test: $(TEST_DIR)/Zip
