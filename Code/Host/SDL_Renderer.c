@@ -4,6 +4,7 @@
 #include "SDL_Renderer.h"
 #include "Host/Ent.h"
 #include "Public/Ent.h"
+#include "SDL3/SDL_render.h"
 
 //
 // NOTE: Internal
@@ -104,6 +105,12 @@ Renderer RendererInit(SDL_Window *Window)
     Result.TexCount++;
 
     if (!SDL_SetRenderLogicalPresentation(Result.SDL, 1280, 720, SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    {
+        Result.IsValid = False;
+        return Result;
+    }
+
+    if (!SDL_SetRenderVSync(Result.SDL, 1))
     {
         Result.IsValid = False;
         return Result;
