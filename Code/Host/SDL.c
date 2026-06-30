@@ -2,6 +2,7 @@
 #include "Host/Ent.h"
 #include "KeyValue.h"
 #include "Public/Ent.h"
+#include "Public/Input.h"
 #include "Runtime.h"
 #include "SDL_Renderer.h"
 
@@ -494,23 +495,23 @@ static Void HostGetInputState(wasm_exec_env_t ExecEnv, Uint32 OutPtrOffset, Inpu
 // NOTE: Internal
 //
 
-// static inline Float32 GetDeltaSeconds()
-// {
-//     static Uint64 LastFrameTicks = 0;
-//     static Bool IsInitialized = True;
+static inline Float32 GetDeltaSeconds()
+{
+    static Uint64 LastFrameTicks = 0;
+    static Bool IsInitialized = True;
 
-//     if (IsInitialized)
-//     {
-//         IsInitialized = False;
-//         LastFrameTicks = SDL_GetTicks();
-//     }
+    if (IsInitialized)
+    {
+        IsInitialized = False;
+        LastFrameTicks = SDL_GetTicks();
+    }
 
-//     Uint64 ThisFrameTicks = SDL_GetTicks();
-//     Float32 DeltaSeconds = (ThisFrameTicks - LastFrameTicks) / 1000.0f;
-//     LastFrameTicks = ThisFrameTicks;
+    Uint64 ThisFrameTicks = SDL_GetTicks();
+    Float32 DeltaSeconds = (ThisFrameTicks - LastFrameTicks) / 1000.0f;
+    LastFrameTicks = ThisFrameTicks;
 
-//     return DeltaSeconds;
-// }
+    return DeltaSeconds;
+}
 
 static inline Int64 GetFileModTime(const char *Path)
 {
@@ -966,6 +967,12 @@ static inline Int32 GetKeyIndex(SDL_Scancode Code)
         return Key_S;
     case SDL_SCANCODE_D:
         return Key_D;
+    case SDL_SCANCODE_E:
+        return Key_E;
+    case SDL_SCANCODE_SPACE:
+        return Key_Space;
+    case SDL_SCANCODE_LSHIFT:
+        return Key_Shift;
     default:
         return -1;
     }

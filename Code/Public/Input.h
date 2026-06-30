@@ -17,6 +17,10 @@ typedef enum Input
     Key_A,
     Key_S,
     Key_D,
+    Key_E,
+
+    Key_Space,
+    Key_Shift,
 
     Button_Left,
     Button_Right,

@@ -21,8 +21,8 @@
 typedef Void InitFunction(Void);
 #define Init(Name) Export("Init") Void Init(Void)
 
-typedef Void UpdateAndRenderFunction(Void);
-#define UpdateAndRender(Name) Export("UpdateAndRender") Void Name(Void)
+typedef Void UpdateAndRenderFunction(Float32 DeltaTime);
+#define UpdateAndRender(Name) Export("UpdateAndRender") Void Name(Float32 DeltaTime)
 
 //
 // NOTE: Imports.
