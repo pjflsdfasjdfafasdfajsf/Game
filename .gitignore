@@ -2,3 +2,5 @@
 
 zig-out
 zig-pkg
+
+compile_flags.txt

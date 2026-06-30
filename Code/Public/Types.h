@@ -21,6 +21,7 @@ typedef void Void;
 typedef float Float32;
 typedef double Float64;
 typedef size_t Usize;
+typedef intptr_t Iptr;
 
 #define True 1
 #define False 0
