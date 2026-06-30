@@ -1,8 +1,4 @@
 #include "SDL.h"
-#include "Host/Ent.h"
-#include "KeyValue.h"
-#include "Public/Ent.h"
-#include "SDL_Renderer.h"
 
 // 
 // NOTE: Implementation
@@ -29,20 +25,6 @@ SDL Init()
         LogCritical("%s", SDL_GetError());
         Assert(0);
     }
-
-    Result.Renderer = RendererInit(Result.Window);
-    if (!Result.Renderer.IsValid)
-    {
-        LogCritical("%s", SDL_GetError());
-        Assert(0);
-    }
-
-    //
-    // NOTE: Built-in components.
-    //
-
-    CompInit(&Result.World, CompTransformHash, sizeof(CompTransform));
-    CompInit(&Result.World, CompRenderableHash, sizeof(CompRenderable));
 
     return Result;
 }

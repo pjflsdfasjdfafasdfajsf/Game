@@ -2,64 +2,12 @@
 #include "Types.h"
 
 //
-// NOTE: MemAlloc
-//
-
-#define MemAllocDefaultAlign 4
-
-MemAlloc MemAllocInit(void *Mem, Uint32 Cap)
-{
-    MemAlloc Result = {};
-
-    Assert(Mem);
-    Assert(Cap > 0);
-
-    Result.Base = (Uint8 *)Mem;
-    Result.Cap = Cap;
-    Result.Used = 0;
-
-    return Result;
-}
-
-Void *MemAllocPushEx(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align)
-{
-    Assert(Bytes > 0);
-    Assert(IsPow2(Align));
-
-    Uint32 Offset = AlignUp(MemAlloc->Used, Align);
-    Uint32 Req = Offset + Bytes;
-
-    Bool HasSpace = Req <= MemAlloc->Cap;
-    Assert(HasSpace);
-
-    if (HasSpace)
-    {
-        Void *Result = MemAlloc->Base + Offset;
-        MemAlloc->Used = Req;
-
-        return Result;
-    }
-
-    return 0;
-}
-
-Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes)
-{
-    return MemAllocPushEx(MemAlloc, Bytes, MemAllocDefaultAlign);
-}
-
-Void MemAllocClear(MemAlloc *MemAlloc)
-{
-    MemAlloc->Used = 0;
-}
-
-//
 // NOTE: Memory Reader
 //
 
-MemStream MemStreamInit(const Void *Mem, Usize Size)
+Mem_Stream Mem_Stream_Init(const Void *Mem, Usize Size)
 {
-    MemStream Result = {};
+    Mem_Stream Result = {};
 
     Result.Base = (Uint8 *)Mem;
     Result.Size = Size;
@@ -68,7 +16,7 @@ MemStream MemStreamInit(const Void *Mem, Usize Size)
     return Result;
 }
 
-Void MemStreamSeek(MemStream *S, Usize Pos)
+Void Mem_Stream_Seek(Mem_Stream *S, Usize Pos)
 {
     Assert(S);
     if (S->HasError)
@@ -88,7 +36,7 @@ Void MemStreamSeek(MemStream *S, Usize Pos)
     S->BitCount = 0;
 }
 
-Void MemStreamSkip(MemStream *S, Usize Bytes)
+Void MemStreamSkip(Mem_Stream *S, Usize Bytes)
 {
     Assert(S);
     if (S->HasError)
@@ -105,7 +53,7 @@ Void MemStreamSkip(MemStream *S, Usize Bytes)
     S->Pos += Bytes;
 }
 
-Uint16 MemStreamReadU16LE(MemStream *S)
+Uint16 Mem_Stream_ReadU16LE(Mem_Stream *S)
 {
     Assert(S);
     if (S->HasError)
@@ -127,7 +75,7 @@ Uint16 MemStreamReadU16LE(MemStream *S)
     return Result;
 }
 
-Uint32 MemStreamReadU32LE(MemStream *S)
+Uint32 Mem_Stream_ReadU32LE(Mem_Stream *S)
 {
     Assert(S);
     if (S->HasError)
@@ -151,7 +99,7 @@ Uint32 MemStreamReadU32LE(MemStream *S)
     return Result;
 }
 
-const Uint8 *MemStreamReadBytes(MemStream *S, Usize Bytes)
+const Uint8 *Mem_Stream_ReadBytes(Mem_Stream *S, Usize Bytes)
 {
     Assert(S);
     if (S->HasError)
@@ -171,7 +119,7 @@ const Uint8 *MemStreamReadBytes(MemStream *S, Usize Bytes)
     return Result;
 }
 
-Void MemStreamRefillBits(MemStream *S, Uint32 Num)
+Void Mem_Stream_RefillBits(Mem_Stream *S, Uint32 Num)
 {
     Assert(S);
     Assert(Num <= 24);
@@ -197,7 +145,7 @@ Void MemStreamRefillBits(MemStream *S, Uint32 Num)
     }
 }
 
-Uint32 MemStreamGetBits(MemStream *S, Uint32 Num)
+Uint32 Mem_Stream_GetBits(Mem_Stream *S, Uint32 Num)
 {
     Assert(S);
     Assert(Num <= 24);
@@ -207,7 +155,7 @@ Uint32 MemStreamGetBits(MemStream *S, Uint32 Num)
         return 0;
     }
 
-    MemStreamRefillBits(S, Num);
+    Mem_Stream_RefillBits(S, Num);
     if (S->HasError)
     {
         return 0;
@@ -227,7 +175,7 @@ Uint32 MemStreamGetBits(MemStream *S, Uint32 Num)
     return Value;
 }
 
-Uint32 MemStreamGetBitsBase(MemStream *S, Uint32 Num, Uint32 Base)
+Uint32 MemS_tream_GetBitsBase(Mem_Stream *S, Uint32 Num, Uint32 Base)
 {
     Assert(S);
 
@@ -239,13 +187,13 @@ Uint32 MemStreamGetBitsBase(MemStream *S, Uint32 Num, Uint32 Base)
     Uint32 Extra = 0;
     if (Num > 0)
     {
-        Extra = MemStreamGetBits(S, Num);
+        Extra = Mem_Stream_GetBits(S, Num);
     }
 
     return Base + Extra;
 }
 
-Void MemStreamAlignToByteBoundary(MemStream *S)
+Void Mem_Stream_AlignToByteBoundary(Mem_Stream *S)
 {
     Assert(S);
 
@@ -274,7 +222,7 @@ Void MemStreamAlignToByteBoundary(MemStream *S)
     S->BitCount = 0;
 }
 
-Void MemStreamWriteU8(MemStream *S, Uint8 Val)
+Void Mem_Stream_WriteU8(Mem_Stream *S, Uint8 Val)
 {
     Assert(S);
     if (S->HasError)
@@ -291,7 +239,7 @@ Void MemStreamWriteU8(MemStream *S, Uint8 Val)
     S->Base[S->Pos++] = Val;
 }
 
-Void MemStreamWriteU16LE(MemStream *S, Uint16 Val)
+Void Mem_Stream_WriteU16LE(Mem_Stream *S, Uint16 Val)
 {
     Assert(S);
     if (S->HasError)
@@ -309,7 +257,7 @@ Void MemStreamWriteU16LE(MemStream *S, Uint16 Val)
     S->Base[S->Pos++] = (Uint8)((Val >> 8) & 0xff);
 }
 
-Void MemStreamWriteU32LE(MemStream *S, Uint32 Val)
+Void Mem_Stream_WriteU32LE(Mem_Stream *S, Uint32 Val)
 {
     Assert(S);
     if (S->HasError)
@@ -329,7 +277,7 @@ Void MemStreamWriteU32LE(MemStream *S, Uint32 Val)
     S->Base[S->Pos++] = (Uint8)((Val >> 24) & 0xff);
 }
 
-Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size)
+Void Mem_Stream_WriteBytes(Mem_Stream *S, const Void *Bytes, Usize Size)
 {
     Assert(S);
     if (S->HasError)
@@ -350,11 +298,11 @@ Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size)
         return;
     }
 
-    MemCopy(S->Base + S->Pos, Bytes, Size);
+    Mem_Copy(S->Base + S->Pos, Bytes, Size);
     S->Pos += Size;
 }
 
-Void MemStreamWriteBits(MemStream *S, Uint32 Val, Uint32 Num)
+Void Mem_Stream_WriteBits(Mem_Stream *S, Uint32 Val, Uint32 Num)
 {
     Assert(S);
     if (S->HasError)
@@ -378,7 +326,7 @@ Void MemStreamWriteBits(MemStream *S, Uint32 Val, Uint32 Num)
     }
 }
 
-Void MemStreamFlushBits(MemStream *S)
+Void Mem_Stream_FlushBits(Mem_Stream *S)
 {
     Assert(S);
     if (S->HasError)
@@ -403,7 +351,7 @@ Void MemStreamFlushBits(MemStream *S)
 // NOTE: String utilities
 //
 
-Uint32 CStrLen(const char *CStr)
+Uint32 Mem_CStrLen(const char *CStr)
 {
     Assert(CStr);
 
@@ -420,7 +368,7 @@ Uint32 CStrLen(const char *CStr)
 // NOTE: Memory utilities
 //
 
-Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size)
+Void Mem_Copy(Void *DestInit, const Void *SrcInit, Usize Size)
 {
     Assert(DestInit);
     Assert(SrcInit);
@@ -439,7 +387,7 @@ Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size)
     }
 }
 
-Bool MemEql(const Void *A, const Void *B, Usize Size)
+Bool Mem_Eql(const Void *A, const Void *B, Usize Size)
 {
     const Uint8 *ByteA = (const Uint8 *)A;
     const Uint8 *ByteB = (const Uint8 *)B;
@@ -453,7 +401,7 @@ Bool MemEql(const Void *A, const Void *B, Usize Size)
     return True;
 }
 
-Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
+Void Mem_NullTerminate(char *Buf, Usize Cap, Usize Len)
 {
     Assert(Buf);
     Assert(Cap > 0);
@@ -468,7 +416,7 @@ Void MemNullTerminate(char *Buf, Usize Cap, Usize Len)
     }
 }
 
-const char *MemFindChar(const char *Start, const char *End, char Target)
+const char *Mem_FindChar(const char *Start, const char *End, char Target)
 {
     Assert(Start);
     Assert(End >= Start);
@@ -483,7 +431,7 @@ const char *MemFindChar(const char *Start, const char *End, char Target)
     return 0;
 }
 
-Uint32 MemParseUint(const char **CurInit)
+Uint32 Mem_ParseUint(const char **CurInit)
 {
     Uint32 Result = 0;
 
@@ -503,7 +451,7 @@ Uint32 MemParseUint(const char **CurInit)
     return Result;
 }
 
-Void MemAdvanceToNextLine(const char **CurInit, const char *End)
+Void Mem_AdvanceToNextLine(const char **CurInit, const char *End)
 {
     Assert(CurInit);
     Assert(*CurInit);
@@ -529,7 +477,7 @@ Void MemAdvanceToNextLine(const char **CurInit, const char *End)
 //
 
 // NOTE: From a path 'Foo/Bar/Baz.png' returns 'Baz.png'.
-const char *GetBaseName(const char *Path, Uint32 Len)
+const char *Mem_GetBaseName(const char *Path, Uint32 Len)
 {
     const char *Result = Path;
 

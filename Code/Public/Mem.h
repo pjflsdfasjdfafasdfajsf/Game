@@ -8,23 +8,6 @@
 
 #define MemSize Mb(2)
 
-// NOTE: This is a simple bump allocator.
-typedef struct
-{
-    Uint8 *Base;
-    Uint32 Cap;
-    Uint32 Used;
-} MemAlloc;
-
-MemAlloc MemAllocInit(void *Mem, Uint32 Cap);
-
-// NOTE: If you stumbled upon this accidentally -- use MemAllocPush. This
-// function is for more complex usecases when you need alignment.
-Void *MemAllocPushEx(MemAlloc *MemAlloc, Uint32 Bytes, Uint32 Align);
-Void *MemAllocPush(MemAlloc *MemAlloc, Uint32 Bytes);
-
-Void MemAllocClear(MemAlloc *MemAlloc);
-
 //
 // NOTE: Memory Reader
 //
@@ -39,58 +22,58 @@ typedef struct
     Uint32 BitCount;
 
     Bool HasError;
-} MemStream;
+} Mem_Stream;
 
-MemStream MemStreamInit(const Void *Mem, Usize Size);
+Mem_Stream Mem_Stream_Init(const Void *Mem, Usize Size);
 
-Void MemStreamSeek(MemStream *S, Usize Pos);
-Void MemStreamSkip(MemStream *S, Usize Bytes);
+Void Mem_Stream_Seek(Mem_Stream *S, Usize Pos);
+Void MemStreamSkip(Mem_Stream *S, Usize Bytes);
 
 // NOTE: Read functions.
 
-Uint16 MemStreamReadU16LE(MemStream *S);
-Uint32 MemStreamReadU32LE(MemStream *S);
-const Uint8 *MemStreamReadBytes(MemStream *S, Usize Bytes);
+Uint16 Mem_Stream_ReadU16LE(Mem_Stream *S);
+Uint32 Mem_Stream_ReadU32LE(Mem_Stream *S);
+const Uint8 *Mem_Stream_ReadBytes(Mem_Stream *S, Usize Bytes);
 
-Void MemStreamRefillBits(MemStream *S, Uint32 Num);
-Uint32 MemStreamGetBits(MemStream *S, Uint32 Num);
-Uint32 MemStreamGetBitsBase(MemStream *S, Uint32 Num, Uint32 Base);
-Void MemStreamAlignToByteBoundary(MemStream *S);
+Void Mem_Stream_RefillBits(Mem_Stream *S, Uint32 Num);
+Uint32 Mem_Stream_GetBits(Mem_Stream *S, Uint32 Num);
+Uint32 MemS_tream_GetBitsBase(Mem_Stream *S, Uint32 Num, Uint32 Base);
+Void Mem_Stream_AlignToByteBoundary(Mem_Stream *S);
 
 // NOTE: Write functions.
 
-Void MemStreamWriteU8(MemStream *S, Uint8 Val);
-Void MemStreamWriteU16LE(MemStream *S, Uint16 Val);
-Void MemStreamWriteU32LE(MemStream *S, Uint32 Val);
-Void MemStreamWriteBytes(MemStream *S, const Void *Bytes, Usize Size);
+Void Mem_Stream_WriteU8(Mem_Stream *S, Uint8 Val);
+Void Mem_Stream_WriteU16LE(Mem_Stream *S, Uint16 Val);
+Void Mem_Stream_WriteU32LE(Mem_Stream *S, Uint32 Val);
+Void Mem_Stream_WriteBytes(Mem_Stream *S, const Void *Bytes, Usize Size);
 
-Void MemStreamWriteBits(MemStream *S, Uint32 Val, Uint32 Num);
-Void MemStreamFlushBits(MemStream *S);
+Void Mem_Stream_WriteBits(Mem_Stream *S, Uint32 Val, Uint32 Num);
+Void Mem_Stream_FlushBits(Mem_Stream *S);
 
 //
 // NOTE: String utilities
 //
 
-Uint32 CStrLen(const char *CStr);
+Uint32 Mem_CStrLen(const char *CStr);
 
 //
 // NOTE: Memory utilities
 //
 
-Void MemCopy(Void *DestInit, const Void *SrcInit, Usize Size);
-Bool MemEql(const Void *A, const Void *B, Usize Size);
-Void MemNullTerminate(char *Buf, Usize Cap, Usize Len);
+Void Mem_Copy(Void *DestInit, const Void *SrcInit, Usize Size);
+Bool Mem_Eql(const Void *A, const Void *B, Usize Size);
+Void Mem_NullTerminate(char *Buf, Usize Cap, Usize Len);
 
-const char *MemFindChar(const char *Start, const char *End, char Target);
-Uint32 MemParseUint(const char **CurInit);
+const char *Mem_FindChar(const char *Start, const char *End, char Target);
+Uint32 Mem_ParseUint(const char **CurInit);
 
-Void MemAdvanceToNextLine(const char **CurInit, const char *End);
+Void Mem_AdvanceToNextLine(const char **CurInit, const char *End);
 
 //
 // NOTE: Misc
 //
 
 // NOTE: From a path 'Foo/Bar/Baz.png' returns 'Baz.png'.
-const char *GetBaseName(const char *Path, Uint32 Len);
+const char *Mem_GetBaseName(const char *Path, Uint32 Len);
 
 #endif

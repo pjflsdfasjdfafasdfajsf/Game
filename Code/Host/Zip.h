@@ -18,9 +18,7 @@ typedef struct
     // NOTE: Offset to the Local File Header
     Uint32 LocalHeaderOffset;
     Uint32 Crc32;
-
-    Bool IsValid;
-} ZipEntry;
+} Zip_Entry;
 
 typedef struct
 {
@@ -30,27 +28,25 @@ typedef struct
     Uint32 CdOffset;
     // NOTE: Total bytes in the Central Directory
     Uint32 CdSize;
-    // NOTE: Total tnries in the archive
+    // NOTE: Total entries in the archive
     Uint16 Count;
-
-    Bool IsValid;
-} ZipArchive;
+} Zip_Archive;
 
 // NOTE: Reader
 
-ZipArchive ZipOpen(const Uint8 *Mem, Usize Size);
+Result Zip_Open(const Uint8 *Mem, Usize Size, Zip_Archive *OutZip);
 
-ZipEntry ZipGetEntByIndex(const ZipArchive *Zip, Uint32 Index);
-ZipEntry ZipGetEntByName(const ZipArchive *Zip, const char *File);
+Result Zip_Entry_GetByIndex(const Zip_Archive *Zip, Uint32 Index, Zip_Entry *OutEnt);
+Result Zip_Entry_GetByName(const Zip_Archive *Zip, const char *File, Zip_Entry *OutEnt);
 
-Bool ZipReadEnt(const ZipArchive *Zip, const ZipEntry *Ent, Uint8 *Buf, Usize BufSize);
+Result Zip_Entry_Read(const Zip_Archive *Zip, const Zip_Entry *Ent, Uint8 *Buf, Usize BufSize);
 // NOTE: Returns true if Ent name ends with Suffix
-Bool ZipEntEndsWith(const ZipEntry *Ent, const char *Suffix);
+Bool Zip_Entry_EndsWith(const Zip_Entry *Ent, const char *Suffix);
 
 // NOTE: Writer
 
-MemStream ZipWriterInit(Void *Buf, Usize Cap);
-Bool ZipWriterAppend(MemStream *S, const char *Name, const Uint8 *Mem, Usize Size);
-Usize ZipWriterFlush(MemStream *S);
+Mem_Stream Zip_Writer_Init(Void *Buf, Usize Cap);
+Result Zip_Writer_Append(Mem_Stream *S, const char *Name, const Uint8 *Mem, Usize Size);
+Result Zip_Writer_Flush(Mem_Stream *S, Usize *OutWritten);
 
 #endif

@@ -26,7 +26,6 @@ pub fn build(b: *std.Build) void {
     });
     sdk.root_module.addCSourceFiles(.{
         .files = &.{
-            "Code/Public/Ent.c",
             "Code/Public/Math.c",
             "Code/Public/Mem.c",
         },
@@ -48,8 +47,6 @@ pub fn build(b: *std.Build) void {
         .files = &.{
             "Code/Host/Main.c",
             "Code/Host/SDL.c",
-            "Code/Host/SDL_Renderer.c",
-            "Code/Host/Ent.c",
         },
     });
     host.root_module.addIncludePath(b.path("Code"));

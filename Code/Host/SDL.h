@@ -3,7 +3,6 @@
 
 #include <SDL3/SDL.h>
 
-#include "SDL_Renderer.h"
 #include "Zip.h"
 
 enum
@@ -16,14 +15,6 @@ enum
 typedef struct
 {
     SDL_Window *Window;
-
-    Renderer Renderer;
-    // TODO: I don't know if it's best way to do that or the other way.
-    // By 'other way' I mean passing this around to everyone as parameter in
-    // UpdateAndRender.
-    //
-    // UPDATE: The other way is better
-    World World;
 } SDL;
 
 // NOTE: On any failures all of these function just traps the process.

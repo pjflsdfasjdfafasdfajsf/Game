@@ -25,6 +25,23 @@ typedef size_t Usize;
 #define True 1
 #define False 0
 
+// NOTE: Generic result.
+typedef struct
+{
+    Bool Error;
+    const char *Msg;
+} Result;
+
+static inline Result Result_MakeError(const char *Msg)
+{
+    return (Result){True, Msg};
+}
+
+static inline Result Result_Success(Void)
+{
+    return (Result){False, 0};
+}
+
 //
 // NOTE: Compilerz.
 //
